@@ -14,8 +14,8 @@ android {
         applicationId = "com.ronan.qmusicwatch"
         minSdk = 24
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.7.1"
+        versionCode = 19
+        versionName = "0.7.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartext"] = "false"
     }
