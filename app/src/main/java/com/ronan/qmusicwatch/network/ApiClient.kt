@@ -41,20 +41,39 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
         when (value) { is JsonObject -> { yield(value); value.values.forEach { yieldAll(objects(it)) } }; is JsonArray -> value.forEach { yieldAll(objects(it)) }; else -> Unit }
     }
     val all = objects(root).toList()
-    fun value(vararg names: String) = all.firstNotNullOfOrNull { item -> names.firstNotNullOfOrNull { name -> (item[name] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) } }
-    val name = value("nick", "nickname", "nickName", "userName").orEmpty()
-    val avatar = value("headurl", "headUrl", "headPic", "headPicUrl", "avatarUrl", "avatar", "picurl", "pic").orEmpty().let { if (it.startsWith("//")) "https:$it" else it.replace("http://", "https://") }
-    val vipRaw = value("isVip", "is_vip", "vipFlag", "vip_flag", "vipStatus", "vip_type", "vipType")
-    val isVip = vipRaw?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 }
-    val expireRaw = value("vipEndTime", "vip_end_time", "vipExpireTime", "expireTime", "expire_time", "endTime", "end_time")?.toLongOrNull()
-    val expire = expireRaw?.let { if (it > 10_000_000_000L) it / 1000 else it }?.takeIf { it > 0 }
-    val vipName = value("vipName", "vip_name", "vipLevelName", "levelName").orEmpty()
+    fun JsonObject.value(vararg names: String) = names.firstNotNullOfOrNull { name -> (this[name] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+    val identity = all.firstOrNull { it.value("nick", "nickname", "nickName", "userName") != null }
+    val name = identity?.value("nick", "nickname", "nickName", "userName").orEmpty()
+    val avatarKeys = arrayOf("headurl", "headUrl", "headpic", "headPic", "head_pic", "headPicUrl", "avatarurl", "avatarUrl")
+    val avatar = (identity?.value(*avatarKeys) ?: all.firstNotNullOfOrNull { it.value(*avatarKeys) }).orEmpty().let { if (it.startsWith("//")) "https:$it" else it.replace("http://", "https://") }
+    val now = System.currentTimeMillis() / 1000
+    val memberships = all.map { item ->
+        val raw = item.value("isVip", "is_vip", "isSVip", "is_svip", "vipFlag", "vip_flag", "svipFlag", "svip_status", "vipStatus", "vip_type", "vipType")
+        val enabled = raw?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 }
+        val end = item.value("vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime", "vipExpireTime", "vipExpireDate", "expireTime", "expire_time", "expireDate", "endTime", "end_time", "endDate")?.let(::profileEpoch)
+        var label = item.value("vipName", "vip_name", "vipLevelName", "levelName", "svipName").orEmpty()
+        if (label.contains("svip", true) || label.contains("超级") || item.value("isSVip", "is_svip", "svipFlag", "svip_status")?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 } == true) label = "超级会员"
+        else if (label.contains("绿钻")) label = "豪华绿钻"
+        Triple(enabled, end, label)
+    }
+    val active = memberships.filter { it.first == true || (it.second ?: 0) > now }.maxByOrNull { it.second ?: 0 }
+    val expire = active?.second ?: memberships.mapNotNull { it.second }.maxOrNull()
+    val isVip = when { active != null -> true; memberships.any { it.first == false } -> false; else -> null }
+    val vipName = active?.third?.ifBlank { "QQ 音乐会员" }.orEmpty()
     return UserProfile(name, avatar, isVip, expire, vipName).takeIf { it.displayName.isNotBlank() || it.avatarUrl.isNotBlank() || it.isVip != null || it.vipExpireAt != null }
+}
+
+private fun profileEpoch(value: String): Long? {
+    val digits = value.filter(Char::isDigit)
+    if (digits.length == 8 && digits.startsWith("20")) return runCatching { java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).parse(digits)?.time?.div(1000) }.getOrNull()
+    return digits.toLongOrNull()?.let { if (it > 10_000_000_000L) it / 1000 else it }?.takeIf { it > 0 }
 }
 
 internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {
     if (values.isEmpty()) return null
-    return UserProfile(values.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(), values.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(), values.firstNotNullOfOrNull { it.isVip }, values.firstNotNullOfOrNull { it.vipExpireAt }, values.firstNotNullOfOrNull { it.vipName.takeIf(String::isNotBlank) }.orEmpty())
+    val expire = values.mapNotNull(UserProfile::vipExpireAt).maxOrNull()
+    val isVip = when { values.any { it.isVip == true } || expire?.let { it > System.currentTimeMillis() / 1000 } == true -> true; values.any { it.isVip == false } -> false; else -> null }
+    return UserProfile(values.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(), values.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(), isVip, expire, values.firstNotNullOfOrNull { it.takeIf { profile -> profile.isVip == true }?.vipName?.takeIf(String::isNotBlank) } ?: values.firstNotNullOfOrNull { it.vipName.takeIf(String::isNotBlank) }.orEmpty())
 }
 
 internal fun parseSearchTrack(item: JsonObject): Track? {
