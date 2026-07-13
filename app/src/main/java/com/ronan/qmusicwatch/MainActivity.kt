@@ -2,6 +2,7 @@ package com.ronan.qmusicwatch
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -45,8 +46,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,6 +71,7 @@ import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.login.MusicCookie
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.model.*
+import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -98,6 +104,9 @@ class MainActivity : ComponentActivity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideStatusBar()
     }
+
+    override fun onResume() { super.onResume(); FramePerformanceMonitor.start() }
+    override fun onPause() { FramePerformanceMonitor.stop(); super.onPause() }
 
     private fun hideStatusBar() = WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.statusBars())
 }
@@ -134,7 +143,12 @@ class MainActivity : ComponentActivity() {
     val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
     val queueReversed by vm.queueReversed.collectAsStateWithLifecycle()
     val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { AppLog.write("PERF", "startup_ui_ready_ms=${android.os.SystemClock.elapsedRealtime() - QMusicApplication.processStartedAt}") }
     val snackbar = remember { SnackbarHostState() }
+    DisposableEffect(backStack?.destination?.route) {
+        FramePerformanceMonitor.section = backStack?.destination?.route ?: "home"
+        onDispose { }
+    }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); vm.consumeMessage() } }
     LaunchedEffect(state.playEvent, autoOpenPlayer) {
         if (state.playEvent != 0L && autoOpenPlayer && state.currentTrack != null && backStack?.destination?.route != "player") nav.navigate("player") { launchSingleTop = true }
@@ -159,7 +173,7 @@ class MainActivity : ComponentActivity() {
                     nav.navigate("login") { popUpTo("home") }
                 }) { nav.popBackStack() }
             }
-            composable("settings/about") { AboutScreen(vm) { nav.popBackStack() } }
+            composable("settings/about") { AboutScreen(vm, state.releaseInfo, state.updateChecking) { nav.popBackStack() } }
         }
     }
     state.pendingSpeakerTrack?.let { track ->
@@ -181,11 +195,13 @@ class MainActivity : ComponentActivity() {
         HorizontalPager(state = pager, modifier = Modifier.weight(1f), beyondViewportPageCount = 1) { page ->
             if (page == 0) LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { Spacer(Modifier.height(8.dp)); Text("QMusic Watch", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("第三方非官方客户端", color = Color.Gray) }
+                if (state.offlineSnapshot) item { Text("离线内容 · 联网后自动刷新", color = Color(0xFFFFC857), fontSize = 13.sp) }
                 item { FilledTonalButton({ nav.navigate("search") }, Modifier.fillMaxWidth().height(58.dp), shape = RoundedCornerShape(18.dp)) { Icon(Icons.Default.Search, null); Spacer(Modifier.width(7.dp)); Text("搜索歌曲、歌单、歌手、专辑") } }
                 item { SectionTitle("每日推荐", "换一换") { if (daily.isNotEmpty()) dailyOffset = (dailyOffset + dailyCount) % daily.size } }
                 items(shown, key = { it.id }) { TrackRow(it, vm, queue = shown) }
             } else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { Spacer(Modifier.height(8.dp)); Text("我的", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+                if (state.offlineSnapshot) item { Text("离线内容 · 显示上次同步结果", color = Color(0xFFFFC857), fontSize = 13.sp) }
                 item {
                     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = Surface) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -479,12 +495,21 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     }
 }
 
-@Composable private fun AboutScreen(vm: AppViewModel, onBack: () -> Unit) = LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+@Composable private fun AboutScreen(vm: AppViewModel, release: ReleaseInfo?, checking: Boolean, onBack: () -> Unit) {
+    val context = LocalContext.current
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item { SettingsHeader("关于", onBack) }
     item { ListItem(headlineContent = { Text("QMusic Watch") }, supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME}\n第三方非官方、开源、非商业客户端") }) }
     item { ListItem(headlineContent = { Text("开发者") }, supportingContent = { Text("Ronan") }, leadingContent = { Icon(Icons.Default.Code, null, tint = Green) }) }
+    item { OutlinedButton(vm::checkForUpdate, Modifier.fillMaxWidth(), enabled = !checking) { if (checking) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Default.SystemUpdate, null); Spacer(Modifier.width(7.dp)); Text(if (checking) "正在检查" else "检查 GitHub 更新") } }
+    release?.let { info ->
+        item { ListItem(headlineContent = { Text(if (info.newer) "发现 ${info.tag}" else "最新版本 ${info.tag}") }, supportingContent = { Text(buildString { append(info.title); if (info.notes.isNotBlank()) append("\n${info.notes.take(240)}"); append("\nAPK SHA-256：${info.sha256.ifBlank { "发布页未提供" }}") }) }) }
+        val openUrl = info.apkUrl.ifBlank { info.pageUrl }
+        if (openUrl.isNotBlank()) item { Button({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(openUrl))) }, Modifier.fillMaxWidth()) { Text(if (info.apkUrl.isNotBlank()) "打开 APK 下载" else "打开 Release 页面") } }
+    }
     item { Text("本项目与腾讯或 QQ 音乐无隶属、赞助或认可关系。不绕过会员、地区、付费或 DRM 限制。", color = Color.Gray) }
     item { Text("开源与致谢", fontWeight = FontWeight.Bold); Text("QQMusicApi（GPL-3.0，未复制代码）\nQQmusic-API（Apache-2.0，协议实现参考）\nTides-WearOS（GPL-3.0，未复制代码）\nHorologist（Apache-2.0）\nHeyWear（MIT）", color = Color.Gray, fontSize = 14.sp) }
+    }
 }
 
 @Composable private fun SettingsScreen(
@@ -539,8 +564,12 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     var saveDialog by remember { mutableStateOf(false) }
     var importDialog by remember { mutableStateOf(false) }
     var playlistTitle by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    val haptics = LocalHapticFeedback.current
+    val view = LocalView.current
+    val edgePx = with(androidx.compose.ui.platform.LocalDensity.current) { 72.dp.toPx() }
     val shown = remember(queue, query) { queue.withIndex().filter { query.isBlank() || it.value.title.contains(query, true) || it.value.artists.any { artist -> artist.contains(query, true) } } }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 18.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), state = listState, contentPadding = PaddingValues(bottom = 18.dp)) {
         item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.Default.ArrowBack, "返回") }; Text("当前播放列表", Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.Bold); TextButton(vm::reverseQueue) { Icon(if (reversed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null); Text(if (reversed) "倒序" else "正序") } } }
         item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("筛选播放列表") }, leadingIcon = { Icon(Icons.Default.Search, null) }) }
         item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton({ vm.cacheAll(queue, "当前播放列表") }) { Icon(Icons.Default.Download, null); Text("缓存全部") }; TextButton({ importDialog = true }) { Icon(Icons.Default.LibraryAdd, null); Text("从歌单添加") }; TextButton({ saveDialog = true }) { Icon(Icons.Default.PlaylistAdd, null); Text("保存为歌单") }; TextButton(vm::removeQueueDuplicates) { Text("移除重复") }; TextButton(vm::clearQueue) { Text("清空") } } }
@@ -552,7 +581,27 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
             var dragged by remember(track.id) { mutableFloatStateOf(0f) }
             var dragging by remember(track.id) { mutableStateOf(false) }
             var rowHeightPx by remember(track.id) { mutableIntStateOf(1) }
-            ListItem(modifier = Modifier.animateItem().zIndex(if (dragging) 1f else 0f).graphicsLayer { translationY = dragged; alpha = if (dragging) .88f else 1f; scaleX = if (dragging) .98f else 1f }.onSizeChanged { rowHeightPx = it.height }.clickable { vm.playQueueItem(index) }, headlineContent = { Text(track.title, color = if (index == currentIndex) Green else Color.White, maxLines = 1) }, supportingContent = { Text(track.artists.joinToString(" / "), maxLines = 1) }, leadingContent = { if (index == currentIndex) Icon(Icons.Default.GraphicEq, null, tint = Green) else Text("${index + 1}", color = Color.Gray) }, trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.DragHandle, "长按拖动排序", Modifier.size(40.dp).padding(8.dp).pointerInput(track.id, rowHeightPx, visibleIndices) { detectDragGesturesAfterLongPress(onDragStart = { dragging = true; dragged = 0f }, onDragCancel = { dragging = false; dragged = 0f }, onDragEnd = { queueDropIndex(visibleIndices, visiblePosition, dragged, rowHeightPx)?.let { target -> if (target != index) vm.moveQueue(index, target - index) }; dragging = false; dragged = 0f }) { change, amount -> change.consume(); dragged += amount.y } }); IconButton({ vm.removeFromQueue(index) }) { Icon(Icons.Default.RemoveCircleOutline, "移除") } } })
+            var handleTopInWindow by remember(track.id) { mutableFloatStateOf(0f) }
+            var edgeScrollDirection by remember(track.id) { mutableIntStateOf(0) }
+            LaunchedEffect(dragging, edgeScrollDirection, rowHeightPx) {
+                while (dragging && edgeScrollDirection != 0) {
+                    val consumed = listState.scrollBy(edgeScrollDirection * rowHeightPx * .12f)
+                    dragged += consumed
+                    if (consumed == 0f) edgeScrollDirection = 0
+                    delay(16)
+                }
+            }
+            ListItem(modifier = Modifier.animateItem().zIndex(if (dragging) 1f else 0f).graphicsLayer { translationY = dragged; alpha = if (dragging) .88f else 1f; scaleX = if (dragging) .98f else 1f }.onSizeChanged { rowHeightPx = it.height }.clickable { vm.playQueueItem(index) }, headlineContent = { Text(track.title, color = if (index == currentIndex) Green else Color.White, maxLines = 1) }, supportingContent = { Text(track.artists.joinToString(" / "), maxLines = 1) }, leadingContent = { if (index == currentIndex) Icon(Icons.Default.GraphicEq, null, tint = Green) else Text("${index + 1}", color = Color.Gray) }, trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.DragHandle, "长按拖动排序", Modifier.size(40.dp).padding(8.dp).onGloballyPositioned { handleTopInWindow = it.positionInWindow().y }.pointerInput(track.id, rowHeightPx, visibleIndices, view.height) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); dragging = true; dragged = 0f },
+                    onDragCancel = { edgeScrollDirection = 0; dragging = false; dragged = 0f },
+                    onDragEnd = { queueDropIndex(visibleIndices, visiblePosition, dragged, rowHeightPx)?.let { target -> if (target != index) { vm.moveQueue(index, target - index); haptics.performHapticFeedback(HapticFeedbackType.LongPress) } }; edgeScrollDirection = 0; dragging = false; dragged = 0f },
+                ) { change, amount ->
+                    change.consume(); dragged += amount.y
+                    val fingerY = handleTopInWindow + change.position.y
+                    edgeScrollDirection = queueEdgeScrollDirection(fingerY, view.height, edgePx)
+                }
+            }); IconButton({ vm.removeFromQueue(index) }) { Icon(Icons.Default.RemoveCircleOutline, "移除") } } })
         }
     }
     if (saveDialog) AlertDialog(onDismissRequest = { saveDialog = false }, title = { Text("保存为我的歌单") }, text = { OutlinedTextField(playlistTitle, { playlistTitle = it.take(50) }, label = { Text("歌单名称") }, singleLine = true) }, confirmButton = { TextButton({ if (playlistTitle.isNotBlank()) vm.saveQueueAsPlaylist(playlistTitle); saveDialog = false }) { Text("保存") } }, dismissButton = { TextButton({ saveDialog = false }) { Text("取消") } })

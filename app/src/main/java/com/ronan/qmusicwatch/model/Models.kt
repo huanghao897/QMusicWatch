@@ -31,9 +31,18 @@ import kotlinx.serialization.Serializable
 @Serializable data class PlaybackSnapshot(
     val track: Track? = null, val queue: List<Track> = emptyList(), val positionMs: Long = 0,
     val queueReversed: Boolean = false,
+    val streamUrl: String = "", val streamExpiresAt: Long = 0, val quality: String = "128",
 )
 @Serializable data class UserProfile(
     val displayName: String = "", val avatarUrl: String = "", val isVip: Boolean? = null,
     val vipExpireAt: Long? = null, val vipName: String = "",
 )
 @Serializable data class CachedUserProfile(val accountId: String, val profile: UserProfile, val updatedAt: Long)
+@Serializable data class CachedAccountSnapshot(
+    val accountId: String, val home: HomeData? = null, val library: LibraryData? = null, val updatedAt: Long,
+)
+@Serializable data class CachedAccountSnapshots(val items: List<CachedAccountSnapshot> = emptyList())
+@Serializable data class ReleaseInfo(
+    val tag: String, val title: String, val notes: String, val pageUrl: String,
+    val apkUrl: String = "", val sha256: String = "", val newer: Boolean = false,
+)

@@ -116,6 +116,34 @@ internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {
     return UserProfile(values.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(), values.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(), isVip, expire, values.firstNotNullOfOrNull { it.takeIf { profile -> profile.isVip == true }?.vipName?.takeIf(String::isNotBlank) } ?: values.firstNotNullOfOrNull { it.vipName.takeIf(String::isNotBlank) }.orEmpty())
 }
 
+internal fun isVersionNewer(latest: String, current: String): Boolean {
+    fun parts(value: String) = value.trim().removePrefix("v").substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+    val left = parts(latest); val right = parts(current)
+    return (0 until maxOf(left.size, right.size)).firstNotNullOfOrNull { index ->
+        val difference = left.getOrElse(index) { 0 }.compareTo(right.getOrElse(index) { 0 })
+        difference.takeIf { it != 0 }
+    }?.let { it > 0 } ?: false
+}
+
+internal fun parseGitHubRelease(root: JsonObject, currentVersion: String): ReleaseInfo {
+    val tag = root["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    val notes = root["body"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    val assets = root["assets"] as? JsonArray ?: JsonArray(emptyList())
+    val apk = assets.mapNotNull { it as? JsonObject }.firstOrNull { asset ->
+        asset["name"]?.jsonPrimitive?.contentOrNull?.endsWith(".apk", true) == true
+    }
+    val apkUrl = apk?.get("browser_download_url")?.jsonPrimitive?.contentOrNull.orEmpty()
+        .takeIf { it.startsWith("https://github.com/huanghao897/QMusicWatch/releases/download/") }.orEmpty()
+    val digest = apk?.get("digest")?.jsonPrimitive?.contentOrNull.orEmpty().removePrefix("sha256:")
+    val bodyDigest = Regex("(?i)sha-?256\\s*[:=]\\s*([a-f0-9]{64})").find(notes)?.groupValues?.getOrNull(1).orEmpty()
+    return ReleaseInfo(
+        tag = tag, title = root["name"]?.jsonPrimitive?.contentOrNull.orEmpty().ifBlank { tag }, notes = notes,
+        pageUrl = root["html_url"]?.jsonPrimitive?.contentOrNull.orEmpty().takeIf { it.startsWith("https://github.com/huanghao897/QMusicWatch/releases/") }.orEmpty(),
+        apkUrl = apkUrl, sha256 = digest.takeIf { it.matches(Regex("[a-fA-F0-9]{64}")) } ?: bodyDigest,
+        newer = isVersionNewer(tag, currentVersion),
+    )
+}
+
 internal fun parseSearchTrack(item: JsonObject): Track? {
     fun text(name: String) = (item[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
     fun number(name: String) = (item[name] as? JsonPrimitive)?.longOrNull ?: 0
@@ -272,6 +300,15 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             http.newCall(builder.build()).execute().use { response -> if (!response.isSuccessful) error("HTTP ${response.code}"); json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject }
         }.getOrNull()?.let { roots += it }
         mergeUserProfiles(roots.mapNotNull(::parseUserProfile)) ?: error("QQ 音乐未返回账号资料")
+    }
+
+    suspend fun latestRelease(currentVersion: String): ReleaseInfo = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url("https://api.github.com/repos/huanghao897/QMusicWatch/releases/latest")
+            .header("Accept", "application/vnd.github+json").header("User-Agent", "QMusicWatch/$currentVersion").build()
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("GitHub Release 检查失败 ${response.code}")
+            parseGitHubRelease(json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject, currentVersion)
+        }
     }
 
     suspend fun recent(): List<Track> = emptyList() // QQ Music has no stable public recent-play contract.

@@ -10,6 +10,7 @@ import com.ronan.qmusicwatch.network.ApiClient
 import com.ronan.qmusicwatch.playback.PlaybackConnection
 
 class QMusicApplication : Application() {
+    companion object { val processStartedAt: Long = android.os.SystemClock.elapsedRealtime() }
     lateinit var db: AppDatabase
     lateinit var vault: SessionVault
     lateinit var api: ApiClient
@@ -23,7 +24,7 @@ class QMusicApplication : Application() {
         vault = SessionVault(this)
         api = ApiClient(this) { vault.load()?.upstreamCookie }
         downloads = DownloadController(this, db)
-        playback = PlaybackConnection(this)
         settings = SettingsStore(this)
+        playback = PlaybackConnection(this)
     }
 }

@@ -8,6 +8,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class QueueTest {
+    @Test fun edgeScrollDirectionMatchesViewportEdges() {
+        assertEquals(-1, queueEdgeScrollDirection(20f, 480, 72f))
+        assertEquals(0, queueEdgeScrollDirection(240f, 480, 72f))
+        assertEquals(1, queueEdgeScrollDirection(470f, 480, 72f))
+    }
     @Test fun insertsNextWithoutDuplicatingTrack() {
         val a = Track("a", "A")
         val b = Track("b", "B")
