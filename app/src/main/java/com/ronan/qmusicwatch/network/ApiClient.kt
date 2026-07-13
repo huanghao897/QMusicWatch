@@ -71,10 +71,14 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
             "isVip", "is_vip", "isSVip", "is_svip", "isSvip", "vip", "svip",
             "vipFlag", "vip_flag", "svipFlag", "svip_flag", "svip_status", "vipStatus",
             "vip_type", "vipType", "viptype", "music_vip_level", "green_vip_level",
-            "luxury_vip_level", "super_vip_level", "svip_type", "svipType",
+            "luxury_vip_level", "super_vip_level", "svip_type", "svipType", "HugeVip", "LMFlag",
         )
         val enabled = raw?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 }
-        val end = item.value("vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime", "vipExpireTime", "vipExpireDate", "expire", "expireTime", "expire_time", "expireDate", "expire_date", "endTime", "end_time", "endDate")?.let(::profileEpoch)
+        val end = item.value(
+            "HugeVipEnd", "LMEnd", "vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime",
+            "vipExpireTime", "vipExpireDate", "expireTime", "expire_time", "expireDate", "expire_date",
+            "endTime", "end_time", "endDate",
+        )?.let(::profileEpoch)
         var label = item.value("vipName", "vip_name", "vipLevelName", "levelName", "svipName", "name", "title").orEmpty()
         val pathAndLabel = "$path $label"
         label = when {
@@ -97,7 +101,7 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
 private fun profileEpoch(value: String): Long? {
     val digits = value.filter(Char::isDigit)
     if (digits.length == 8 && digits.startsWith("20")) return runCatching { java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).parse(digits)?.time?.div(1000) }.getOrNull()
-    return digits.toLongOrNull()?.let { if (it > 10_000_000_000L) it / 1000 else it }?.takeIf { it > 0 }
+    return digits.toLongOrNull()?.let { if (it > 10_000_000_000L) it / 1000 else it }?.takeIf { it >= 946_684_800L }
 }
 
 internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {

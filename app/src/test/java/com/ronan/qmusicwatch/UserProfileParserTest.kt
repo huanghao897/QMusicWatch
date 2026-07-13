@@ -28,9 +28,15 @@ class UserProfileParserTest {
     }
 
     @Test fun parsesRealVipLoginBaseShape() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_response":{"svip":1,"plus":{"vip":1,"huge_vip":1},"userinfo":{"expire":1784649600,"music_level":8}}}"""))!!
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_response":{"svip":1,"identity":{"vip":1,"HugeVip":1,"HugeVipEnd":"2026-07-22","LMFlag":1,"LMEnd":"2026-07-22"},"userinfo":{"expire":9,"music_level":8}}}"""))!!
         assertEquals(true, profile.isVip)
         assertEquals("超级会员（SVIP）", profile.vipName)
         assertEquals(1784649600L, profile.vipExpireAt)
+    }
+
+    @Test fun doesNotTreatVipExpireCounterAsUnixTimestamp() {
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_response":{"svip":1,"userinfo":{"expire":9}}}"""))!!
+        assertEquals(true, profile.isVip)
+        assertEquals(null, profile.vipExpireAt)
     }
 }
