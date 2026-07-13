@@ -24,6 +24,13 @@ class QueueTest {
         assertEquals(1, nextQueueIndex(3, 2, 1, "shuffle", true, 1))
     }
 
+    @Test fun dragUsesMeasuredRowHeightAndVisibleQueueOrder() {
+        val visible = listOf(1, 4, 7, 9)
+        assertEquals(7, queueDropIndex(visible, 1, 76f, 60))
+        assertEquals(1, queueDropIndex(visible, 1, -200f, 60))
+        assertEquals(9, queueDropIndex(visible, 1, 500f, 60))
+    }
+
     @Test fun dailyRecommendationWrapsWithoutGrowingPastCount() {
         assertEquals(listOf(4, 5, 1), dailyBatch(listOf(1, 2, 3, 4, 5), 3, 3))
         assertEquals(listOf(1, 2), dailyBatch(listOf(1, 2), 0, 10))

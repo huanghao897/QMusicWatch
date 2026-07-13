@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import kotlin.math.roundToInt
 
 data class AppUiState(
     val loading: Boolean = false, val message: String? = null, val home: HomeData? = null,
@@ -33,6 +34,12 @@ internal fun insertNext(queue: List<Track>, currentId: String?, track: Track): L
     val current = items.indexOfFirst { it.id == currentId }
     items.add((current + 1).coerceIn(0, items.size), track)
     return items
+}
+
+internal fun queueDropIndex(visibleQueueIndices: List<Int>, visiblePosition: Int, dragPx: Float, itemHeightPx: Int): Int? {
+    if (visiblePosition !in visibleQueueIndices.indices || itemHeightPx <= 0) return null
+    val target = (visiblePosition + (dragPx / itemHeightPx).roundToInt()).coerceIn(visibleQueueIndices.indices)
+    return visibleQueueIndices[target]
 }
 
 internal fun nextQueueIndex(size: Int, current: Int, delta: Int, mode: String, ended: Boolean, shuffled: Int = -1): Int = when {
