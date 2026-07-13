@@ -23,6 +23,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -36,12 +37,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -49,10 +52,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.ronan.qmusicwatch.data.DownloadEntity
@@ -83,8 +89,16 @@ internal fun <T> dailyBatch(items: List<T>, offset: Int, count: Int): List<T> = 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        hideStatusBar()
         setContent { QMusicTheme { QMusicApp() } }
     }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideStatusBar()
+    }
+
+    private fun hideStatusBar() = WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.statusBars())
 }
 
 @Composable private fun QMusicTheme(content: @Composable () -> Unit) = MaterialTheme(
@@ -531,10 +545,13 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
         item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton({ vm.cacheAll(queue, "当前播放列表") }) { Icon(Icons.Default.Download, null); Text("缓存全部") }; TextButton({ importDialog = true }) { Icon(Icons.Default.LibraryAdd, null); Text("从歌单添加") }; TextButton({ saveDialog = true }) { Icon(Icons.Default.PlaylistAdd, null); Text("保存为歌单") }; TextButton(vm::removeQueueDuplicates) { Text("移除重复") }; TextButton(vm::clearQueue) { Text("清空") } } }
         item { Text("${queue.size} 首", color = Color.Gray) }
         if (queue.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("播放列表为空", color = Color.Gray) } }
-        items(shown, key = { it.value.id }) { indexed ->
+        val visibleIndices = shown.map { it.index }
+        itemsIndexed(shown, key = { _, item -> item.value.id }) { visiblePosition, indexed ->
             val index = indexed.index; val track = indexed.value
-            var dragged by remember(index) { mutableFloatStateOf(0f) }
-            ListItem(modifier = Modifier.clickable { vm.playQueueItem(index) }, headlineContent = { Text(track.title, color = if (index == currentIndex) Green else Color.White, maxLines = 1) }, supportingContent = { Text(track.artists.joinToString(" / "), maxLines = 1) }, leadingContent = { if (index == currentIndex) Icon(Icons.Default.GraphicEq, null, tint = Green) else Text("${index + 1}", color = Color.Gray) }, trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.DragHandle, "长按拖动排序", Modifier.size(40.dp).padding(8.dp).pointerInput(index) { detectDragGesturesAfterLongPress(onDragStart = { dragged = 0f }, onDragEnd = { val delta = (dragged / 56f).toInt(); if (delta != 0) vm.moveQueue(index, delta.coerceIn(-index, queue.lastIndex - index)) }) { change, amount -> change.consume(); dragged += amount.y } }); IconButton({ vm.removeFromQueue(index) }) { Icon(Icons.Default.RemoveCircleOutline, "移除") } } })
+            var dragged by remember(track.id) { mutableFloatStateOf(0f) }
+            var dragging by remember(track.id) { mutableStateOf(false) }
+            var rowHeightPx by remember(track.id) { mutableIntStateOf(1) }
+            ListItem(modifier = Modifier.animateItem().zIndex(if (dragging) 1f else 0f).graphicsLayer { translationY = dragged; alpha = if (dragging) .88f else 1f; scaleX = if (dragging) .98f else 1f }.onSizeChanged { rowHeightPx = it.height }.clickable { vm.playQueueItem(index) }, headlineContent = { Text(track.title, color = if (index == currentIndex) Green else Color.White, maxLines = 1) }, supportingContent = { Text(track.artists.joinToString(" / "), maxLines = 1) }, leadingContent = { if (index == currentIndex) Icon(Icons.Default.GraphicEq, null, tint = Green) else Text("${index + 1}", color = Color.Gray) }, trailingContent = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.DragHandle, "长按拖动排序", Modifier.size(40.dp).padding(8.dp).pointerInput(track.id, rowHeightPx, visibleIndices) { detectDragGesturesAfterLongPress(onDragStart = { dragging = true; dragged = 0f }, onDragCancel = { dragging = false; dragged = 0f }, onDragEnd = { queueDropIndex(visibleIndices, visiblePosition, dragged, rowHeightPx)?.let { target -> if (target != index) vm.moveQueue(index, target - index) }; dragging = false; dragged = 0f }) { change, amount -> change.consume(); dragged += amount.y } }); IconButton({ vm.removeFromQueue(index) }) { Icon(Icons.Default.RemoveCircleOutline, "移除") } } })
         }
     }
     if (saveDialog) AlertDialog(onDismissRequest = { saveDialog = false }, title = { Text("保存为我的歌单") }, text = { OutlinedTextField(playlistTitle, { playlistTitle = it.take(50) }, label = { Text("歌单名称") }, singleLine = true) }, confirmButton = { TextButton({ if (playlistTitle.isNotBlank()) vm.saveQueueAsPlaylist(playlistTitle); saveDialog = false }) { Text("保存") } }, dismissButton = { TextButton({ saveDialog = false }) { Text("取消") } })
