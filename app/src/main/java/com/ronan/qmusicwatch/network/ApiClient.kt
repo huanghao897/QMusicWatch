@@ -74,12 +74,12 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
             "luxury_vip_level", "super_vip_level", "svip_type", "svipType",
         )
         val enabled = raw?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 }
-        val end = item.value("vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime", "vipExpireTime", "vipExpireDate", "expireTime", "expire_time", "expireDate", "expire_date", "endTime", "end_time", "endDate")?.let(::profileEpoch)
+        val end = item.value("vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime", "vipExpireTime", "vipExpireDate", "expire", "expireTime", "expire_time", "expireDate", "expire_date", "endTime", "end_time", "endDate")?.let(::profileEpoch)
         var label = item.value("vipName", "vip_name", "vipLevelName", "levelName", "svipName", "name", "title").orEmpty()
         val pathAndLabel = "$path $label"
         label = when {
             pathAndLabel.contains("听书", true) || pathAndLabel.contains("book", true) -> "听书会员"
-            pathAndLabel.contains("svip", true) || pathAndLabel.contains("超级", true) || item.value("isSVip", "is_svip", "isSvip", "svipFlag", "svip_flag", "svip_status")?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 } == true -> "超级会员（SVIP）"
+            pathAndLabel.contains("svip", true) || pathAndLabel.contains("超级", true) || item.value("isSVip", "is_svip", "isSvip", "svip", "huge_vip", "svipFlag", "svip_flag", "svip_status")?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 } == true -> "超级会员（SVIP）"
             pathAndLabel.contains("绿钻", true) || pathAndLabel.contains("green", true) || pathAndLabel.contains("luxury", true) -> "豪华绿钻"
             label.contains("会员") || label.contains("vip", true) -> label
             else -> ""
@@ -89,7 +89,8 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
     val active = memberships.filter { it.first == true || (it.second ?: 0) > now }.maxByOrNull { it.second ?: 0 }
     val expire = active?.second ?: memberships.mapNotNull { it.second }.maxOrNull()
     val isVip = when { active != null -> true; memberships.any { it.first == false } -> false; else -> null }
-    val vipName = active?.third?.ifBlank { "QQ 音乐会员" }.orEmpty()
+    val labels = memberships.map { it.third }.filter(String::isNotBlank)
+    val vipName = if (active == null) "" else labels.firstOrNull { it.contains("超级") } ?: labels.firstOrNull() ?: "QQ 音乐会员"
     return UserProfile(name, avatar, isVip, expire, vipName).takeIf { it.displayName.isNotBlank() || it.avatarUrl.isNotBlank() || it.isVip != null || it.vipExpireAt != null }
 }
 
@@ -250,21 +251,13 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         listOf("GetLoginUserInfo", "GetUserInfo").forEach { method ->
             runCatching { api("music.UserInfo.userInfoServer", method, obj("user_uin" to id, "login_uin" to id, "uin" to id)) }.getOrNull()?.let { data -> AppLog.write("PROFILE", "$method keys=${data.keys.joinToString(",").take(300)}"); roots += data }
         }
-        runCatching { api("music.UnifiedSearch.Profile", "GetUserProfile", obj("ct" to 24, "uin" to id)) }.getOrNull()?.let { data ->
-            AppLog.write("PROFILE", "GetUserProfile keys=${data.keys.joinToString(",").take(300)}")
-            roots += data
-        }
-        listOf(
-            Triple("music.vip.VipUserInfo", "GetVipUserInfo", obj("uin" to id)),
-            Triple("music.vip.VipInfo", "GetVipInfo", obj("uin" to id, "user_uin" to id)),
-        ).forEach { (module, method, params) ->
-            runCatching { api(module, method, params) }.getOrNull()?.let { data ->
-                AppLog.write("PROFILE", "$method keys=${data.keys.joinToString(",").take(300)}")
-                roots += data
-            }
+        runCatching { api("VipLogin.VipLoginInter", "vip_login_base", obj()) }.getOrNull()?.let { data ->
+            AppLog.write("PROFILE", "vip_login_base keys=${data.keys.joinToString(",").take(300)}")
+            roots += buildJsonObject { put("vip_response", data) }
         }
         runCatching {
-            val url = "https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?format=json&loginUin=$id&hostUin=$id&cid=205360838&reqfrom=1"
+            val gtk = hash33(cookieValue("qqmusic_key", "qm_keyst", "p_skey", "skey").orEmpty())
+            val url = "https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?format=json&loginUin=$id&hostUin=0&userid=$id&g_tk=$gtk&cid=205360838&reqfrom=1"
             val builder = Request.Builder().url(url).header("Referer", "https://y.qq.com/").header("User-Agent", WEB_UA)
             cookie()?.takeIf(String::isNotBlank)?.let { builder.header("Cookie", it) }
             http.newCall(builder.build()).execute().use { response -> if (!response.isSuccessful) error("HTTP ${response.code}"); json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject }
@@ -407,8 +400,9 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     }
 
     private fun webComm() = buildJsonObject {
+        val gtk = hash33(cookieValue("qqmusic_key", "qm_keyst", "p_skey", "skey").orEmpty())
         put("ct", 24); put("cv", 4_747_474); put("platform", "yqq.json"); put("uin", accountId().ifBlank { "0" })
-        put("g_tk", 5381); put("g_tk_new_20200303", 5381); put("format", "json"); put("inCharset", "utf-8"); put("outCharset", "utf-8"); put("notice", 0); put("need_new_code", 1)
+        put("g_tk", gtk); put("g_tk_new_20200303", gtk); put("format", "json"); put("inCharset", "utf-8"); put("outCharset", "utf-8"); put("notice", 0); put("need_new_code", 1)
     }
 
     private fun playbackComm(android: Boolean) = buildJsonObject {

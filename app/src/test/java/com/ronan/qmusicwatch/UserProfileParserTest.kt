@@ -26,4 +26,11 @@ class UserProfileParserTest {
         assertEquals("超级会员（SVIP）", profile.vipName)
         assertEquals(1784649600L, profile.vipExpireAt)
     }
+
+    @Test fun parsesRealVipLoginBaseShape() {
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_response":{"svip":1,"plus":{"vip":1,"huge_vip":1},"userinfo":{"expire":1784649600,"music_level":8}}}"""))!!
+        assertEquals(true, profile.isVip)
+        assertEquals("超级会员（SVIP）", profile.vipName)
+        assertEquals(1784649600L, profile.vipExpireAt)
+    }
 }
