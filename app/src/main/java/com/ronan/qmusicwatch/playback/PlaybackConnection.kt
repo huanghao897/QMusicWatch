@@ -2,6 +2,7 @@ package com.ronan.qmusicwatch.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.AudioManager
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -16,12 +17,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.ronan.qmusicwatch.data.AppLog
 
 class PlaybackConnection(context: Context) {
+    private val audio = context.getSystemService(AudioManager::class.java)
     private val future: ListenableFuture<MediaController> = MediaController.Builder(context, SessionToken(context, ComponentName(context, PlaybackService::class.java))).buildAsync()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _sleepRemaining = MutableStateFlow(0L)
     val sleepRemaining = _sleepRemaining.asStateFlow()
     private var sleepJob: Job? = null
     private var stopAfterCurrent = false
+    private var sleepVolume: Float? = null
     var onEnded: (() -> Unit)? = null
     var onError: ((String) -> Unit)? = null
     init {
@@ -52,22 +55,33 @@ class PlaybackConnection(context: Context) {
     fun position() = if (future.isDone) future.get().currentPosition.coerceAtLeast(0) else 0L
     fun duration() = if (future.isDone) future.get().duration.coerceAtLeast(0) else 0L
     fun isPlaying() = future.isDone && future.get().isPlaying
+    fun adjustVolume(direction: Int) = audio.adjustStreamVolume(
+        AudioManager.STREAM_MUSIC,
+        if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+        AudioManager.FLAG_SHOW_UI,
+    )
     fun startSleepTimer(minutes: Int, finishCurrent: Boolean = false) {
         sleepJob?.cancel()
         stopAfterCurrent = false
+        sleepVolume = null
         sleepJob = scope.launch {
             _sleepRemaining.value = minutes.coerceIn(1, 1440) * 60L
-            while (_sleepRemaining.value > 0) { delay(1_000); _sleepRemaining.value-- }
+            while (_sleepRemaining.value > 0) {
+                delay(1_000); _sleepRemaining.value--
+                if (!finishCurrent && _sleepRemaining.value <= 10 && future.isDone) {
+                    val player = future.get()
+                    val initial = sleepVolume ?: player.volume.also { sleepVolume = it }
+                    player.volume = initial * (_sleepRemaining.value / 10f)
+                }
+            }
             if (finishCurrent) stopAfterCurrent = true else {
                 if (future.isDone) {
                     val player = future.get()
-                    val initial = player.volume
-                    repeat(10) { step -> player.volume = initial * (9 - step) / 10f; delay(200) }
-                    pause(); player.volume = initial
+                    pause(); player.volume = sleepVolume ?: player.volume; sleepVolume = null
                 } else pause()
             }
         }
     }
-    fun cancelSleepTimer() { sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false; _sleepRemaining.value = 0 }
+    fun cancelSleepTimer() { sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false; if (future.isDone) sleepVolume?.let { future.get().volume = it }; sleepVolume = null; _sleepRemaining.value = 0 }
     fun release() { scope.cancel(); MediaController.releaseFuture(future) }
 }

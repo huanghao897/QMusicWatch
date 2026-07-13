@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 )
 @Serializable data class MusicCollection(
     val id: String, val title: String, val artworkUrl: String = "", val trackCount: Int = -1,
-    val directoryId: String = id,
+    val directoryId: String = id, val owned: Boolean? = null,
 )
 @Serializable data class HomeData(val daily: List<Track>, val recommended: List<MusicCollection>)
 @Serializable data class PagedTracks(val items: List<Track>, val nextCursor: String? = null)
@@ -28,7 +28,10 @@ import kotlinx.serialization.Serializable
 @Serializable data class CookieExchange(val provider: String, val cookie: String)
 @Serializable data class Ack(val accepted: Boolean)
 @Serializable data class CollectionDetail(val title: String, val tracks: List<Track>)
-@Serializable data class PlaybackSnapshot(val track: Track? = null, val queue: List<Track> = emptyList(), val positionMs: Long = 0)
+@Serializable data class PlaybackSnapshot(
+    val track: Track? = null, val queue: List<Track> = emptyList(), val positionMs: Long = 0,
+    val queueReversed: Boolean = false,
+)
 @Serializable data class UserProfile(
     val displayName: String = "", val avatarUrl: String = "", val isVip: Boolean? = null,
     val vipExpireAt: Long? = null, val vipName: String = "",

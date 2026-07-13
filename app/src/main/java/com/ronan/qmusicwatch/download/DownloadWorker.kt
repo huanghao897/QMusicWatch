@@ -20,9 +20,9 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val dir = File(applicationContext.filesDir, "offline/$ownerDir").apply { mkdirs() }
         val part = File(dir, "$fileName.part")
         val target = File(dir, "$fileName.audio")
+        db.downloads().upsert(DownloadEntity(id, owner, inputData.getString("title").orEmpty(), inputData.getString("artists").orEmpty(), inputData.getString("artwork").orEmpty(), target.absolutePath, "downloading", part.length(), groupName = inputData.getString("group").orEmpty().ifBlank { "单曲缓存" }))
         val available = if (android.os.Build.VERSION.SDK_INT >= 26) applicationContext.getSystemService(android.os.storage.StorageManager::class.java).getAllocatableBytes(android.os.storage.StorageManager.UUID_DEFAULT) else dir.usableSpace
-        if (available < 256L * 1024 * 1024) return@withContext Result.failure(workDataOf("reason" to "存储空间不足，需保留 256MB"))
-        db.downloads().upsert(DownloadEntity(id, owner, inputData.getString("title").orEmpty(), inputData.getString("artists").orEmpty(), inputData.getString("artwork").orEmpty(), target.absolutePath, "downloading", part.length()))
+        if (available < 256L * 1024 * 1024) { db.downloads().progress(id, owner, "failed_storage", part.length(), -1); return@withContext Result.failure(workDataOf("reason" to "存储空间不足，需保留 256MB")) }
         val request = Request.Builder().url(url).apply { if (part.length() > 0) header("Range", "bytes=${part.length()}-") }.build()
         runCatching {
             OkHttpClient().newCall(request).execute().use { response ->
@@ -52,10 +52,16 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
 class DownloadController(private val context: Context, private val db: AppDatabase) {
     val downloads = db.downloads().observeAll()
-    fun enqueue(track: com.ronan.qmusicwatch.model.Track, owner: String, url: String) {
-        val data = workDataOf("id" to track.id, "owner" to owner, "url" to url, "title" to track.title, "artists" to track.artists.joinToString(" / "), "artwork" to track.artworkUrl)
-        WorkManager.getInstance(context).enqueueUniqueWork("download-${owner}-${track.id}", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(data).setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build())
+    fun enqueue(track: com.ronan.qmusicwatch.model.Track, owner: String, url: String, wifiOnly: Boolean, groupName: String) {
+        val data = workDataOf("id" to track.id, "owner" to owner, "url" to url, "title" to track.title, "artists" to track.artists.joinToString(" / "), "artwork" to track.artworkUrl, "group" to groupName)
+        val network = if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+        WorkManager.getInstance(context).enqueueUniqueWork("download-${owner}-${track.id}", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(data).setConstraints(Constraints.Builder().setRequiredNetworkType(network).build()).build())
     }
     suspend fun pause(trackId: String, owner: String) { WorkManager.getInstance(context).cancelUniqueWork("download-$owner-$trackId"); val item = db.downloads().find(trackId, owner); db.downloads().progress(trackId, owner, "paused", item?.downloadedBytes ?: 0, item?.totalBytes ?: -1) }
     suspend fun delete(trackId: String, owner: String) { pause(trackId, owner); db.downloads().find(trackId, owner)?.let { File(it.filePath).delete(); File(it.filePath.removeSuffix(".audio") + ".part").delete() }; db.downloads().delete(trackId, owner) }
+    suspend fun deleteInvalid(owner: String): Int {
+        val invalid = db.downloads().all().filter { it.ownerAccountId == owner && (it.status == "complete" && !File(it.filePath).exists() || it.status.startsWith("failed")) }
+        invalid.forEach { delete(it.trackId, owner) }
+        return invalid.size
+    }
 }

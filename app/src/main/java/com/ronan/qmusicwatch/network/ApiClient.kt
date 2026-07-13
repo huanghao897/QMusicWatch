@@ -16,22 +16,33 @@ import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 
 internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
-    fun objects(value: JsonElement): Sequence<JsonObject> = sequence {
+    fun objects(value: JsonElement, ownedHint: Boolean? = null): Sequence<Pair<JsonObject, Boolean?>> = sequence {
         when (value) {
-            is JsonObject -> { yield(value); value.values.forEach { yieldAll(objects(it)) } }
-            is JsonArray -> value.forEach { yieldAll(objects(it)) }
+            is JsonObject -> {
+                yield(value to ownedHint)
+                value.forEach { (key, child) ->
+                    val hint = when {
+                        key.contains("collect", true) || key.contains("favorite", true) -> false
+                        key.contains("create", true) || key.contains("playlist", true) -> true
+                        else -> ownedHint
+                    }
+                    yieldAll(objects(child, hint))
+                }
+            }
+            is JsonArray -> value.forEach { yieldAll(objects(it, ownedHint)) }
             else -> Unit
         }
     }
     fun JsonObject.text(name: String) = (this[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
     fun JsonObject.number(name: String) = (this[name] as? JsonPrimitive)?.intOrNull ?: 0
-    return objects(root).mapNotNull { item ->
+    return objects(root).mapNotNull { (item, ownedHint) ->
         val dirId = item.text("dirId").ifBlank { item.text("dirid") }
         val id = item.text("tid").ifBlank { item.text("id") }.ifBlank { dirId }
         val title = item.text("dirName").ifBlank { item.text("title") }.ifBlank { item.text("name") }
+        val owned = item.text("isOwn").ifBlank { item.text("is_self") }.toIntOrNull()?.let { it > 0 } ?: ownedHint
         if (dirId.isBlank() || id.isBlank() || title.isBlank()) null else MusicCollection(
             id, title, item.text("picUrl").ifBlank { item.text("picurl") }.replace("http://", "https://"),
-            item.number("songNum").takeIf { it > 0 } ?: item.number("songnum"), dirId,
+            item.number("songNum").takeIf { it > 0 } ?: item.number("songnum"), dirId, owned,
         )
     }.distinctBy { it.directoryId }.toList()
 }
