@@ -26,7 +26,7 @@ class PlaybackConnection(context: Context) {
     private var stopAfterCurrent = false
     private var sleepVolume: Float? = null
     var onEnded: (() -> Unit)? = null
-    var onError: ((String) -> Unit)? = null
+    var onError: ((PlaybackErrorEvent) -> Unit)? = null
     init {
         future.addListener({
             future.get().addListener(object : Player.Listener {
@@ -37,7 +37,13 @@ class PlaybackConnection(context: Context) {
                 override fun onPlayerError(error: PlaybackException) {
                     val causes = generateSequence<Throwable>(error) { it.cause }.joinToString(" <- ") { "${it.javaClass.simpleName}:${it.message.orEmpty()}" }
                     AppLog.write("PLAYER", "${error.errorCodeName} $causes")
-                    onError?.invoke("播放失败：${error.errorCodeName}")
+                    val controller = future.get()
+                    onError?.invoke(PlaybackErrorEvent(
+                        error = error,
+                        mediaId = controller.currentMediaItem?.mediaId.orEmpty(),
+                        positionMs = controller.currentPosition.coerceAtLeast(0),
+                        isLocalFile = controller.currentMediaItem?.localConfiguration?.uri?.scheme == "file",
+                    ))
                 }
             })
         }, ContextCompat.getMainExecutor(context))
@@ -45,7 +51,7 @@ class PlaybackConnection(context: Context) {
     fun play(id: String, uri: String, title: String, artist: String, artwork: String) {
         AppLog.write("PLAYER", "prepare track=$id scheme=${android.net.Uri.parse(uri).scheme.orEmpty()}")
         future.get().apply {
-            setMediaItem(MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(artist).apply { if (artwork.isNotBlank()) setArtworkUri(android.net.Uri.parse(artwork)) }.build()).build())
+            setMediaItem(playbackMediaItem(id, uri, title, artist, artwork))
             prepare(); play()
         }
     }
@@ -85,3 +91,9 @@ class PlaybackConnection(context: Context) {
     fun cancelSleepTimer() { sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false; if (future.isDone) sleepVolume?.let { future.get().volume = it }; sleepVolume = null; _sleepRemaining.value = 0 }
     fun release() { scope.cancel(); MediaController.releaseFuture(future) }
 }
+
+internal fun playbackMediaItem(id: String, uri: String, title: String, artist: String, artwork: String) =
+    MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(
+        MediaMetadata.Builder().setTitle(title).setArtist(artist)
+            .apply { if (artwork.isNotBlank()) setArtworkUri(android.net.Uri.parse(artwork)) }.build()
+    ).build()

@@ -1,52 +1,10 @@
-# Spec: Watch playback completion
+# Reliability batch plan
 
-## Objective
+1. 先建立错误分类与可测试的重试决策，再把重试接入 ViewModel/Media3 错误回调。
+2. 扩展播放快照，使 `MediaSessionService` 可独立恢复媒体项；随后声明 `MediaButtonReceiver`。
+3. 在现有队列 UI 上增加边缘滚动和触觉反馈，不替换当前拖动实现。
+4. 复用 DataStore 存储账号隔离的首页/资料库快照，网络成功时更新，失败时保留。
+5. 用现有 OkHttp 调 GitHub Releases API，设置页只展示并打开 HTTPS 链接。
+6. 添加轻量帧性能日志和手工 Baseline Profile，最后统一做 Release 验证。
 
-Complete every item in the approved playback/settings checklist for a 480x480 Android 7+ square watch while keeping the existing single-module Kotlin/Compose architecture.
-
-## Tech Stack
-
-Kotlin, Jetpack Compose, DataStore, Room, WorkManager and Media3 1.10.1. No new dependency is required.
-
-## Commands
-
-- Test: `.\gradlew.bat :app:testDebugUnitTest`
-- Lint: `.\gradlew.bat :app:lintRelease`
-- Build: `.\gradlew.bat :app:assembleRelease`
-
-## Project Structure
-
-- `app/src/main/java/com/ronan/qmusicwatch`: UI and state orchestration
-- `data`: persistent settings, queue snapshots and download records
-- `playback`: Media3 service/controller, volume and sleep timer
-- `download`: resumable account-isolated offline cache
-- `app/src/test`: parser, queue and snapshot unit tests
-
-## Code Style
-
-Use existing StateFlow/DataStore patterns and native Android/Compose APIs. Keep behavior in the shared controller/view-model rather than duplicating it in screens.
-
-## Testing Strategy
-
-Unit-test queue cleanup, snapshot compatibility and cache calculations. Run all JVM tests, release lint, R8 release build and APK signature/package verification.
-
-## Boundaries
-
-- Always: preserve API 24 support, account cache isolation, existing login/playback behavior and offline data.
-- Ask first: new external dependencies, database-destructive migrations or server contract changes.
-- Never: store credentials in logs, bypass membership/DRM restrictions or expose another account's cache.
-
-## Success Criteria
-
-- Playback mode, queue order, current track and position survive app restart.
-- Sleep timer supports presets/custom time, fade-out and finish-current behavior.
-- Lyrics support original/translation visibility, size, offset, animation strength, manual scrolling and tap-to-seek.
-- Player supports cover double-tap, cover swipe track/volume, rotary volume/lyrics, touch lock and AMOLED black mode.
-- Cache supports Wi-Fi-only mode, total usage, playlist grouping label, invalid-file cleanup and storage errors.
-- Account page shows provider-appropriate account ID, avatar, nickname, membership type/expiry, created and collected playlist sections, login check and re-login.
-- Queue supports reorder, reverse, save-as-playlist, batch import, duplicate removal, next-play and search.
-
-## Open Questions
-
-None. The user approved the complete checklist and requested all changes be pushed after verification.
-
+风险：QQ 音乐地址失败发生在播放器层，而重新签发需要当前账号 Cookie。前台播放通过控制器错误事件回到 ViewModel 重签；系统媒体恢复由服务读取同一账号会话，地址失效时直接重签。

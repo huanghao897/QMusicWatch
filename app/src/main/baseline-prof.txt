@@ -1,0 +1,7 @@
+Lcom/ronan/qmusicwatch/MainActivity;
+Lcom/ronan/qmusicwatch/AppViewModel;
+Lcom/ronan/qmusicwatch/QMusicApplication;
+Lcom/ronan/qmusicwatch/network/ApiClient;
+Lcom/ronan/qmusicwatch/playback/PlaybackService;
+Lcom/ronan/qmusicwatch/playback/PlaybackConnection;
+Lcom/ronan/qmusicwatch/lyrics/LrcParser;

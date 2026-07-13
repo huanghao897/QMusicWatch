@@ -1,7 +1,21 @@
-- [x] Persist complete playback snapshot and restore it
-- [x] Complete lyric controls and watch gestures
-- [x] Complete cache settings and maintenance
-- [x] Complete account and playlist sections
-- [x] Complete queue batch operations and duplicate cleanup
-- [x] Add tests and build release APK
-- [x] Commit and push to GitHub
+- [x] 播放错误分类和一次自动重签
+  - Acceptance：保留歌曲、队列与进度；二次失败显示分类原因
+  - Verify：单元测试 + Debug/Release 编译
+- [x] 系统媒体播放恢复
+  - Acceptance：Manifest receiver 和 `onPlaybackResumption` 返回已保存媒体项
+  - Verify：单元测试快照兼容 + Release manifest 检查
+- [x] 队列边缘滚动和触觉反馈
+  - Acceptance：拖到上下边缘持续滚动，松手落点按可见队列计算
+  - Verify：滚动方向单测 + Compose 编译
+- [x] 账号隔离离线快照
+  - Acceptance：首页/资料库请求失败时显示同账号缓存，不跨账号
+  - Verify：序列化与账号匹配单测
+- [x] GitHub Release 更新检测
+  - Acceptance：显示版本、说明、SHA-256 与 HTTPS 下载入口
+  - Verify：版本比较/响应解析单测
+- [x] 性能日志与 Baseline Profile
+  - Acceptance：关键页面慢帧写入脱敏日志，APK 含 `assets/dexopt/baseline.prof`
+  - Verify：Release 构建后检查 APK 内容
+- [x] 完整交付
+  - Acceptance：测试、lint、Release、签名和远端提交一致
+  - Verify：Gradle + apksigner + aapt + git ls-remote
