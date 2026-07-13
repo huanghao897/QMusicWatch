@@ -10,6 +10,7 @@ import com.ronan.qmusicwatch.lyrics.LrcParser
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.model.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -41,6 +42,9 @@ internal fun queueDropIndex(visibleQueueIndices: List<Int>, visiblePosition: Int
     val target = (visiblePosition + (dragPx / itemHeightPx).roundToInt()).coerceIn(visibleQueueIndices.indices)
     return visibleQueueIndices[target]
 }
+
+internal fun profileCacheNeedsRefresh(cache: CachedUserProfile?, accountId: String?, now: Long): Boolean =
+    cache == null || cache.accountId != accountId || cache.profile.isVip == null || cache.profile.vipExpireAt?.let { it * 1000 <= now } == true
 
 internal fun nextQueueIndex(size: Int, current: Int, delta: Int, mode: String, ended: Boolean, shuffled: Int = -1): Int = when {
     size <= 0 -> -1
@@ -81,6 +85,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingQueue: List<Track>? = null
     private var restoredPosition = 0L
     private val json = Json { ignoreUnknownKeys = true }
+    private val profileCacheReady = CompletableDeferred<Unit>()
     private var currentSession = graph.vault.load()
     val signedIn get() = currentSession != null
     val accountId get() = currentSession?.accountId
@@ -99,6 +104,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     _queueIndex.value = _queue.value.indexOfFirst { item -> item.id == track.id }
                 }
             }
+        }
+        viewModelScope.launch {
+            var refresh = false
+            try {
+                if (signedIn) {
+                    val cached = runCatching { json.decodeFromString<CachedUserProfile>(graph.settings.profileCache.first()) }.getOrNull()
+                    cached?.takeIf { it.accountId == accountId }?.let { _state.update { state -> state.copy(profile = it.profile) } }
+                    refresh = profileCacheNeedsRefresh(cached, accountId, System.currentTimeMillis())
+                }
+            } finally { profileCacheReady.complete(Unit) }
+            if (refresh) loadProfile(force = true)
         }
         viewModelScope.launch { while (isActive) { delay(10_000); if (_state.value.currentTrack != null) persistSnapshot() } }
         loadHome()
@@ -124,7 +140,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             graph.vault.save(session)
             currentSession = session
             _state.update { s -> s.copy(qrStatus = "登录成功", message = "登录成功") }
-            loadHome(); loadProfile()
+            loadHome(); loadProfile(force = true)
         }.onFailure { error ->
             _state.update { s -> s.copy(qrStatus = "登录失败，请返回刷新二维码") }
             fail(error)
@@ -136,8 +152,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runCatching { graph.api.library() }.onSuccess { value -> _state.update { it.copy(library = value) } }.onFailure(::fail)
     }
     fun loadProfile(force: Boolean = false) = viewModelScope.launch {
+        profileCacheReady.await()
         if (!signedIn || (!force && _state.value.profile != null)) return@launch
-        runCatching { graph.api.profile() }.onSuccess { profile -> _state.update { it.copy(profile = profile) } }
+        runCatching { graph.api.profile() }.onSuccess { profile ->
+            _state.update { it.copy(profile = profile) }
+            graph.settings.setProfileCache(json.encodeToString(CachedUserProfile(accountId.orEmpty(), profile, System.currentTimeMillis())))
+        }
             .onFailure { AppLog.write("PROFILE", "${it.javaClass.simpleName}:${it.message.orEmpty()}") }
     }
     fun diagnose() = viewModelScope.launch {

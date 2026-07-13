@@ -26,6 +26,7 @@ class SettingsStore(private val context: Context) {
     private val playbackSnapshotKey = stringPreferencesKey("playback_snapshot")
     private val dailyCountKey = stringPreferencesKey("daily_count")
     private val searchHistoryKey = stringPreferencesKey("search_history")
+    private val profileCacheKey = stringPreferencesKey("profile_cache")
     val quality = context.settingsDataStore.data.map { it[qualityKey] ?: "128" }
     val headphoneWarning = context.settingsDataStore.data.map { it[headphoneWarningKey] ?: true }
     val autoOpenPlayer = context.settingsDataStore.data.map { it[autoOpenPlayerKey] ?: true }
@@ -42,6 +43,7 @@ class SettingsStore(private val context: Context) {
     val playbackSnapshot = context.settingsDataStore.data.map { it[playbackSnapshotKey].orEmpty() }
     val dailyCount = context.settingsDataStore.data.map { if (it[dailyCountKey] == "10") 10 else 5 }
     val searchHistory = context.settingsDataStore.data.map { it[searchHistoryKey].orEmpty().lineSequence().filter(String::isNotBlank).take(8).toList() }
+    val profileCache = context.settingsDataStore.data.map { it[profileCacheKey].orEmpty() }
     suspend fun setQuality(value: String) = context.settingsDataStore.edit { it[qualityKey] = if (value == "320") "320" else "128" }
     suspend fun setHeadphoneWarning(value: Boolean) = context.settingsDataStore.edit { it[headphoneWarningKey] = value }
     suspend fun setAutoOpenPlayer(value: Boolean) = context.settingsDataStore.edit { it[autoOpenPlayerKey] = value }
@@ -62,4 +64,5 @@ class SettingsStore(private val context: Context) {
         if (query.isNotBlank()) prefs[searchHistoryKey] = (listOf(query) + prefs[searchHistoryKey].orEmpty().lineSequence().filter { it.isNotBlank() && it != query }).take(8).joinToString("\n")
     }
     suspend fun clearSearchHistory() = context.settingsDataStore.edit { it.remove(searchHistoryKey) }
+    suspend fun setProfileCache(value: String) = context.settingsDataStore.edit { it[profileCacheKey] = value }
 }

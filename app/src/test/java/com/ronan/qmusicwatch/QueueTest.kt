@@ -31,6 +31,15 @@ class QueueTest {
         assertEquals(9, queueDropIndex(visible, 1, 500f, 60))
     }
 
+    @Test fun profileCacheRefreshesOnlyWhenMissingWrongAccountUnknownOrExpired() {
+        val now = 2_000_000_000_000L
+        val fresh = com.ronan.qmusicwatch.model.CachedUserProfile("1", com.ronan.qmusicwatch.model.UserProfile(displayName = "Ronan", isVip = true, vipExpireAt = now / 1000 + 86_400), now - 100L * 24 * 60 * 60 * 1000)
+        assertEquals(false, profileCacheNeedsRefresh(fresh, "1", now))
+        assertEquals(true, profileCacheNeedsRefresh(fresh, "2", now))
+        assertEquals(true, profileCacheNeedsRefresh(fresh.copy(profile = fresh.profile.copy(isVip = null)), "1", now))
+        assertEquals(true, profileCacheNeedsRefresh(fresh.copy(profile = fresh.profile.copy(vipExpireAt = now / 1000)), "1", now))
+    }
+
     @Test fun dailyRecommendationWrapsWithoutGrowingPastCount() {
         assertEquals(listOf(4, 5, 1), dailyBatch(listOf(1, 2, 3, 4, 5), 3, 3))
         assertEquals(listOf(1, 2), dailyBatch(listOf(1, 2), 0, 10))
