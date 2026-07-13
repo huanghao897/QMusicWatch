@@ -43,6 +43,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -74,8 +75,8 @@ private fun loginProviderName(provider: String) = if (provider == "wechat") "微
 private fun accountLabel(provider: String, accountId: String?) = if (provider == "wechat") "微信账号已绑定" else "QQ号 ${accountId.orEmpty()}"
 private fun vipSummary(profile: UserProfile?): String = when (profile?.isVip) {
     true -> buildString { append(profile.vipName.ifBlank { "会员有效" }); profile.vipExpireAt?.let { append(" · 到期 "); append(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format(java.util.Date(it * 1000))) } }
-    false -> "当前不是会员"
-    null -> "会员状态暂未返回"
+    false -> "未检测到会员播放权益"
+    null -> "正在读取会员状态"
 }
 internal fun <T> dailyBatch(items: List<T>, offset: Int, count: Int): List<T> = if (items.isEmpty()) emptyList() else List(minOf(count, items.size)) { items[(offset + it) % items.size] }
 
@@ -329,6 +330,12 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     var locked by rememberSaveable { mutableStateOf(false) }
+    val view = LocalView.current
+    DisposableEffect(locked) {
+        val previous = view.keepScreenOn
+        if (locked) view.keepScreenOn = true
+        onDispose { view.keepScreenOn = previous }
+    }
     LaunchedEffect(Unit) { delay(100); focusRequester.requestFocus() }
     LaunchedEffect(track.id, lowPowerPlayer) { var ticks = 0; val interval = if (lowPowerPlayer) 1_000L else 500L; while (true) { position = vm.playbackPosition(); duration = vm.playbackDuration(); playing = vm.isPlaying(); if (++ticks * interval >= 10_000) { ticks = 0; vm.savePlaybackState() }; delay(interval) } }
     LaunchedEffect(active, lyrics.size) {
@@ -358,7 +365,6 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
                         }
                     }
                 }
-                if (showTranslation && lyrics.isNotEmpty() && lyrics.none { !it.translation.isNullOrBlank() }) Text("QQ 音乐未提供官方翻译", Modifier.align(Alignment.TopCenter).padding(top = 58.dp).background(Color.Black.copy(alpha = .55f), RoundedCornerShape(14.dp)).padding(horizontal = 10.dp, vertical = 5.dp), color = Color.Gray, fontSize = 12.sp)
                 }
             } else {
                 Column(Modifier.fillMaxSize().padding(horizontal = 22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -382,7 +388,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
             repeat(2) { page -> Box(Modifier.size(if (pager.currentPage == page) 7.dp else 5.dp).background(if (pager.currentPage == page) Green else Color.Gray, RoundedCornerShape(50))) }
         }
         if (locked) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .72f)).clickable { }, contentAlignment = Alignment.Center) { Text("防误触已锁定\n点击右上角解锁", textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = Color.Gray) }
+            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures {} })
             IconButton({ locked = false }, Modifier.align(Alignment.TopEnd).padding(8.dp).background(Surface, RoundedCornerShape(20.dp))) { Icon(Icons.Default.Lock, "解除锁定", tint = Green) }
         }
     }
