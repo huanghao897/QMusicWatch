@@ -36,3 +36,4 @@ import kotlinx.serialization.Serializable
     val displayName: String = "", val avatarUrl: String = "", val isVip: Boolean? = null,
     val vipExpireAt: Long? = null, val vipName: String = "",
 )
+@Serializable data class CachedUserProfile(val accountId: String, val profile: UserProfile, val updatedAt: Long)

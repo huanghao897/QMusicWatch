@@ -89,6 +89,7 @@ internal fun <T> dailyBatch(items: List<T>, offset: Int, count: Int): List<T> = 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         hideStatusBar()
         setContent { QMusicTheme { QMusicApp() } }
     }
@@ -138,7 +139,7 @@ class MainActivity : ComponentActivity() {
     LaunchedEffect(state.playEvent, autoOpenPlayer) {
         if (state.playEvent != 0L && autoOpenPlayer && state.currentTrack != null && backStack?.destination?.route != "player") nav.navigate("player") { launchSingleTop = true }
     }
-    Scaffold(containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = { if (backStack?.destination?.route != "player") MiniPlayer(state.currentTrack) { nav.navigate("player") } }) { padding ->
+    Scaffold(containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom), snackbarHost = { SnackbarHost(snackbar) }, bottomBar = { if (backStack?.destination?.route != "player") MiniPlayer(state.currentTrack) { nav.navigate("player") } }) { padding ->
         NavHost(nav, "home", Modifier.padding(padding)) {
             composable("home") { HomeScreen(nav, state, vm, dailyCount) }
             composable("login") { LoginScreen(state, vm) { nav.popBackStack() } }
