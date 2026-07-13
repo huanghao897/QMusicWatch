@@ -10,6 +10,8 @@ import com.ronan.qmusicwatch.lyrics.LrcParser
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.model.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -53,8 +55,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val playMode = graph.settings.playMode.stateIn(viewModelScope, SharingStarted.Eagerly, "sequential")
     val lyricSize = graph.settings.lyricSize.stateIn(viewModelScope, SharingStarted.Eagerly, "normal")
     val lyricTranslation = graph.settings.lyricTranslation.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val lyricOriginal = graph.settings.lyricOriginal.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val lyricOffset = graph.settings.lyricOffset.stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+    val lyricAnimation = graph.settings.lyricAnimation.stateIn(viewModelScope, SharingStarted.Eagerly, "soft")
     val pureBlack = graph.settings.pureBlack.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val lowPowerPlayer = graph.settings.lowPowerPlayer.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val wifiOnlyDownload = graph.settings.wifiOnlyDownload.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val lastSleepMinutes = graph.settings.lastSleepMinutes.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val dailyCount = graph.settings.dailyCount.stateIn(viewModelScope, SharingStarted.Eagerly, 5)
     val searchHistory = graph.settings.searchHistory.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
@@ -78,6 +85,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()?.let { snapshot ->
                 _queue.value = snapshot.queue.distinctBy(Track::id)
+                _queueReversed.value = snapshot.queueReversed
                 restoredPosition = snapshot.positionMs
                 snapshot.track?.let { track ->
                     _state.update { it.copy(currentTrack = track) }
@@ -85,6 +93,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        viewModelScope.launch { while (isActive) { delay(10_000); if (_state.value.currentTrack != null) persistSnapshot() } }
         loadHome()
     }
     fun consumeMessage() = _state.update { it.copy(message = null) }
@@ -176,14 +185,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun continueOnSpeaker() { _state.value.pendingSpeakerTrack?.let { requestPlay(it, true, pendingQueue) } }
     fun dismissSpeakerPrompt() = _state.update { it.copy(pendingSpeakerTrack = null) }
-    fun cache(track: Track) = viewModelScope.launch {
+    fun cache(track: Track, groupName: String = "单曲缓存") = viewModelScope.launch {
         val owner = accountId ?: return@launch fail(IllegalStateException("请先登录"))
-        runCatching { graph.api.stream(track, preferredQuality(track)) }.onSuccess { graph.downloads.enqueue(track, owner, it.url); _state.update { s -> s.copy(message = "已加入离线缓存") } }.onFailure(::fail)
+        runCatching { graph.api.stream(track, preferredQuality(track)) }.onSuccess { graph.downloads.enqueue(track, owner, it.url, wifiOnlyDownload.value, groupName); _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "已加入缓存，等待 Wi-Fi" else "已加入离线缓存") } }.onFailure(::fail)
     }
-    fun cacheAll(tracks: List<Track>) = tracks.forEach(::cache)
-    fun resumeDownload(item: com.ronan.qmusicwatch.data.DownloadEntity) = cache(Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl, qualities = listOf("128", "320")))
+    fun cacheAll(tracks: List<Track>, groupName: String = "播放列表缓存") = tracks.forEach { cache(it, groupName) }
+    fun resumeDownload(item: com.ronan.qmusicwatch.data.DownloadEntity) = cache(Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl, qualities = listOf("128", "320")), item.groupName)
     fun pauseDownload(id: String) = viewModelScope.launch { accountId?.let { graph.downloads.pause(id, it) } }
     fun deleteDownload(id: String, owner: String) = viewModelScope.launch { graph.downloads.delete(id, owner) }
+    fun deleteInvalidDownloads() = viewModelScope.launch {
+        val owner = accountId ?: return@launch
+        val count = graph.downloads.deleteInvalid(owner)
+        _state.update { it.copy(message = if (count == 0) "没有失效缓存" else "已删除 $count 个失效缓存") }
+    }
     fun like(track: Track, liked: Boolean) = viewModelScope.launch { runCatching { graph.api.like(track, liked) }.onSuccess { loadLibrary() }.onFailure(::fail) }
     fun loadDetail(type: String, collection: MusicCollection, editable: Boolean = false) = viewModelScope.launch { runCatching { graph.api.collection(type, collection) }.onSuccess { value -> _state.update { it.copy(detail = value, detailDirectoryId = collection.directoryId.takeIf { editable }) } }.onFailure(::fail) }
     fun createPlaylist(title: String) = viewModelScope.launch { runCatching { graph.api.createPlaylist(title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
@@ -204,8 +218,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setPlayMode(value: String) = viewModelScope.launch { graph.settings.setPlayMode(value) }
     fun setLyricSize(value: String) = viewModelScope.launch { graph.settings.setLyricSize(value) }
     fun setLyricTranslation(value: Boolean) = viewModelScope.launch { graph.settings.setLyricTranslation(value) }
+    fun setLyricOriginal(value: Boolean) = viewModelScope.launch { graph.settings.setLyricOriginal(value) }
     fun setLyricOffset(value: Long) = viewModelScope.launch { graph.settings.setLyricOffset(value) }
+    fun setLyricAnimation(value: String) = viewModelScope.launch { graph.settings.setLyricAnimation(value) }
     fun setPureBlack(value: Boolean) = viewModelScope.launch { graph.settings.setPureBlack(value) }
+    fun setLowPowerPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setLowPowerPlayer(value) }
+    fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch { graph.settings.setWifiOnlyDownload(value) }
     fun setDailyCount(value: Int) = viewModelScope.launch { graph.settings.setDailyCount(value) }
     fun addToQueue(track: Track) { if (_queue.value.none { it.id == track.id }) _queue.value = _queue.value + track; persistSnapshot(); _state.update { it.copy(message = "已加入播放列表") } }
     fun enqueueNext(track: Track) {
@@ -223,6 +241,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         persistSnapshot()
     }
     fun clearQueue() { _queue.value = emptyList(); _queueIndex.value = -1; persistSnapshot() }
+    fun removeQueueDuplicates() {
+        val before = _queue.value.size
+        _queue.value = _queue.value.distinctBy(Track::id)
+        _queueIndex.value = _state.value.currentTrack?.let { playing -> _queue.value.indexOfFirst { it.id == playing.id } } ?: -1
+        persistSnapshot(); _state.update { it.copy(message = "已移除 ${before - _queue.value.size} 首重复歌曲") }
+    }
     fun reverseQueue() {
         _queue.value = _queue.value.reversed(); _queueReversed.value = !_queueReversed.value
         _queueIndex.value = _state.value.currentTrack?.let { playing -> _queue.value.indexOfFirst { it.id == playing.id } } ?: -1
@@ -253,7 +277,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _queue.value.forEach { graph.api.changePlaylistTrack(playlist.directoryId, it, true) }
         }.onSuccess { _state.update { it.copy(message = "播放列表已保存为歌单") }; loadLibrary() }.onFailure(::fail)
     }
-    fun startSleepTimer(minutes: Int, finishCurrent: Boolean = false) { graph.playback.startSleepTimer(minutes, finishCurrent); _state.update { it.copy(message = if (finishCurrent) "$minutes 分钟后播完当前歌曲关闭" else "将在 $minutes 分钟后停止播放") } }
+    fun importPlaylistToQueue(collection: MusicCollection) = viewModelScope.launch {
+        runCatching { graph.api.collection("playlist", collection) }.onSuccess { detail ->
+            val before = _queue.value.size
+            _queue.value = (_queue.value + detail.tracks).distinctBy(Track::id)
+            _queueIndex.value = _state.value.currentTrack?.let { current -> _queue.value.indexOfFirst { it.id == current.id } } ?: -1
+            persistSnapshot(); _state.update { it.copy(message = "已从${collection.title}添加 ${_queue.value.size - before} 首") }
+        }.onFailure(::fail)
+    }
+    fun startSleepTimer(minutes: Int, finishCurrent: Boolean = false) { graph.playback.startSleepTimer(minutes, finishCurrent); viewModelScope.launch { graph.settings.setLastSleepMinutes(minutes) }; _state.update { it.copy(message = if (finishCurrent) "$minutes 分钟后播完当前歌曲关闭" else "将在 $minutes 分钟后停止播放") } }
     fun cancelSleepTimer() { graph.playback.cancelSleepTimer(); _state.update { it.copy(message = "已取消定时关闭") } }
     fun playbackPosition() = graph.playback.position()
     fun playbackDuration() = graph.playback.duration()
@@ -261,9 +293,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun pausePlayback() { graph.playback.pause(); persistSnapshot() }
     fun resumePlayback() { if (graph.playback.duration() == 0L) _state.value.currentTrack?.let { requestPlay(it, true) } else graph.playback.resume() }
     fun seek(position: Long) = graph.playback.seek(position)
+    fun adjustVolume(direction: Int) = graph.playback.adjustVolume(direction)
     fun savePlaybackState() = persistSnapshot()
     private fun persistSnapshot(position: Long = graph.playback.position()) = viewModelScope.launch {
-        graph.settings.setPlaybackSnapshot(json.encodeToString(PlaybackSnapshot(_state.value.currentTrack, _queue.value, position)))
+        graph.settings.setPlaybackSnapshot(json.encodeToString(PlaybackSnapshot(_state.value.currentTrack, _queue.value, position, _queueReversed.value)))
     }
     private fun preferredQuality(track: Track) = if (quality.value == "320" && "320" in track.qualities) "320" else "128"
     override fun onCleared() { graph.playback.onEnded = null; graph.playback.onError = null; super.onCleared() }

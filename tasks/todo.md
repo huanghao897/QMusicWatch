@@ -1,0 +1,7 @@
+- [x] Persist complete playback snapshot and restore it
+- [x] Complete lyric controls and watch gestures
+- [x] Complete cache settings and maintenance
+- [x] Complete account and playlist sections
+- [x] Complete queue batch operations and duplicate cleanup
+- [x] Add tests and build release APK
+- [x] Commit and push to GitHub
