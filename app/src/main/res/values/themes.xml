@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.QMusicWatch" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#090C0B</item>
+        <item name="android:navigationBarColor">#090C0B</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
+
