@@ -128,15 +128,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!signedIn) return@launch fail(IllegalStateException("请先登录"))
         runCatching { graph.api.library() }.onSuccess { value -> _state.update { it.copy(library = value) } }.onFailure(::fail)
     }
-    fun loadProfile() = viewModelScope.launch {
-        if (!signedIn || _state.value.profile != null) return@launch
+    fun loadProfile(force: Boolean = false) = viewModelScope.launch {
+        if (!signedIn || (!force && _state.value.profile != null)) return@launch
         runCatching { graph.api.profile() }.onSuccess { profile -> _state.update { it.copy(profile = profile) } }
             .onFailure { AppLog.write("PROFILE", "${it.javaClass.simpleName}:${it.message.orEmpty()}") }
     }
     fun diagnose() = viewModelScope.launch {
         _state.update { it.copy(message = "正在检查登录、歌单和播放地址…") }
         runCatching { graph.api.diagnose() }
-            .onSuccess { result -> _state.update { it.copy(message = result, diagnostic = result) } }
+            .onSuccess { result -> _state.update { it.copy(message = result, diagnostic = result) }; loadProfile(force = true) }
             .onFailure { error -> _state.update { it.copy(diagnostic = "诊断失败：${error.message ?: "未知错误"}") }; fail(error) }
     }
     fun loadRecent() = viewModelScope.launch {

@@ -137,7 +137,12 @@ class MainActivity : ComponentActivity() {
             composable("settings") { SettingsCenter(nav) { nav.popBackStack() } }
             composable("settings/display") { DisplaySettingsScreen(vm, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, pureBlack, lowPowerPlayer) { nav.popBackStack() } }
             composable("settings/playback") { PlaybackSettingsScreen(vm, quality, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() } }
-            composable("settings/network") { NetworkSettingsScreen(vm, dailyCount, state.diagnostic, state.profile) { nav.popBackStack() } }
+            composable("settings/network") {
+                NetworkSettingsScreen(vm, dailyCount, state.diagnostic, state.profile, onRelogin = {
+                    vm.logout()
+                    nav.navigate("login") { popUpTo("home") }
+                }) { nav.popBackStack() }
+            }
             composable("settings/about") { AboutScreen(vm) { nav.popBackStack() } }
         }
     }
@@ -179,7 +184,6 @@ class MainActivity : ComponentActivity() {
                     item { SettingsModule("我喜欢", "${state.library?.liked?.size ?: 0} 首歌曲", Icons.Default.Favorite) { nav.navigate("library") } }
                     item { SettingsModule("我创建的歌单", "${state.library?.playlists?.count { it.owned != false } ?: 0} 个歌单", Icons.Default.QueueMusic) { nav.navigate("library") } }
                     item { SettingsModule("收藏歌单", "${state.library?.playlists?.count { it.owned == false } ?: 0} 个歌单", Icons.Default.LibraryMusic) { nav.navigate("library") } }
-                    item { FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { OutlinedButton(vm::diagnose) { Text("检查登录") }; OutlinedButton({ vm.logout(); nav.navigate("login") }) { Text("重新登录") } } }
                 }
                 item { SettingsModule("最近播放", "本地与云端播放记录", Icons.Default.History) { nav.navigate("recent") } }
                 item { SettingsModule("离线缓存", "已下载歌曲与任务", Icons.Default.Download) { nav.navigate("downloads") } }
@@ -436,14 +440,17 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     if (customTimer) AlertDialog(onDismissRequest = { customTimer = false }, title = { Text("自定义播放时间") }, text = { OutlinedTextField(customMinutes, { customMinutes = it.filter(Char::isDigit).take(4) }, label = { Text("分钟（1-1440）") }, singleLine = true) }, confirmButton = { TextButton({ customMinutes.toIntOrNull()?.coerceIn(1, 1440)?.let { vm.startSleepTimer(it, finishCurrent) }; customTimer = false }) { Text("开始") } }, dismissButton = { TextButton({ customTimer = false }) { Text("取消") } })
 }
 
-@Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, diagnostic: String?, profile: UserProfile?, onBack: () -> Unit) {
+@Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, diagnostic: String?, profile: UserProfile?, onRelogin: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val saveLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> uri?.let { runCatching { AppLog.copyTo(context, it) } } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item { SettingsHeader("内容与网络", onBack) }
         item { Column(Modifier.fillMaxWidth().padding(16.dp, 8.dp)) { Text("每日推荐显示数量"); Row { FilterChip(dailyCount == 5, { vm.setDailyCount(5) }, label = { Text("5 首") }); Spacer(Modifier.width(7.dp)); FilterChip(dailyCount == 10, { vm.setDailyCount(10) }, label = { Text("10 首") }) } } }
-        item { if (vm.signedIn) ListItem(headlineContent = { Text(profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户") }, supportingContent = { Text("${loginProviderName(vm.loginProvider)}登录\n${vipSummary(profile)}") }, leadingContent = { Icon(Icons.Default.AccountCircle, null, tint = Green) }) }
-        item { if (vm.signedIn) OutlinedButton(vm::diagnose, Modifier.fillMaxWidth()) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(7.dp)); Text("账号与播放诊断") } }
+        if (vm.signedIn) {
+            item { Text("账号", color = Green, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
+            item { ListItem(headlineContent = { Text(profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户") }, supportingContent = { Text("${accountLabel(vm.loginProvider, vm.accountId)}\n${vipSummary(profile)}") }, leadingContent = { Icon(Icons.Default.AccountCircle, null, tint = Green) }) }
+            item { FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { OutlinedButton(vm::diagnose) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(5.dp)); Text("检查登录") }; OutlinedButton(onRelogin) { Text("重新登录") } } }
+        }
         diagnostic?.let { item { Text(it, color = if (it.startsWith("诊断失败")) MaterialTheme.colorScheme.error else Green, fontSize = 14.sp) } }
         item { Text("日志最多 256KB，不记录 Cookie、令牌或播放 URL。", color = Color.Gray, fontSize = 14.sp) }
         item { FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) { OutlinedButton({ context.startActivity(Intent.createChooser(AppLog.shareIntent(context), "分享日志")) }) { Icon(Icons.Default.Share, null); Text("分享") }; OutlinedButton({ saveLog.launch("QMusicWatch-${BuildConfig.VERSION_NAME}.log") }) { Icon(Icons.Default.Save, null); Text("保存") }; TextButton(AppLog::clear) { Text("清空") } } }

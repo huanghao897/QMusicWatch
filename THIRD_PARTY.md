@@ -9,6 +9,8 @@ These projects informed behavior, product research, or compatible protocol imple
 | [google/horologist](https://github.com/google/horologist) | Apache-2.0 | Media interaction guidance only; no library dependency |
 | [m16a4666/HeyWear](https://github.com/m16a4666/HeyWear) | MIT | Square-watch layout and QR usability research only |
 | [fovepig/QQmusic-API](https://github.com/fovepig/QQmusic-API) | Apache-2.0 | QQ Music request/module shapes informed the Kotlin client; no Node runtime code is bundled |
+| [BeyondtheApex/ChillPatcher](https://github.com/BeyondtheApex/ChillPatcher) | No license declared | VIP endpoint behavior research only; no source code copied |
+| [Hjdd14/Mconnect-Music_connect](https://github.com/Hjdd14/Mconnect-Music_connect) | MIT | VIP module/method compatibility research only; no source code copied |
 
 Runtime dependencies keep their original licenses. Gradle and npm lock files
 are the authoritative dependency lists for a particular release.

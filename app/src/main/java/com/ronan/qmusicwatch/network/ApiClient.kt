@@ -48,24 +48,43 @@ internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
 }
 
 internal fun parseUserProfile(root: JsonElement): UserProfile? {
-    fun objects(value: JsonElement): Sequence<JsonObject> = sequence {
-        when (value) { is JsonObject -> { yield(value); value.values.forEach { yieldAll(objects(it)) } }; is JsonArray -> value.forEach { yieldAll(objects(it)) }; else -> Unit }
+    fun objects(value: JsonElement, path: String = "root"): Sequence<Pair<String, JsonObject>> = sequence {
+        when (value) {
+            is JsonObject -> {
+                yield(path to value)
+                value.forEach { (key, child) -> yieldAll(objects(child, "$path.$key")) }
+            }
+            is JsonArray -> value.forEachIndexed { index, child -> yieldAll(objects(child, "$path[$index]")) }
+            else -> Unit
+        }
     }
     val all = objects(root).toList()
     fun JsonObject.value(vararg names: String) = names.firstNotNullOfOrNull { name -> (this[name] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
-    val identity = all.firstOrNull { it.value("nick", "nickname", "nickName", "userName") != null }
+    val identity = all.firstOrNull { (_, item) -> item.value("nick", "nickname", "nickName", "userName") != null }?.second
     val name = identity?.value("nick", "nickname", "nickName", "userName").orEmpty()
-    val avatarKeys = arrayOf("headurl", "headUrl", "headpic", "headPic", "head_pic", "headPicUrl", "avatarurl", "avatarUrl")
-    val avatar = (identity?.value(*avatarKeys) ?: all.firstNotNullOfOrNull { it.value(*avatarKeys) }).orEmpty().let { if (it.startsWith("//")) "https:$it" else it.replace("http://", "https://") }
+    val avatarKeys = arrayOf("logo", "logoUrl", "headurl", "headUrl", "headpic", "headPic", "head_pic", "headPicUrl", "avatarurl", "avatarUrl")
+    val avatar = (identity?.value(*avatarKeys) ?: all.firstNotNullOfOrNull { (_, item) -> item.value(*avatarKeys) }).orEmpty().let { if (it.startsWith("//")) "https:$it" else it.replace("http://", "https://") }
     val now = System.currentTimeMillis() / 1000
-    val memberships = all.map { item ->
-        val raw = item.value("isVip", "is_vip", "isSVip", "is_svip", "vipFlag", "vip_flag", "svipFlag", "svip_status", "vipStatus", "vip_type", "vipType")
+    val memberships = all.mapNotNull { (path, item) ->
+        val membershipPath = path.contains("vip", true) || path.contains("member", true)
+        val raw = item.value(
+            "isVip", "is_vip", "isSVip", "is_svip", "isSvip", "vip", "svip",
+            "vipFlag", "vip_flag", "svipFlag", "svip_flag", "svip_status", "vipStatus",
+            "vip_type", "vipType", "viptype", "music_vip_level", "green_vip_level",
+            "luxury_vip_level", "super_vip_level", "svip_type", "svipType",
+        )
         val enabled = raw?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 }
-        val end = item.value("vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime", "vipExpireTime", "vipExpireDate", "expireTime", "expire_time", "expireDate", "endTime", "end_time", "endDate")?.let(::profileEpoch)
-        var label = item.value("vipName", "vip_name", "vipLevelName", "levelName", "svipName").orEmpty()
-        if (label.contains("svip", true) || label.contains("超级") || item.value("isSVip", "is_svip", "svipFlag", "svip_status")?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 } == true) label = "超级会员"
-        else if (label.contains("绿钻")) label = "豪华绿钻"
-        Triple(enabled, end, label)
+        val end = item.value("vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime", "vipExpireTime", "vipExpireDate", "expireTime", "expire_time", "expireDate", "expire_date", "endTime", "end_time", "endDate")?.let(::profileEpoch)
+        var label = item.value("vipName", "vip_name", "vipLevelName", "levelName", "svipName", "name", "title").orEmpty()
+        val pathAndLabel = "$path $label"
+        label = when {
+            pathAndLabel.contains("听书", true) || pathAndLabel.contains("book", true) -> "听书会员"
+            pathAndLabel.contains("svip", true) || pathAndLabel.contains("超级", true) || item.value("isSVip", "is_svip", "isSvip", "svipFlag", "svip_flag", "svip_status")?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 } == true -> "超级会员（SVIP）"
+            pathAndLabel.contains("绿钻", true) || pathAndLabel.contains("green", true) || pathAndLabel.contains("luxury", true) -> "豪华绿钻"
+            label.contains("会员") || label.contains("vip", true) -> label
+            else -> ""
+        }
+        if (!membershipPath && end == null && label.isBlank()) null else Triple(enabled, end, label)
     }
     val active = memberships.filter { it.first == true || (it.second ?: 0) > now }.maxByOrNull { it.second ?: 0 }
     val expire = active?.second ?: memberships.mapNotNull { it.second }.maxOrNull()
@@ -228,8 +247,21 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         requireLogin()
         val id = accountId()
         val roots = mutableListOf<JsonObject>()
-        listOf("GetLoginUserInfo", "GetVipInfo", "GetUserInfo").forEach { method ->
+        listOf("GetLoginUserInfo", "GetUserInfo").forEach { method ->
             runCatching { api("music.UserInfo.userInfoServer", method, obj("user_uin" to id, "login_uin" to id, "uin" to id)) }.getOrNull()?.let { data -> AppLog.write("PROFILE", "$method keys=${data.keys.joinToString(",").take(300)}"); roots += data }
+        }
+        runCatching { api("music.UnifiedSearch.Profile", "GetUserProfile", obj("ct" to 24, "uin" to id)) }.getOrNull()?.let { data ->
+            AppLog.write("PROFILE", "GetUserProfile keys=${data.keys.joinToString(",").take(300)}")
+            roots += data
+        }
+        listOf(
+            Triple("music.vip.VipUserInfo", "GetVipUserInfo", obj("uin" to id)),
+            Triple("music.vip.VipInfo", "GetVipInfo", obj("uin" to id, "user_uin" to id)),
+        ).forEach { (module, method, params) ->
+            runCatching { api(module, method, params) }.getOrNull()?.let { data ->
+                AppLog.write("PROFILE", "$method keys=${data.keys.joinToString(",").take(300)}")
+                roots += data
+            }
         }
         runCatching {
             val url = "https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?format=json&loginUin=$id&hostUin=$id&cid=205360838&reqfrom=1"
@@ -237,8 +269,6 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             cookie()?.takeIf(String::isNotBlank)?.let { builder.header("Cookie", it) }
             http.newCall(builder.build()).execute().use { response -> if (!response.isSuccessful) error("HTTP ${response.code}"); json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject }
         }.getOrNull()?.let { roots += it }
-        val liked = api("music.srfDissInfo.DissInfo", "CgiGetDiss", obj("disstid" to 0, "dirid" to 201, "tag" to true, "song_begin" to 0, "song_num" to 1, "userinfo" to true, "orderlist" to false))
-        roots += liked
         mergeUserProfiles(roots.mapNotNull(::parseUserProfile)) ?: error("QQ 音乐未返回账号资料")
     }
 
