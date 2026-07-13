@@ -99,9 +99,14 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
 }
 
 private fun profileEpoch(value: String): Long? {
-    val digits = value.filter(Char::isDigit)
-    if (digits.length == 8 && digits.startsWith("20")) return runCatching { java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).parse(digits)?.time?.div(1000) }.getOrNull()
-    return digits.toLongOrNull()?.let { if (it > 10_000_000_000L) it / 1000 else it }?.takeIf { it >= 946_684_800L }
+    val text = value.trim()
+    val date = when {
+        text.length >= 10 && text[4] in "-/" && text[7] in "-/" -> text.take(10).replace('/', '-')
+        text.length == 8 && text.startsWith("20") && text.all(Char::isDigit) -> "${text.take(4)}-${text.substring(4, 6)}-${text.takeLast(2)}"
+        else -> null
+    }
+    date?.let { runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply { isLenient = false }.parse(it)?.time?.div(1000) }.getOrNull() }?.let { return it }
+    return text.toLongOrNull()?.let { if (it > 10_000_000_000L) it / 1000 else it }?.takeIf { it >= 946_684_800L }
 }
 
 internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {
