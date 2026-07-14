@@ -8,7 +8,7 @@
 
 - 继续使用 Kotlin、Jetpack Compose、StateFlow 和现有 QQ 音乐直连接口
 - 不新增 UI 或拖动依赖；使用 `animateItem`、`spring`、现有手势与震动 API
-- QRC 字级时间可用时精确高亮；仅有 LRC 时按相邻两行时间均匀高亮
+- QQ 返回的加密 QRC 在没有兼容解密器时不得覆盖普通歌词；LRC 按相邻两行时间均匀高亮
 
 ## Commands
 
@@ -20,8 +20,8 @@
 
 - `MainActivity.kt`：紧凑搜索、实时队列拖动、选择导入和歌词绘制
 - `AppViewModel.kt`：队列移动与选择导入状态
-- `lyrics/LrcParser.kt`：LRC/QRC 字级时间解析
-- `network/ApiClient.kt`、`model/Models.kt`：请求和承载 QRC 数据
+- `lyrics/LrcParser.kt`：LRC 解析、逐字进度与可选 QRC 字级时间解析
+- `network/ApiClient.kt`、`model/Models.kt`：可靠歌词请求与歌词数据模型
 - `app/src/test/`：拖动落点、QRC 和逐字进度测试
 
 ## Code Style
@@ -29,15 +29,13 @@
 复用现有状态和 Compose 动画，不建立新的拖动框架：
 
 ```kotlin
-if (dragOffset >= rowHeight / 2f) {
-    moveQueue(from, 1)
-    dragOffset -= rowHeight
-}
+workingQueue = moveQueuePreview(workingQueue, from, to)
+// 松手后只提交一次最终顺序
 ```
 
 ## Testing Strategy
 
-- 单元测试覆盖跨半行实时换位、边缘方向、QRC 解析和逐字进度
+- 单元测试覆盖跨半行实时换位、连续跨多格、无效 QRC 回退和逐字进度
 - Compose 编译验证选择导入、圆角队列和紧凑搜索
 - 最终运行测试、Release lint、R8 构建、签名与 APK 哈希检查
 
@@ -50,10 +48,10 @@ if (dragOffset >= rowHeight / 2f) {
 ## Success Criteria
 
 - 顶部不再显示“离线内容/离线缓存”提示，但断网快照仍静默可用
-- 队列越过半行立即重排，其他歌曲以弹簧动画补位，松手位置与视觉位置一致
-- 队列歌曲使用紧凑圆角卡片；搜索框、标签和页面间距缩小
+- 队列越过半行只更新页面预览，其他歌曲以弹簧动画补位，被拖动项不叠加补位动画；松手后一次提交最终顺序
+- 队列歌曲使用紧凑圆角卡片；首页搜索入口、搜索页和队列筛选框统一为深色圆角且不使用绿色描边
 - “我喜欢”和任意歌单进入歌曲勾选页，只有确认选择的歌曲加入队列
-- 当前歌词行明显大于其他行；有 QRC 时按字级时间高亮，没有时平滑按行间时间高亮
+- 当前歌词行明显大于其他行；普通歌词始终优先可用，并按行间时间平滑逐字高亮；无法安全解析的 QRC 不得使歌词为空
 
 ## Open Questions
 

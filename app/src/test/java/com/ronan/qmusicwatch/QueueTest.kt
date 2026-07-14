@@ -19,6 +19,14 @@ class QueueTest {
         assertEquals(-1, queueReorderStep(-31f, 60))
     }
 
+    @Test fun previewCanCrossSeveralRowsWithoutLosingOrder() {
+        var queue = listOf(Track("a", "A"), Track("b", "B"), Track("c", "C"), Track("d", "D"))
+        queue = moveQueuePreview(queue, 0, 1)
+        queue = moveQueuePreview(queue, 1, 2)
+        queue = moveQueuePreview(queue, 2, 3)
+        assertEquals(listOf("b", "c", "d", "a"), queue.map(Track::id))
+    }
+
     @Test fun selectedImportAddsOnlyCheckedTracksWithoutDuplicates() {
         val a = Track("a", "A"); val b = Track("b", "B"); val c = Track("c", "C")
         assertEquals(listOf("a", "c"), mergeSelectedQueue(listOf(a), listOf(a, b, c), setOf("a", "c")).map(Track::id))

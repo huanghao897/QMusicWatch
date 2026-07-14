@@ -25,4 +25,8 @@ class LrcParserTest {
         val line = LrcParser.parse("[00:01]四个文字").single()
         assertEquals(2, highlightedCharacters(line, 3_000, 5_000))
     }
+
+    @Test fun invalidWordSyncMetadataDoesNotHideLrc() {
+        assertEquals("歌词仍在", LrcParser.parse("[00:01]歌词仍在", wordSync = "1").single().text)
+    }
 }
