@@ -63,6 +63,11 @@ internal fun queueReorderStep(dragPx: Float, itemHeightPx: Int): Int = when {
     else -> 0
 }
 
+internal fun moveQueuePreview(queue: List<Track>, from: Int, to: Int): List<Track> {
+    if (from !in queue.indices || to !in queue.indices || from == to) return queue
+    return queue.toMutableList().apply { add(to, removeAt(from)) }
+}
+
 internal fun profileCacheNeedsRefresh(cache: CachedUserProfile?, accountId: String?, now: Long): Boolean =
     cache == null || cache.accountId != accountId || cache.profile.isVip == null || cache.profile.vipExpireAt?.let { it * 1000 <= now } == true
 
@@ -395,10 +400,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _queueIndex.value = _state.value.currentTrack?.let { playing -> _queue.value.indexOfFirst { it.id == playing.id } } ?: -1
         persistSnapshot()
     }
-    fun moveQueue(index: Int, delta: Int) {
-        val target = index + delta
-        if (index !in _queue.value.indices || target !in _queue.value.indices) return
-        val items = _queue.value.toMutableList(); val item = items.removeAt(index); items.add(target, item); _queue.value = items
+    fun replaceQueueOrder(items: List<Track>) {
+        if (items.map(Track::id).sorted() != _queue.value.map(Track::id).sorted()) return
+        if (items.map(Track::id) == _queue.value.map(Track::id)) return
+        _queue.value = items
         _queueIndex.value = _state.value.currentTrack?.let { playing -> items.indexOfFirst { it.id == playing.id } } ?: -1
         persistSnapshot()
     }

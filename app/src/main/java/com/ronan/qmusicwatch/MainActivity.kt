@@ -83,6 +83,11 @@ import kotlin.math.abs
 
 private val Green = Color(0xFF6DFF9E)
 private val Surface = Color(0xFF111714)
+@Composable private fun watchSearchColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = Color(0xFF59625E), unfocusedBorderColor = Color.Transparent,
+    focusedContainerColor = Surface, unfocusedContainerColor = Surface,
+    cursorColor = Color.White,
+)
 private fun nextPlayMode(mode: String) = when (mode) { "sequential" -> "repeat_one"; "repeat_one" -> "loop_all"; "loop_all" -> "shuffle"; else -> "sequential" }
 private fun playModeName(mode: String) = when (mode) { "repeat_one" -> "单曲循环"; "loop_all" -> "列表循环"; "shuffle" -> "随机播放"; else -> "顺序播放" }
 private fun playModeIcon(mode: String) = when (mode) { "repeat_one" -> Icons.Default.RepeatOne; "loop_all" -> Icons.Default.Repeat; "shuffle" -> Icons.Default.Shuffle; else -> Icons.Default.FormatListNumbered }
@@ -199,7 +204,7 @@ class MainActivity : ComponentActivity() {
         HorizontalPager(state = pager, modifier = Modifier.weight(1f), beyondViewportPageCount = 1) { page ->
             if (page == 0) LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { Spacer(Modifier.height(8.dp)); Text("QMusic Watch", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("第三方非官方客户端", color = Color.Gray) }
-                item { FilledTonalButton({ nav.navigate("search") }, Modifier.fillMaxWidth().height(58.dp), shape = RoundedCornerShape(18.dp)) { Icon(Icons.Default.Search, null); Spacer(Modifier.width(7.dp)); Text("搜索歌曲、歌单、歌手、专辑") } }
+                item { Surface(Modifier.fillMaxWidth().height(52.dp).clickable { nav.navigate("search") }, shape = RoundedCornerShape(20.dp), color = Surface) { Row(Modifier.padding(horizontal = 15.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(9.dp)); Text("搜索歌曲、歌单、歌手、专辑", color = Color(0xFFB6BFBA), fontSize = 14.sp) } } }
                 item { SectionTitle("每日推荐", "换一换") { if (daily.isNotEmpty()) dailyOffset = (dailyOffset + dailyCount) % daily.size } }
                 items(shown, key = { it.id }) { TrackRow(it, vm, queue = shown) }
             } else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -295,7 +300,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     var type by remember { mutableStateOf("track") }
     val names = linkedMapOf("track" to "歌曲", "playlist" to "歌单", "artist" to "歌手", "album" to "专辑")
     Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(52.dp), singleLine = true, placeholder = { Text("搜索", fontSize = 15.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp), trailingIcon = { IconButton({ vm.search(query, type) }, Modifier.size(40.dp)) { Icon(Icons.Default.Search, null) } }, keyboardActions = KeyboardActions(onDone = { vm.search(query, type) }))
+        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(50.dp), singleLine = true, shape = RoundedCornerShape(20.dp), colors = watchSearchColors(), placeholder = { Text("搜索", fontSize = 14.sp, color = Color.Gray) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp), trailingIcon = { IconButton({ vm.search(query, type) }, Modifier.size(38.dp)) { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(20.dp)) } }, keyboardActions = KeyboardActions(onDone = { vm.search(query, type) }))
         if (query.isBlank() && history.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) { Text("最近搜索", Modifier.weight(1f), color = Color.Gray, fontSize = 13.sp); TextButton(vm::clearSearchHistory, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("清空", fontSize = 13.sp) } }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) { history.forEach { value -> AssistChip({ query = value; vm.search(value, type) }, label = { Text(value, maxLines = 1, fontSize = 13.sp) }, leadingIcon = { Icon(Icons.Default.History, null, Modifier.size(14.dp)) }) } }
@@ -574,24 +579,28 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     var saveDialog by remember { mutableStateOf(false) }
     var importDialog by remember { mutableStateOf(false) }
     var playlistTitle by remember { mutableStateOf("") }
+    var workingQueue by remember { mutableStateOf(queue) }
+    var draggingTrackId by remember { mutableStateOf<String?>(null) }
     val selectedIds = remember { mutableStateListOf<String>() }
     val library = state.library
     LaunchedEffect(state.queueImportTitle) { selectedIds.clear() }
+    LaunchedEffect(queue, draggingTrackId) { if (draggingTrackId == null) workingQueue = queue }
     val listState = rememberLazyListState()
     val haptics = LocalHapticFeedback.current
     val view = LocalView.current
     val edgePx = with(androidx.compose.ui.platform.LocalDensity.current) { 72.dp.toPx() }
-    val shown = remember(queue, query) { queue.withIndex().filter { query.isBlank() || it.value.title.contains(query, true) || it.value.artists.any { artist -> artist.contains(query, true) } } }
+    val currentTrackId = state.currentTrack?.id ?: queue.getOrNull(currentIndex)?.id
+    val shown = remember(workingQueue, query) { workingQueue.withIndex().filter { query.isBlank() || it.value.title.contains(query, true) || it.value.artists.any { artist -> artist.contains(query, true) } } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), state = listState, contentPadding = PaddingValues(bottom = 18.dp)) {
         item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.Default.ArrowBack, "返回") }; Text("当前播放列表", Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.Bold); TextButton(vm::reverseQueue) { Icon(if (reversed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null); Text(if (reversed) "倒序" else "正序") } } }
-        item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(50.dp), singleLine = true, placeholder = { Text("筛选播放列表", fontSize = 14.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp), leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) }) }
+        item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(48.dp), singleLine = true, shape = RoundedCornerShape(19.dp), colors = watchSearchColors(), placeholder = { Text("筛选播放列表", fontSize = 13.sp, color = Color.Gray) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp), leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(19.dp)) }) }
         item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalArrangement = Arrangement.spacedBy(0.dp)) { TextButton({ vm.cacheAll(queue, "当前播放列表") }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Text("缓存", fontSize = 13.sp) }; TextButton({ vm.clearQueueImport(); importDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.LibraryAdd, null, Modifier.size(18.dp)); Text("选歌添加", fontSize = 13.sp) }; TextButton({ saveDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.PlaylistAdd, null, Modifier.size(18.dp)); Text("保存", fontSize = 13.sp) }; TextButton(vm::removeQueueDuplicates, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("去重", fontSize = 13.sp) }; TextButton(vm::clearQueue, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("清空", fontSize = 13.sp) } } }
-        item { Text("${queue.size} 首", color = Color.Gray) }
-        if (queue.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("播放列表为空", color = Color.Gray) } }
+        item { Text("${workingQueue.size} 首", color = Color.Gray) }
+        if (workingQueue.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("播放列表为空", color = Color.Gray) } }
         itemsIndexed(shown, key = { _, item -> item.value.id }) { _, indexed ->
             val index = indexed.index; val track = indexed.value
             var dragged by remember(track.id) { mutableFloatStateOf(0f) }
-            var dragging by remember(track.id) { mutableStateOf(false) }
+            val dragging = draggingTrackId == track.id
             var rowHeightPx by remember(track.id) { mutableIntStateOf(1) }
             var handleTopInWindow by remember(track.id) { mutableFloatStateOf(0f) }
             var edgeScrollDirection by remember(track.id) { mutableIntStateOf(0) }
@@ -602,9 +611,9 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
                     var keepMoving = true
                     while (keepMoving) {
                         val step = queueReorderStep(dragged, rowHeightPx)
-                        val target = (dragIndex + step).coerceIn(queue.indices)
+                        val target = (dragIndex + step).coerceIn(workingQueue.indices)
                         if (step == 0 || target == dragIndex) keepMoving = false else {
-                            vm.moveQueue(dragIndex, step)
+                            workingQueue = moveQueuePreview(workingQueue, dragIndex, target)
                             dragIndex = target
                             dragged -= step * rowHeightPx
                         }
@@ -623,9 +632,9 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
             val handleModifier = Modifier.size(44.dp).padding(9.dp).onGloballyPositioned { handleTopInWindow = it.positionInWindow().y }.then(
                 if (query.isBlank()) Modifier.pointerInput(track.id, rowHeightPx, view.height) {
                     detectDragGesturesAfterLongPress(
-                        onDragStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); dragIndex = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0); dragStartIndex = dragIndex; dragging = true; dragged = 0f },
-                        onDragCancel = { edgeScrollDirection = 0; dragging = false; dragged = 0f },
-                        onDragEnd = { if (dragIndex != dragStartIndex) haptics.performHapticFeedback(HapticFeedbackType.LongPress); edgeScrollDirection = 0; dragging = false; dragged = 0f },
+                        onDragStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); workingQueue = queue; dragIndex = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0); dragStartIndex = dragIndex; draggingTrackId = track.id; dragged = 0f },
+                        onDragCancel = { edgeScrollDirection = 0; workingQueue = queue; draggingTrackId = null; dragged = 0f },
+                        onDragEnd = { if (dragIndex != dragStartIndex) haptics.performHapticFeedback(HapticFeedbackType.LongPress); edgeScrollDirection = 0; vm.replaceQueueOrder(workingQueue); draggingTrackId = null; dragged = 0f },
                     ) { change, amount ->
                         change.consume(); dragged += amount.y; reorderByOffset()
                         edgeScrollDirection = queueEdgeScrollDirection(handleTopInWindow + change.position.y, view.height, edgePx)
@@ -635,17 +644,17 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
             Surface(
                 modifier = Modifier.padding(vertical = 3.dp).animateItem(
                     fadeInSpec = androidx.compose.animation.core.tween(180),
-                    placementSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
+                    placementSpec = if (dragging) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
                     fadeOutSpec = androidx.compose.animation.core.tween(160),
                 ).zIndex(if (dragging) 2f else 0f).graphicsLayer {
                     translationY = dragged; scaleX = if (dragging) 1.025f else 1f; scaleY = if (dragging) 1.025f else 1f
                     shadowElevation = if (dragging) 12.dp.toPx() else 0f
                 }.onSizeChanged { rowHeightPx = it.height },
-                shape = RoundedCornerShape(16.dp), color = if (index == currentIndex) Color(0xFF15261D) else Surface,
+                shape = RoundedCornerShape(18.dp), color = if (track.id == currentTrackId) Color(0xFF15261D) else Surface,
             ) {
                 Row(Modifier.fillMaxWidth().clickable { vm.playQueueItem(queue.indexOfFirst { it.id == track.id }) }.padding(start = 11.dp, end = 3.dp, top = 7.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) { if (index == currentIndex) Icon(Icons.Default.GraphicEq, null, tint = Green, modifier = Modifier.size(21.dp)) else Text("${index + 1}", color = Color.Gray, fontSize = 13.sp) }
-                    Spacer(Modifier.width(7.dp)); Column(Modifier.weight(1f)) { Text(track.title, color = if (index == currentIndex) Green else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp); Text(track.artists.joinToString(" / "), color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp) }
+                    Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) { if (track.id == currentTrackId) Icon(Icons.Default.GraphicEq, null, tint = Green, modifier = Modifier.size(21.dp)) else Text("${index + 1}", color = Color.Gray, fontSize = 13.sp) }
+                    Spacer(Modifier.width(7.dp)); Column(Modifier.weight(1f)) { Text(track.title, color = if (track.id == currentTrackId) Green else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp); Text(track.artists.joinToString(" / "), color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp) }
                     Icon(Icons.Default.DragHandle, if (query.isBlank()) "长按拖动排序" else "筛选时不可排序", handleModifier)
                     IconButton({ vm.removeFromQueue(queue.indexOfFirst { it.id == track.id }) }, Modifier.size(44.dp)) { Icon(Icons.Default.RemoveCircleOutline, "移除", Modifier.size(21.dp)) }
                 }

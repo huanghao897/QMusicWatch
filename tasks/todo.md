@@ -13,3 +13,15 @@
 - [x] 完整交付
   - Acceptance：测试、lint、Release、签名和远端提交一致
   - Verify：Gradle + apksigner + aapt + git ls-remote
+- [x] 恢复歌词可靠回退
+  - Acceptance：QQ 返回不可解析 QRC 时仍显示普通歌词
+  - Verify：真实接口样本 + LRC 回退单测
+- [x] 统一圆润搜索样式
+  - Acceptance：首页入口、搜索页和队列筛选框无绿色外框且更紧凑
+  - Verify：Compose 编译
+- [x] 队列拖动单次提交
+  - Acceptance：跨多格不乱序，被拖动项不闪烁，其他项实时补位
+  - Verify：连续跨三格单测 + Compose 编译
+- [x] 0.8.9 完整交付
+  - Acceptance：测试、lint、Release、签名和远端提交一致
+  - Verify：Gradle + apksigner + aapt + git ls-remote

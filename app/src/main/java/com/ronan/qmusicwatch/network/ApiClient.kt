@@ -234,12 +234,11 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     suspend fun lyrics(id: String): LyricsData = withContext(Dispatchers.IO) {
         val data = webApi(
             "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
-            obj("songMid" to id, "crypt" to 0, "qrc" to 1, "qrc_t" to 0, "trans" to 1, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474)
+            obj("songMid" to id, "crypt" to 0, "qrc" to 0, "qrc_t" to 0, "trans" to 1, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474)
         )
         LyricsData(
             decodeText(data.string("lyric")),
             decodeText(data.string("trans")).ifBlank { null },
-            decodeText(data.string("qrc").ifBlank { data.string("qrcLyric") }).ifBlank { null },
         )
     }
 
