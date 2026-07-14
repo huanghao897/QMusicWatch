@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class HomeData(val daily: List<Track>, val recommended: List<MusicCollection>)
 @Serializable data class PagedTracks(val items: List<Track>, val nextCursor: String? = null)
 @Serializable data class PagedCollections(val items: List<MusicCollection>, val nextCursor: String? = null)
-@Serializable data class LyricsData(val original: String, val translation: String? = null)
+@Serializable data class LyricsData(val original: String, val translation: String? = null, val wordSync: String? = null)
 @Serializable data class StreamData(val url: String, val quality: String, val expiresAt: Long)
 @Serializable data class LibraryData(val liked: List<Track>, val playlists: List<MusicCollection>)
 @Serializable data class SessionTokens(

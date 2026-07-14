@@ -1,21 +1,15 @@
-- [x] 播放错误分类和一次自动重签
-  - Acceptance：保留歌曲、队列与进度；二次失败显示分类原因
-  - Verify：单元测试 + Debug/Release 编译
-- [x] 系统媒体播放恢复
-  - Acceptance：Manifest receiver 和 `onPlaybackResumption` 返回已保存媒体项
-  - Verify：单元测试快照兼容 + Release manifest 检查
-- [x] 队列边缘滚动和触觉反馈
-  - Acceptance：拖到上下边缘持续滚动，松手落点按可见队列计算
-  - Verify：滚动方向单测 + Compose 编译
-- [x] 账号隔离离线快照
-  - Acceptance：首页/资料库请求失败时显示同账号缓存，不跨账号
-  - Verify：序列化与账号匹配单测
-- [x] GitHub Release 更新检测
-  - Acceptance：显示版本、说明、SHA-256 与 HTTPS 下载入口
-  - Verify：版本比较/响应解析单测
-- [x] 性能日志与 Baseline Profile
-  - Acceptance：关键页面慢帧写入脱敏日志，APK 含 `assets/dexopt/baseline.prof`
-  - Verify：Release 构建后检查 APK 内容
+- [x] 队列实时换位和圆角动画
+  - Acceptance：跨半行立即换位，其他项弹簧补位，筛选时不允许拖动
+  - Verify：队列落点单测 + Compose 编译
+- [x] 喜欢与歌单逐首选择导入
+  - Acceptance：先选来源再勾选歌曲，确认后仅添加勾选项
+  - Verify：选择合并单测 + Compose 编译
+- [x] 紧凑搜索与间距
+  - Acceptance：搜索框和标签缩小，删除顶部离线提示但保留快照
+  - Verify：Compose 编译 + 480×480 真机观察
+- [x] 当前歌词放大和逐字高亮
+  - Acceptance：QRC 精确字级时间，LRC 平滑回退，翻译缺失不显示文案
+  - Verify：QRC/进度单测 + Compose 编译
 - [x] 完整交付
   - Acceptance：测试、lint、Release、签名和远端提交一致
   - Verify：Gradle + apksigner + aapt + git ls-remote

@@ -33,6 +33,7 @@ data class AppUiState(
     val detail: CollectionDetail? = null, val detailDirectoryId: String? = null, val playEvent: Long = 0,
     val diagnostic: String? = null, val profile: UserProfile? = null, val offlineSnapshot: Boolean = false,
     val releaseInfo: ReleaseInfo? = null, val updateChecking: Boolean = false,
+    val queueImportTitle: String = "", val queueImportTracks: List<Track> = emptyList(), val queueImportLoading: Boolean = false,
 )
 
 internal fun insertNext(queue: List<Track>, currentId: String?, track: Track): List<Track> {
@@ -55,11 +56,21 @@ internal fun queueEdgeScrollDirection(fingerY: Float, viewportHeight: Int, edgeP
     else -> 0
 }
 
+internal fun queueReorderStep(dragPx: Float, itemHeightPx: Int): Int = when {
+    itemHeightPx <= 0 -> 0
+    dragPx >= itemHeightPx / 2f -> 1
+    dragPx <= -itemHeightPx / 2f -> -1
+    else -> 0
+}
+
 internal fun profileCacheNeedsRefresh(cache: CachedUserProfile?, accountId: String?, now: Long): Boolean =
     cache == null || cache.accountId != accountId || cache.profile.isVip == null || cache.profile.vipExpireAt?.let { it * 1000 <= now } == true
 
 internal fun upsertAccountSnapshot(cache: CachedAccountSnapshots, value: CachedAccountSnapshot): CachedAccountSnapshots =
     CachedAccountSnapshots((listOf(value) + cache.items.filterNot { it.accountId == value.accountId }).take(4))
+
+internal fun mergeSelectedQueue(queue: List<Track>, source: List<Track>, selectedIds: Set<String>): List<Track> =
+    (queue + source.filter { it.id in selectedIds }).distinctBy(Track::id)
 
 internal fun nextQueueIndex(size: Int, current: Int, delta: Int, mode: String, ended: Boolean, shuffled: Int = -1): Int = when {
     size <= 0 -> -1
@@ -297,7 +308,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), track.artworkUrl)
             if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
             graph.db.recent().upsert(RecentEntity(track.id, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
-            runCatching { graph.api.lyrics(track.id) }.map { LrcParser.parse(it.original, it.translation) }.getOrDefault(emptyList())
+            runCatching { graph.api.lyrics(track.id) }.map { LrcParser.parse(it.original, it.translation, it.wordSync) }.getOrDefault(emptyList())
         }.onSuccess { parsedLyrics ->
             sourceQueue?.takeIf(List<Track>::isNotEmpty)?.let { source ->
                 _queue.value = source.distinctBy(Track::id)
@@ -409,13 +420,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _queue.value.forEach { graph.api.changePlaylistTrack(playlist.directoryId, it, true) }
         }.onSuccess { _state.update { it.copy(message = "播放列表已保存为歌单") }; loadLibrary() }.onFailure(::fail)
     }
-    fun importPlaylistToQueue(collection: MusicCollection) = viewModelScope.launch {
-        runCatching { graph.api.collection("playlist", collection) }.onSuccess { detail ->
-            val before = _queue.value.size
-            _queue.value = (_queue.value + detail.tracks).distinctBy(Track::id)
-            _queueIndex.value = _state.value.currentTrack?.let { current -> _queue.value.indexOfFirst { it.id == current.id } } ?: -1
-            persistSnapshot(); _state.update { it.copy(message = "已从${collection.title}添加 ${_queue.value.size - before} 首") }
-        }.onFailure(::fail)
+    fun loadQueueImportLiked() = _state.update { it.copy(queueImportTitle = "我喜欢", queueImportTracks = it.library?.liked.orEmpty(), queueImportLoading = false) }
+    fun loadQueueImportPlaylist(collection: MusicCollection) = viewModelScope.launch {
+        _state.update { it.copy(queueImportTitle = collection.title, queueImportTracks = emptyList(), queueImportLoading = true) }
+        runCatching { graph.api.collection("playlist", collection) }
+            .onSuccess { detail -> _state.update { it.copy(queueImportTitle = detail.title, queueImportTracks = detail.tracks, queueImportLoading = false) } }
+            .onFailure { error -> clearQueueImport(); fail(error) }
+    }
+    fun clearQueueImport() = _state.update { it.copy(queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false) }
+    fun addSelectedQueueTracks(ids: Set<String>) {
+        val before = _queue.value.size
+        _queue.value = mergeSelectedQueue(_queue.value, _state.value.queueImportTracks, ids)
+        _queueIndex.value = _state.value.currentTrack?.let { current -> _queue.value.indexOfFirst { it.id == current.id } } ?: -1
+        val added = _queue.value.size - before
+        persistSnapshot(); clearQueueImport(); _state.update { it.copy(message = "已加入 $added 首歌曲") }
     }
     fun startSleepTimer(minutes: Int, finishCurrent: Boolean = false) { graph.playback.startSleepTimer(minutes, finishCurrent); viewModelScope.launch { graph.settings.setLastSleepMinutes(minutes) }; _state.update { it.copy(message = if (finishCurrent) "$minutes 分钟后播完当前歌曲关闭" else "将在 $minutes 分钟后停止播放") } }
     fun cancelSleepTimer() { graph.playback.cancelSleepTimer(); _state.update { it.copy(message = "已取消定时关闭") } }

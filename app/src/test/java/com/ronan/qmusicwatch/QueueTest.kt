@@ -13,6 +13,16 @@ class QueueTest {
         assertEquals(0, queueEdgeScrollDirection(240f, 480, 72f))
         assertEquals(1, queueEdgeScrollDirection(470f, 480, 72f))
     }
+    @Test fun dragReordersImmediatelyAfterHalfRow() {
+        assertEquals(0, queueReorderStep(29f, 60))
+        assertEquals(1, queueReorderStep(30f, 60))
+        assertEquals(-1, queueReorderStep(-31f, 60))
+    }
+
+    @Test fun selectedImportAddsOnlyCheckedTracksWithoutDuplicates() {
+        val a = Track("a", "A"); val b = Track("b", "B"); val c = Track("c", "C")
+        assertEquals(listOf("a", "c"), mergeSelectedQueue(listOf(a), listOf(a, b, c), setOf("a", "c")).map(Track::id))
+    }
     @Test fun insertsNextWithoutDuplicatingTrack() {
         val a = Track("a", "A")
         val b = Track("b", "B")
