@@ -68,6 +68,10 @@ class PlaybackConnection(context: Context) {
         }
     }
     fun pause() = withController(MediaController::pause)
+    fun stopAndClear() {
+        cancelSleepTimer()
+        withController { controller -> controller.stop(); controller.clearMediaItems() }
+    }
     fun resume() = withController(MediaController::play)
     fun seek(positionMs: Long) = withController { it.seekTo(positionMs) }
     fun position() = controllerOrNull()?.currentPosition?.coerceAtLeast(0) ?: 0L

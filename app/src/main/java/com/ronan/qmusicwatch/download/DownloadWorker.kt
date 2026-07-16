@@ -69,7 +69,16 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
             }
             runCatching { graph.api.lyrics(id) }.getOrNull()?.let { cachedLyricsFile(target.absolutePath).writeText(downloadJson.encodeToString(it)) }
             track.artworkUrl.takeIf { it.startsWith("https://") }?.let { artwork ->
-                runCatching { downloadHttp.newCall(Request.Builder().url(artwork).build()).execute().use { response -> if (response.isSuccessful) response.body?.byteStream()?.use { input -> cachedArtworkFile(target.absolutePath).outputStream().use(input::copyTo) } } }
+                val cover = cachedArtworkFile(target.absolutePath)
+                val coverPart = File("${cover.absolutePath}.part")
+                runCatching {
+                    downloadHttp.newCall(Request.Builder().url(artwork).build()).execute().use { response ->
+                        if (!response.isSuccessful) error("cover ${response.code}")
+                        response.body?.byteStream()?.use { input -> coverPart.outputStream().use(input::copyTo) } ?: error("empty cover")
+                    }
+                    if (cover.exists()) cover.delete()
+                    if (!coverPart.renameTo(cover)) error("cannot finalize cover")
+                }.onFailure { coverPart.delete() }
             }
         }.fold(onSuccess = { Result.success() }, onFailure = { db.downloads().progress(id, owner, if (isStopped) "paused" else "failed", part.length(), -1); if (!isStopped && runAttemptCount < 2) Result.retry() else Result.failure() })
     } }
@@ -89,9 +98,11 @@ class DownloadController(private val context: Context, private val db: AppDataba
     suspend fun pause(trackId: String, owner: String) {
         withContext(Dispatchers.IO) { WorkManager.getInstance(context).cancelUniqueWork("download-$owner-$trackId").result.get(15, TimeUnit.SECONDS) }
         val item = db.downloads().find(trackId, owner)
-        db.downloads().progress(trackId, owner, "paused", item?.downloadedBytes ?: 0, item?.totalBytes ?: -1)
+        val finalized = item?.filePath?.let(::File)?.takeIf(File::exists)
+        if (finalized != null) db.downloads().progress(trackId, owner, "complete", finalized.length(), finalized.length())
+        else db.downloads().progress(trackId, owner, "paused", item?.downloadedBytes ?: 0, item?.totalBytes ?: -1)
     }
-    suspend fun delete(trackId: String, owner: String) { pause(trackId, owner); db.downloads().find(trackId, owner)?.let { File(it.filePath).delete(); File(it.filePath.removeSuffix(".audio") + ".part").delete(); cachedLyricsFile(it.filePath).delete(); cachedArtworkFile(it.filePath).delete() }; db.downloads().delete(trackId, owner) }
+    suspend fun delete(trackId: String, owner: String) { pause(trackId, owner); db.downloads().find(trackId, owner)?.let { File(it.filePath).delete(); File(it.filePath.removeSuffix(".audio") + ".part").delete(); cachedLyricsFile(it.filePath).delete(); cachedArtworkFile(it.filePath).let { cover -> cover.delete(); File("${cover.absolutePath}.part").delete() } }; db.downloads().delete(trackId, owner) }
     suspend fun deleteInvalid(owner: String): Int {
         val invalid = db.downloads().all().filter { it.ownerAccountId == owner && (it.status == "complete" && !File(it.filePath).exists() || it.status.startsWith("failed")) }
         invalid.forEach { delete(it.trackId, owner) }

@@ -148,12 +148,17 @@ internal fun parseGitHubRelease(root: JsonObject, currentVersion: String): Relea
 internal fun parseSearchTrack(item: JsonObject): Track? {
     fun text(name: String) = (item[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
     fun number(name: String) = (item[name] as? JsonPrimitive)?.longOrNull ?: 0
+    val file = item["file"] as? JsonObject ?: JsonObject(emptyMap())
+    fun fileText(name: String) = (file[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    fun fileNumber(name: String) = (file[name] as? JsonPrimitive)?.longOrNull ?: 0
     val mid = text("songmid").ifBlank { text("mid") }; val title = text("songname").ifBlank { text("title") }
     if (mid.isBlank() || title.isBlank()) return null
     val pay = item["pay"] as? JsonObject ?: JsonObject(emptyMap())
     fun pay(name: String) = (pay[name] as? JsonPrimitive)?.intOrNull ?: 0
-    val albumMid = text("albummid")
-    return Track(mid, title, (item["singer"] as? JsonArray).orEmpty().mapNotNull { ((it as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull }, text("albumname"), albumMid.takeIf(String::isNotBlank)?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" }.orEmpty(), true, buildList { if (number("size128") > 0) add("128"); if (number("size320") > 0) add("320") }.ifEmpty { listOf("128") }, numericId = number("songid"), songType = number("type").toInt(), requiresVip = text("isonly") == "1" || pay("payplay") != 0 || pay("pay_play") != 0)
+    val album = item["album"] as? JsonObject ?: JsonObject(emptyMap())
+    val albumMid = text("albummid").ifBlank { (album["mid"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
+    val albumName = text("albumname").ifBlank { (album["title"] as? JsonPrimitive)?.contentOrNull.orEmpty() }.ifBlank { (album["name"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
+    return Track(mid, title, (item["singer"] as? JsonArray).orEmpty().mapNotNull { ((it as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull }, albumName, albumMid.takeIf(String::isNotBlank)?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" }.orEmpty(), true, buildList { if (number("size128") > 0 || fileNumber("size_128mp3") > 0) add("128"); if (number("size320") > 0 || fileNumber("size_320mp3") > 0) add("320") }.ifEmpty { listOf("128") }, numericId = number("songid").takeIf { it > 0 } ?: number("id"), mediaMid = fileText("media_mid"), songType = number("type").toInt(), requiresVip = text("isonly") == "1" || pay("payplay") != 0 || pay("pay_play") != 0)
 }
 
 /**
@@ -200,10 +205,19 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     }
 
     suspend fun home(): HomeData = withContext(Dispatchers.IO) {
-        val dailyData = api(
-            "newsong.NewSongServer", "get_new_song_info", obj("type" to 5)
-        )
-        HomeData(findTracks(dailyData), emptyList())
+        val personalized = if (cookie().isNullOrBlank()) emptyList() else runCatching {
+            api(
+                "music.radioProxy.MbTrackRadioSvr", "get_radio_track",
+                obj("id" to 99, "num" to 20, "from" to 0, "scene" to 0, "song_ids" to emptyList<Long>()),
+            ).let(::findTracks)
+        }.onFailure { AppLog.write("HOME", "personalized ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrDefault(emptyList())
+        val daily = if (personalized.size >= 20) personalized else {
+            val fallback = runCatching { api("newsong.NewSongServer", "get_new_song_info", obj("type" to 5)).let(::findTracks) }
+                .onFailure { AppLog.write("HOME", "fallback ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
+                .getOrDefault(emptyList())
+            (personalized + fallback).distinctBy(Track::id)
+        }
+        HomeData(daily, emptyList())
     }
 
     suspend fun searchTracks(query: String, cursor: String? = null): PagedTracks = withContext(Dispatchers.IO) {
@@ -285,11 +299,19 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     suspend fun library(): LibraryData = withContext(Dispatchers.IO) {
         requireLogin()
         val playlists = api("music.musicasset.PlaylistBaseRead", "GetPlaylistByUin", obj("uin" to accountId()))
-        val liked = api(
-            "music.srfDissInfo.DissInfo", "CgiGetDiss",
-            obj("disstid" to 0, "dirid" to 201, "tag" to true, "song_begin" to 0, "song_num" to 100, "userinfo" to true, "orderlist" to true)
-        )
-        LibraryData(findTracks(liked), parseAccountPlaylists(playlists).filterNot { it.directoryId == "201" })
+        val likedTracks = mutableListOf<Track>()
+        val likedIds = mutableSetOf<String>()
+        for (page in 0 until 20) {
+            val liked = api(
+                "music.srfDissInfo.DissInfo", "CgiGetDiss",
+                obj("disstid" to 0, "dirid" to 201, "tag" to true, "song_begin" to page * 100, "song_num" to 100, "userinfo" to true, "orderlist" to true),
+            )
+            val batch = findTracks(liked)
+            val previousSize = likedTracks.size
+            likedTracks += batch.filter { likedIds.add(it.id) }
+            if (batch.size < 100 || likedTracks.size == previousSize) break
+        }
+        LibraryData(likedTracks, parseAccountPlaylists(playlists).filterNot { it.directoryId == "201" })
     }
 
     suspend fun profile(): UserProfile = withContext(Dispatchers.IO) {
@@ -354,13 +376,23 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     }
 
     suspend fun collection(type: String, collection: MusicCollection): CollectionDetail = withContext(Dispatchers.IO) {
-        val data = when (type) {
-            "album" -> api("music.musichallAlbum.AlbumSongList", "GetAlbumSongList", obj("albumMid" to collection.id, "begin" to 0, "num" to 100, "order" to 2))
-            "artist" -> api("musichall.song_list_server", "GetSingerSongList", obj("singerMid" to collection.id, "begin" to 0, "num" to 100, "order" to 1))
-            else -> api("music.srfDissInfo.DissInfo", "CgiGetDiss", obj("disstid" to (collection.id.toLongOrNull() ?: 0), "dirid" to (collection.directoryId.toLongOrNull() ?: 0), "tag" to true, "song_begin" to 0, "song_num" to 100, "userinfo" to true, "orderlist" to true))
+        val tracks = mutableListOf<Track>()
+        val ids = mutableSetOf<String>()
+        var title = collection.title.ifBlank { "详情" }
+        for (page in 0 until 20) {
+            val begin = page * 100
+            val data = when (type) {
+                "album" -> api("music.musichallAlbum.AlbumSongList", "GetAlbumSongList", obj("albumMid" to collection.id, "begin" to begin, "num" to 100, "order" to 2))
+                "artist" -> api("musichall.song_list_server", "GetSingerSongList", obj("singerMid" to collection.id, "begin" to begin, "num" to 100, "order" to 1))
+                else -> api("music.srfDissInfo.DissInfo", "CgiGetDiss", obj("disstid" to (collection.id.toLongOrNull() ?: 0), "dirid" to (collection.directoryId.toLongOrNull() ?: 0), "tag" to true, "song_begin" to begin, "song_num" to 100, "userinfo" to true, "orderlist" to true))
+            }
+            if (page == 0) title = walkObjects(data).firstNotNullOfOrNull { it.string("title").ifBlank { it.string("name") }.takeIf(String::isNotBlank) } ?: title
+            val batch = findTracks(data)
+            val previousSize = tracks.size
+            tracks += batch.filter { ids.add(it.id) }
+            if (batch.size < 100 || tracks.size == previousSize) break
         }
-        val title = walkObjects(data).firstNotNullOfOrNull { it.string("title").ifBlank { it.string("name") }.takeIf(String::isNotBlank) } ?: "详情"
-        CollectionDetail(title, findTracks(data))
+        CollectionDetail(title, tracks)
     }
 
     suspend fun createPlaylist(title: String): MusicCollection = withContext(Dispatchers.IO) {
@@ -496,7 +528,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             playable = value.int("isonly") == 0 && pay.int("pay_play") == 0,
             qualities = buildList { if (file.long("size_128mp3") > 0) add("128"); if (file.long("size_320mp3") > 0) add("320") }.ifEmpty { listOf("128") },
             numericId = numericId, mediaMid = file.string("media_mid"), songType = value.int("type"),
-            requiresVip = pay.int("pay_play") != 0
+            requiresVip = value.int("isonly") != 0 || pay.int("pay_play") != 0
         )
     }.distinctBy { it.id }.toList()
 

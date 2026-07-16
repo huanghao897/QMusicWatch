@@ -17,9 +17,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -100,6 +100,14 @@ private fun vipSummary(profile: UserProfile?): String = when (profile?.isVip) {
     null -> "正在读取会员状态"
 }
 internal fun <T> dailyBatch(items: List<T>, offset: Int, count: Int): List<T> = if (items.isEmpty()) emptyList() else List(minOf(count, items.size)) { items[(offset + it) % items.size] }
+internal fun downloadProgressSummary(downloadedBytes: Long, totalBytes: Long): String {
+    val safeDownloaded = if (totalBytes > 0) downloadedBytes.coerceIn(0, totalBytes) else downloadedBytes.coerceAtLeast(0)
+    val downloadedMb = safeDownloaded / 1024f / 1024f
+    if (totalBytes <= 0) return "%.1f MB".format(java.util.Locale.US, downloadedMb)
+    val totalMb = totalBytes / 1024f / 1024f
+    val percent = (safeDownloaded * 100 / totalBytes).toInt()
+    return "%.1f / %.1f MB · %d%%".format(java.util.Locale.US, downloadedMb, totalMb, percent)
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -168,11 +176,11 @@ class MainActivity : ComponentActivity() {
             composable("login") { LoginScreen(state, vm) { nav.popBackStack() } }
             composable("search") { SearchScreen(nav, state, vm, searchHistory) }
             composable("library") { LaunchedEffect(Unit) { vm.loadLibrary() }; LibraryScreen(nav, state, vm) }
-            composable("recent") { LaunchedEffect(Unit) { vm.loadRecent() }; TrackListScreen("最近播放", state.recent, vm) }
+            composable("recent") { LaunchedEffect(Unit) { vm.loadRecent() }; TrackListScreen("最近播放", state.recent, state.library?.playlists.orEmpty(), vm) }
             composable("downloads") { DownloadScreen(downloads, vm) }
             composable("player") { PlayerScreen(state.currentTrack, state.lyrics, vm, playMode, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, lowPowerPlayer, { nav.navigate("queue") }) { nav.popBackStack() } }
             composable("queue") { LaunchedEffect(Unit) { if (vm.signedIn) vm.loadLibrary() }; QueueScreen(queue, queueIndex, queueReversed, state, vm) { nav.popBackStack() } }
-            composable("detail") { DetailScreen(state.detail, state.detailDirectoryId, vm) }
+            composable("detail") { DetailScreen(state.detail, state.detailDirectoryId, state.library?.playlists.orEmpty(), vm) { nav.popBackStack() } }
             composable("settings") { SettingsCenter(nav) { nav.popBackStack() } }
             composable("settings/display") { DisplaySettingsScreen(vm, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, pureBlack, lowPowerPlayer) { nav.popBackStack() } }
             composable("settings/playback") { PlaybackSettingsScreen(vm, quality, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() } }
@@ -224,7 +232,7 @@ class MainActivity : ComponentActivity() {
                     item { SettingsModule("我创建的歌单", "${state.library?.playlists?.count { it.owned != false } ?: 0} 个歌单", Icons.Default.QueueMusic) { nav.navigate("library") } }
                     item { SettingsModule("收藏歌单", "${state.library?.playlists?.count { it.owned == false } ?: 0} 个歌单", Icons.Default.LibraryMusic) { nav.navigate("library") } }
                 }
-                item { SettingsModule("最近播放", "本地与云端播放记录", Icons.Default.History) { nav.navigate("recent") } }
+                item { SettingsModule("最近播放", "本机播放记录", Icons.Default.History) { nav.navigate("recent") } }
                 item { SettingsModule("离线缓存", "已下载歌曲与任务", Icons.Default.Download) { nav.navigate("downloads") } }
                 item { SettingsModule("设置中心", "显示、播放、网络与关于", Icons.Default.Settings) { nav.navigate("settings") } }
             }
@@ -276,12 +284,18 @@ class MainActivity : ComponentActivity() {
                 }
                 override fun onPageFinished(view: WebView, url: String) {
                     view.evaluateJavascript(
-                        """(function(){if(window.__qmusicBridge)return;window.__qmusicBridge=true;window.addEventListener('message',function(e){QMusicLogin.onMessage(typeof e.data==='string'?e.data:JSON.stringify(e.data));});if(window.Music&&Music.client&&Music.client.open){var original=Music.client.open.bind(Music.client);Music.client.open=function(scope,action,payload){if(action==='scanLoginResult'){QMusicLogin.onMessage(JSON.stringify(payload||{}));return Promise.resolve({});}return original(scope,action,payload);};}})();""",
+                        """(function(){if(window.__qmusicBridge)return;window.__qmusicBridge=true;window.addEventListener('message',function(e){try{var h=new URL(e.origin).hostname;if(!(h==='qq.com'||h.endsWith('.qq.com')))return;}catch(_){return;}QMusicLogin.onMessage(typeof e.data==='string'?e.data:JSON.stringify(e.data));});if(window.Music&&Music.client&&Music.client.open){var original=Music.client.open.bind(Music.client);Music.client.open=function(scope,action,payload){if(action==='scanLoginResult'){QMusicLogin.onMessage(JSON.stringify(payload||{}));return Promise.resolve({});}return original(scope,action,payload);};}})();""",
                         null
                     )
                 }
             }
-            loadUrl("https://y.qq.com/m/client/qr_code_login/index.html?tmeAppID=qqmusic&frame=1&ct=11&cv=20030508")
+            val target = this
+            cookieManager.removeAllCookies {
+                target.post {
+                    cookieManager.flush()
+                    if (webView === target) target.loadUrl("https://y.qq.com/m/client/qr_code_login/index.html?tmeAppID=qqmusic&frame=1&ct=11&cv=20030508")
+                }
+            }
         }
     }, modifier = Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(16.dp)))
     DisposableEffect(Unit) { onDispose { webView?.stopLoading(); webView?.destroy(); webView = null } }
@@ -289,6 +303,7 @@ class MainActivity : ComponentActivity() {
 
 private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     @JavascriptInterface fun onMessage(message: String) {
+        if (message.length > 16_384) return
         MusicCookie.fromQrMessage(message)?.let { cookie ->
             Handler(Looper.getMainLooper()).post { onCookie(cookie) }
         }
@@ -332,21 +347,24 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     deleting?.let { playlist -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("删除歌单？") }, text = { Text("将从 QQ 音乐永久删除“${playlist.title}”，歌曲本身不会删除。") }, confirmButton = { TextButton({ vm.deletePlaylist(playlist.directoryId); deleting = null }) { Text("确认删除", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ deleting = null }) { Text("取消") } }) }
 }
 
-@Composable private fun TrackListScreen(title: String, tracks: List<Track>, vm: AppViewModel) = LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
-    item { SectionTitle(title) }; items(tracks, key = { it.id }) { TrackRow(it, vm, queue = tracks) }
+@Composable private fun TrackListScreen(title: String, tracks: List<Track>, playlists: List<MusicCollection>, vm: AppViewModel) = LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
+    item { SectionTitle(title) }; items(tracks, key = { it.id }) { TrackRow(it, vm, queue = tracks, playlists = playlists) }
 }
 
 @Composable private fun DownloadScreen(downloads: List<DownloadEntity>, vm: AppViewModel) {
     val own = downloads.filter { it.ownerAccountId == vm.accountId }
+    val locked = downloads.filter { it.ownerAccountId != vm.accountId }
     val totalBytes = own.sumOf { item -> maxOf(item.downloadedBytes, java.io.File(item.filePath).takeIf { item.status == "complete" && it.exists() }?.length() ?: 0L) }
+    val lockedBytes = locked.sumOf { item -> maxOf(item.downloadedBytes, java.io.File(item.filePath).takeIf { item.status == "complete" && it.exists() }?.length() ?: 0L) }
     LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
         item { SectionTitle("离线缓存") }
         item { Text("当前账号占用 %.1f MB · ${own.size} 首".format(totalBytes / 1024f / 1024f), color = Color.Gray); TextButton(vm::deleteInvalidDownloads) { Text("一键删除失效缓存") } }
-        downloads.groupBy(DownloadEntity::groupName).forEach { (group, values) ->
+        if (locked.isNotEmpty()) item { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Surface) { Column(Modifier.padding(12.dp, 9.dp)) { Text("其他账号缓存已锁定"); Text("${locked.size} 首 · %.1f MB，登录原账号后可恢复".format(lockedBytes / 1024f / 1024f), color = Color.Gray, fontSize = 13.sp) } } }
+        own.groupBy(DownloadEntity::groupName).forEach { (group, values) ->
             item(key = "group-$group") { Text(group, color = Green, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp)) }
             items(values, key = { "${it.ownerAccountId}-${it.trackId}" }) { item ->
                 val status = when (item.status) { "complete" -> "已完成"; "downloading" -> "下载中"; "paused" -> "已暂停"; "locked" -> "等待原账号登录"; "failed_storage" -> "存储不足，需保留 256MB"; else -> "下载失败" }
-                ListItem(headlineContent = { Text(item.title) }, supportingContent = { Text("$status · ${item.downloadedBytes / 1024 / 1024} MB${if (vm.accountId != item.ownerAccountId) " · 已锁定" else ""}") },
+                ListItem(headlineContent = { Text(item.title) }, supportingContent = { Text("$status · ${downloadProgressSummary(item.downloadedBytes, item.totalBytes)}${if (vm.accountId != item.ownerAccountId) " · 已锁定" else ""}") },
                     trailingContent = { Row { if (item.status == "downloading") IconButton({ vm.pauseDownload(item.trackId) }) { Icon(Icons.Default.Pause, null) } else if (item.status == "paused" || item.status == "locked" || item.status.startsWith("failed")) IconButton({ vm.resumeDownload(item) }, enabled = vm.accountId == item.ownerAccountId) { Icon(Icons.Default.PlayArrow, null) }; IconButton({ vm.deleteDownload(item.trackId, item.ownerAccountId) }) { Icon(Icons.Default.Delete, null) } } })
             }
         }
@@ -416,10 +434,10 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
                 }
             } else {
                 Column(Modifier.fillMaxSize().padding(horizontal = 22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    var dragX by remember { mutableFloatStateOf(0f) }; var dragY by remember { mutableFloatStateOf(0f) }
+                    var dragY by remember { mutableFloatStateOf(0f) }
                     AsyncImage(track.artworkUrl.ifBlank { null }, null, Modifier.size(if (lowPowerPlayer) 148.dp else 170.dp).background(Surface, RoundedCornerShape(20.dp)).clip(RoundedCornerShape(20.dp))
                         .pointerInput(track.id) { detectTapGestures(onDoubleTap = { if (vm.isPlaying()) vm.pausePlayback() else vm.resumePlayback() }) }
-                        .pointerInput(track.id) { detectDragGestures(onDragStart = { dragX = 0f; dragY = 0f }, onDragEnd = { if (abs(dragX) > abs(dragY) && abs(dragX) > 60) { if (dragX < 0) vm.skipNext() else vm.skipPrevious() } else if (abs(dragY) > 60) vm.adjustVolume(if (dragY < 0) 1 else -1) }) { change, amount -> change.consume(); dragX += amount.x; dragY += amount.y } })
+                        .pointerInput(track.id) { detectVerticalDragGestures(onDragStart = { dragY = 0f }, onDragEnd = { if (abs(dragY) > 60) vm.adjustVolume(if (dragY < 0) 1 else -1) }) { change, amount -> change.consume(); dragY += amount } })
                     Spacer(Modifier.height(10.dp)); Text(track.title, fontSize = 23.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(track.artists.joinToString(" / "), color = Color.Gray, maxLines = 1)
                     Slider(position.toFloat(), { vm.seek(it.toLong()); position = it.toLong() }, valueRange = 0f..duration.coerceAtLeast(1).toFloat())
@@ -442,9 +460,9 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     }
 }
 
-@Composable private fun DetailScreen(detail: CollectionDetail?, editableDirectoryId: String?, vm: AppViewModel) = LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
-    item { SectionTitle(detail?.title ?: "加载中", if (detail != null) "全部缓存" else null) { detail?.let { vm.cacheAll(it.tracks, it.title) } } }
-    items(detail?.tracks.orEmpty(), key = { it.id }) { TrackRow(it, vm, playlistId = editableDirectoryId, removeFromPlaylist = editableDirectoryId != null, queue = detail?.tracks.orEmpty()) }
+@Composable private fun DetailScreen(detail: CollectionDetail?, editableDirectoryId: String?, playlists: List<MusicCollection>, vm: AppViewModel, onBack: () -> Unit) = LazyColumn(Modifier.fillMaxSize().padding(horizontal = 14.dp)) {
+    item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.Default.ArrowBack, "返回") }; Text(detail?.title ?: "加载中", Modifier.weight(1f), fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (detail != null) TextButton({ vm.cacheAll(detail.tracks, detail.title) }) { Text("全部缓存") } } }
+    items(detail?.tracks.orEmpty(), key = { it.id }) { TrackRow(it, vm, playlistId = editableDirectoryId, removeFromPlaylist = editableDirectoryId != null, queue = detail?.tracks.orEmpty(), playlists = playlists) }
 }
 
 @Composable private fun SettingsModule(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, open: () -> Unit) = Surface(
