@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.ronan.qmusicwatch.data.RecentEntity
 import com.ronan.qmusicwatch.data.mergeRecent
 import com.ronan.qmusicwatch.data.AppLog
+import com.ronan.qmusicwatch.download.cachedArtworkFile
+import com.ronan.qmusicwatch.download.cachedLyricsFile
 import com.ronan.qmusicwatch.lyrics.LrcParser
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.model.*
@@ -13,6 +15,8 @@ import com.ronan.qmusicwatch.playback.PlaybackErrorEvent
 import com.ronan.qmusicwatch.playback.classifyPlaybackFailure
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -119,6 +123,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var lastStreamExpiresAt = 0L
     private var lastStreamQuality = "128"
     private var retryingTrackId: String? = null
+    private var searchJob: Job? = null
     private val json = Json { ignoreUnknownKeys = true }
     private val profileCacheReady = CompletableDeferred<Unit>()
     private val snapshotMutex = Mutex()
@@ -131,7 +136,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         graph.playback.onEnded = ::advanceAfterEnd
         graph.playback.onError = ::handlePlaybackError
         viewModelScope.launch {
-            runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()?.let { snapshot ->
+            runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()?.takeIf { it.belongsToAccount(accountId) }?.let { snapshot ->
                 _queue.value = snapshot.queue.distinctBy(Track::id)
                 _queueReversed.value = snapshot.queueReversed
                 restoredPosition = snapshot.positionMs
@@ -182,6 +187,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(message = "播放连接中断，正在自动恢复…") }
             runCatching {
                 val stream = graph.api.stream(track, preferredQuality(track))
+                if (_state.value.currentTrack?.id != track.id) throw CancellationException("歌曲已切换")
                 graph.playback.play(track.id, stream.url, track.title, track.artists.joinToString(" / "), track.artworkUrl)
                 graph.playback.seek(event.positionMs)
                 lastStreamUrl = stream.url
@@ -192,7 +198,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update { it.copy(message = "已从 ${lyricTimeForMessage(event.positionMs)} 自动恢复播放") }
                 delay(10_000)
                 if (_state.value.currentTrack?.id == track.id) retryingTrackId = null
-            }.onFailure(::failPlayback)
+            }.onFailure { error -> retryingTrackId = null; if (error !is CancellationException) failPlayback(error) }
         }
     }
 
@@ -224,7 +230,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             fail(error)
         }
     }
-    fun logout() { graph.vault.clear(); currentSession = null; android.webkit.CookieManager.getInstance().removeAllCookies(null); android.webkit.CookieManager.getInstance().flush(); _state.update { it.copy(library = null, recent = emptyList(), profile = null, message = "已退出，离线文件已保留并锁定") } }
+    fun logout() {
+        graph.playback.pause(); graph.vault.clear(); currentSession = null
+        _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
+        restoredPosition = 0; lastStreamUrl = ""; lastStreamExpiresAt = 0; retryingTrackId = null
+        viewModelScope.launch { graph.settings.setPlaybackSnapshot("") }
+        android.webkit.CookieManager.getInstance().removeAllCookies(null); android.webkit.CookieManager.getInstance().flush()
+        _state.update { it.copy(library = null, recent = emptyList(), profile = null, currentTrack = null, lyrics = emptyList(), message = "已退出，离线文件已保留并锁定") }
+    }
     fun loadLibrary() = viewModelScope.launch {
         if (!signedIn) return@launch fail(IllegalStateException("请先登录"))
         restoreAccountSnapshot()
@@ -271,20 +284,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onFailure { error -> _state.update { it.copy(diagnostic = "诊断失败：${error.message ?: "未知错误"}") }; fail(error) }
     }
     fun loadRecent() = viewModelScope.launch {
-        val local = graph.db.recent().all().map { Track(it.trackId, it.title, it.artists.split(" / "), it.album, it.artworkUrl, playedAt = it.playedAt) }
+        val owner = accountId ?: return@launch _state.update { it.copy(recent = emptyList()) }
+        val local = graph.db.recent().all(owner).map { Track(it.trackId, it.title, it.artists.split(" / "), it.album, it.artworkUrl, playedAt = it.playedAt) }
         val cloud = if (signedIn) runCatching { graph.api.recent() }.getOrDefault(emptyList()) else emptyList()
         _state.update { it.copy(recent = mergeRecent(local, cloud)) }
     }
-    fun search(query: String, type: String, loadMore: Boolean = false) = viewModelScope.launch {
-        if (query.isBlank()) return@launch
+    fun search(query: String, type: String, loadMore: Boolean = false) {
+        if (query.isBlank()) return
         val append = loadMore && _state.value.searchQuery == query && _state.value.searchType == type
-        val cursor = _state.value.searchCursor.takeIf { append } ?: if (loadMore) return@launch else null
-        _state.update { it.copy(searchLoading = true) }
-        if (!append) graph.settings.addSearchHistory(query)
-        runCatching {
-            if (type == "track") graph.api.searchTracks(query, cursor).let { Triple(it.items, emptyList<MusicCollection>(), it.nextCursor) }
-            else graph.api.searchCollections(type, query, cursor).let { Triple(emptyList<Track>(), it.items, it.nextCursor) }
-        }.onSuccess { (tracks, collections, next) -> _state.update { state -> state.copy(searchTracks = (if (append) state.searchTracks + tracks else tracks).distinctBy(Track::id), searchCollections = (if (append) state.searchCollections + collections else collections).distinctBy(MusicCollection::id), searchType = type, searchQuery = query, searchCursor = next, searchLoading = false) } }.onFailure(::fail)
+        val cursor = _state.value.searchCursor.takeIf { append } ?: if (loadMore) return else null
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _state.update { state -> state.copy(searchLoading = true, searchType = type, searchQuery = query, searchCursor = if (append) state.searchCursor else null, searchTracks = if (!append && type == "track") emptyList() else state.searchTracks, searchCollections = if (!append && type != "track") emptyList() else state.searchCollections) }
+            if (!append) graph.settings.addSearchHistory(query)
+            try {
+                val (tracks, collections, next) = if (type == "track") graph.api.searchTracks(query, cursor).let { Triple(it.items, emptyList<MusicCollection>(), it.nextCursor) }
+                else graph.api.searchCollections(type, query, cursor).let { Triple(emptyList<Track>(), it.items, it.nextCursor) }
+                _state.update { state -> state.copy(searchTracks = (if (append) state.searchTracks + tracks else tracks).distinctBy(Track::id), searchCollections = (if (append) state.searchCollections + collections else collections).distinctBy(MusicCollection::id), searchCursor = next, searchLoading = false) }
+            } catch (cancelled: CancellationException) { throw cancelled } catch (error: Throwable) { fail(error) }
+        }
     }
     fun clearSearchHistory() = viewModelScope.launch { graph.settings.clearSearchHistory() }
     fun checkForUpdate() = viewModelScope.launch {
@@ -303,17 +321,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         var issuedUrl = ""
         var issuedExpiresAt = 0L
         var issuedQuality = preferredQuality(track)
+        var resolvedTrack = track
         runCatching {
             val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
             val stream = if (local == null) graph.api.stream(track, preferredQuality(track)) else null
             val uri = local?.let { android.net.Uri.fromFile(File(it.filePath)).toString() } ?: stream!!.url
+            local?.let { item -> cachedArtworkFile(item.filePath).takeIf(File::exists)?.let { resolvedTrack = track.copy(artworkUrl = android.net.Uri.fromFile(it).toString()) } }
             issuedUrl = uri
             issuedExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE
             issuedQuality = stream?.quality ?: preferredQuality(track)
-            graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), track.artworkUrl)
+            graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), resolvedTrack.artworkUrl)
             if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
-            graph.db.recent().upsert(RecentEntity(track.id, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
-            runCatching { graph.api.lyrics(track.id) }.map { LrcParser.parse(it.original, it.translation, it.wordSync) }.getOrDefault(emptyList())
+            graph.db.recent().upsert(RecentEntity(track.id, owner, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
+            runCatching { loadLyrics(track, local?.filePath) }.onFailure { AppLog.write("LYRICS", "${track.id} ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrDefault(emptyList())
         }.onSuccess { parsedLyrics ->
             sourceQueue?.takeIf(List<Track>::isNotEmpty)?.let { source ->
                 _queue.value = source.distinctBy(Track::id)
@@ -327,15 +347,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             lastStreamUrl = issuedUrl
             lastStreamExpiresAt = issuedExpiresAt
             lastStreamQuality = issuedQuality
-            _state.update { it.copy(currentTrack = track, lyrics = parsedLyrics, pendingSpeakerTrack = null, playEvent = System.nanoTime()) }
+            _state.update { it.copy(currentTrack = resolvedTrack, lyrics = parsedLyrics, pendingSpeakerTrack = null, playEvent = System.nanoTime()) }
             persistSnapshot()
         }.onFailure(::failPlayback)
     }
     fun continueOnSpeaker() { _state.value.pendingSpeakerTrack?.let { requestPlay(it, true, pendingQueue) } }
     fun dismissSpeakerPrompt() = _state.update { it.copy(pendingSpeakerTrack = null) }
-    fun cache(track: Track, groupName: String = "单曲缓存") = viewModelScope.launch {
+    private suspend fun loadLyrics(track: Track, localAudioPath: String?): List<LyricLine> {
+        var data = localAudioPath?.let { cachedLyricsFile(it).takeIf(File::exists)?.let { file -> runCatching { json.decodeFromString<LyricsData>(file.readText()) }.getOrNull() } }
+        if (data == null) {
+            data = graph.api.lyrics(track.id)
+            localAudioPath?.let { cachedLyricsFile(it).writeText(json.encodeToString(data)) }
+        }
+        return LrcParser.parse(data.original, data.translation, data.wordSync)
+    }
+    fun reloadLyrics() = viewModelScope.launch {
+        val track = _state.value.currentTrack ?: return@launch
         val owner = accountId ?: return@launch fail(IllegalStateException("请先登录"))
-        runCatching { graph.api.stream(track, preferredQuality(track)) }.onSuccess { graph.downloads.enqueue(track, owner, it.url, wifiOnlyDownload.value, groupName); _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "已加入缓存，等待 Wi-Fi" else "已加入离线缓存") } }.onFailure(::fail)
+        val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
+        _state.update { it.copy(message = "正在重新加载歌词…") }
+        runCatching { loadLyrics(track, local?.filePath) }
+            .onSuccess { lines -> _state.update { it.copy(lyrics = lines, message = if (lines.isEmpty()) "这首歌暂无歌词" else "歌词已重新加载") } }
+            .onFailure(::fail)
+    }
+    fun cache(track: Track, groupName: String = "单曲缓存") {
+        val owner = accountId ?: return fail(IllegalStateException("请先登录"))
+        graph.downloads.enqueue(track, owner, preferredQuality(track), wifiOnlyDownload.value, groupName)
+        _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "已加入缓存，等待 Wi-Fi" else "已加入离线缓存") }
     }
     fun cacheAll(tracks: List<Track>, groupName: String = "播放列表缓存") = tracks.forEach { cache(it, groupName) }
     fun resumeDownload(item: com.ronan.qmusicwatch.data.DownloadEntity) = cache(Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl, qualities = listOf("128", "320")), item.groupName)
@@ -451,9 +489,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun adjustVolume(direction: Int) = graph.playback.adjustVolume(direction)
     fun savePlaybackState() = persistSnapshot()
     private fun persistSnapshot(position: Long = graph.playback.position()) = viewModelScope.launch {
+        val owner = accountId ?: return@launch
         graph.settings.setPlaybackSnapshot(json.encodeToString(PlaybackSnapshot(
             _state.value.currentTrack, _queue.value, position, _queueReversed.value,
-            lastStreamUrl, lastStreamExpiresAt, lastStreamQuality,
+            lastStreamUrl, lastStreamExpiresAt, lastStreamQuality, owner,
         )))
     }
     private fun preferredQuality(track: Track) = if (quality.value == "320" && "320" in track.qualities) "320" else "128"

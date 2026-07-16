@@ -11,6 +11,7 @@ These projects informed behavior, product research, or compatible protocol imple
 | [fovepig/QQmusic-API](https://github.com/fovepig/QQmusic-API) | Apache-2.0 | QQ Music request/module shapes informed the Kotlin client; no Node runtime code is bundled |
 | [BeyondtheApex/ChillPatcher](https://github.com/BeyondtheApex/ChillPatcher) | No license declared | VIP endpoint behavior research only; no source code copied |
 | [Hjdd14/Mconnect-Music_connect](https://github.com/Hjdd14/Mconnect-Music_connect) | MIT | VIP module/method compatibility research only; no source code copied |
+| [wangqr/QQMusicDES](https://github.com/wangqr/QQMusicDES) | MIT | The QQ DES-variant behavior and tables were adapted into Kotlin for QRC lyric decoding; copyright and license are retained in `third_party/wangqr-QQMusicDES-LICENSE.txt` |
 
 Runtime dependencies keep their original licenses. Gradle and npm lock files
 are the authoritative dependency lists for a particular release.

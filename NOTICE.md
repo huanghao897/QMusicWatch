@@ -13,3 +13,7 @@ See THIRD_PARTY.md for research references and dependency notices.
 
 QQ Music compatible request handling includes Kotlin request shapes informed by
 fovepig/QQmusic-API, Copyright its contributors, licensed under Apache-2.0.
+
+QRC lyric decoding includes a Kotlin adaptation of QQMusicDES,
+Copyright (c) 2019 wangqr, licensed under the MIT License.
+See third_party/wangqr-QQMusicDES-LICENSE.txt.

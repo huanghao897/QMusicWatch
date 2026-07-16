@@ -2,6 +2,7 @@ package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.model.Track
 import com.ronan.qmusicwatch.model.PlaybackSnapshot
+import com.ronan.qmusicwatch.model.belongsToAccount
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -73,5 +74,12 @@ class QueueTest {
         val snapshot = PlaybackSnapshot(Track("a", "A"), listOf(Track("a", "A")), 12_345, queueReversed = true)
         assertEquals(true, json.decodeFromString<PlaybackSnapshot>(json.encodeToString(snapshot)).queueReversed)
         assertEquals(false, json.decodeFromString<PlaybackSnapshot>("""{"positionMs":99}""").queueReversed)
+    }
+
+    @Test fun playbackSnapshotOnlyBelongsToItsAccount() {
+        val snapshot = PlaybackSnapshot(track = Track("a", "A"), ownerAccountId = "account-a")
+        assertEquals(true, snapshot.belongsToAccount("account-a"))
+        assertEquals(false, snapshot.belongsToAccount("account-b"))
+        assertEquals(false, PlaybackSnapshot(track = Track("a", "A")).belongsToAccount("account-a"))
     }
 }
