@@ -32,7 +32,9 @@ import kotlinx.serialization.Serializable
     val track: Track? = null, val queue: List<Track> = emptyList(), val positionMs: Long = 0,
     val queueReversed: Boolean = false,
     val streamUrl: String = "", val streamExpiresAt: Long = 0, val quality: String = "128",
+    val ownerAccountId: String = "",
 )
+fun PlaybackSnapshot.belongsToAccount(accountId: String?): Boolean = accountId != null && ownerAccountId == accountId
 @Serializable data class UserProfile(
     val displayName: String = "", val avatarUrl: String = "", val isVip: Boolean? = null,
     val vipExpireAt: Long? = null, val vipName: String = "",

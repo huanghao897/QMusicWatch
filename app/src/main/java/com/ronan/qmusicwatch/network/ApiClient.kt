@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Base64
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.data.AppLog
+import com.ronan.qmusicwatch.lyrics.QqQrcDecoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -236,9 +237,16 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
             obj("songMid" to id, "crypt" to 0, "qrc" to 0, "qrc_t" to 0, "trans" to 1, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474)
         )
+        val qrc = runCatching {
+            webApi(
+                "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
+                obj("songMid" to id, "crypt" to 1, "qrc" to 1, "qrc_t" to 0, "trans" to 0, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474),
+            ).string("lyric").takeIf { it.isNotBlank() }?.let(QqQrcDecoder::decode)
+        }.onFailure { AppLog.write("LYRICS", "qrc ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrNull()
         LyricsData(
             decodeText(data.string("lyric")),
             decodeText(data.string("trans")).ifBlank { null },
+            qrc,
         )
     }
 
@@ -309,6 +317,10 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         val request = Request.Builder().url("https://api.github.com/repos/huanghao897/QMusicWatch/releases/latest")
             .header("Accept", "application/vnd.github+json").header("User-Agent", "QMusicWatch/$currentVersion").build()
         http.newCall(request).execute().use { response ->
+            if (response.code == 404) return@withContext ReleaseInfo(
+                tag = currentVersion, title = "暂无正式发布版本", notes = "当前仓库尚未创建 GitHub Release。",
+                pageUrl = "https://github.com/huanghao897/QMusicWatch/releases", newer = false,
+            )
             if (!response.isSuccessful) error("GitHub Release 检查失败 ${response.code}")
             parseGitHubRelease(json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject, currentVersion)
         }

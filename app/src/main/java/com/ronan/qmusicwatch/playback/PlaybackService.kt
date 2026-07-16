@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.SettableFuture
 import com.ronan.qmusicwatch.QMusicApplication
 import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.model.PlaybackSnapshot
+import com.ronan.qmusicwatch.model.belongsToAccount
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
@@ -54,6 +55,7 @@ class PlaybackService : MediaSessionService() {
                     runCatching {
                         val graph = application as QMusicApplication
                         val snapshot = json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first())
+                        if (!snapshot.belongsToAccount(graph.vault.load()?.accountId)) error("播放记录属于其他账号")
                         val track = snapshot.track ?: error("没有可恢复的歌曲")
                         val local = snapshot.streamUrl.takeIf { it.startsWith("file:") }
                             ?.takeIf { File(android.net.Uri.parse(it).path.orEmpty()).exists() }

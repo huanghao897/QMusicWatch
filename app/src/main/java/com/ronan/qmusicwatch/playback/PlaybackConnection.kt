@@ -25,6 +25,7 @@ class PlaybackConnection(context: Context) {
     private var sleepJob: Job? = null
     private var stopAfterCurrent = false
     private var sleepVolume: Float? = null
+    private val mainExecutor = ContextCompat.getMainExecutor(context)
     var onEnded: (() -> Unit)? = null
     var onError: ((PlaybackErrorEvent) -> Unit)? = null
     init {
@@ -46,18 +47,24 @@ class PlaybackConnection(context: Context) {
                     ))
                 }
             })
-        }, ContextCompat.getMainExecutor(context))
+        }, mainExecutor)
+    }
+    private fun withController(action: (MediaController) -> Unit) {
+        val run = { runCatching { action(future.get()) }.onFailure { AppLog.write("PLAYER", "controller ${it.javaClass.simpleName}:${it.message.orEmpty()}") }; Unit }
+        if (future.isDone) run() else future.addListener(run, mainExecutor)
     }
     fun play(id: String, uri: String, title: String, artist: String, artwork: String) {
         AppLog.write("PLAYER", "prepare track=$id scheme=${android.net.Uri.parse(uri).scheme.orEmpty()}")
-        future.get().apply {
+        withController {
+            it.apply {
             setMediaItem(playbackMediaItem(id, uri, title, artist, artwork))
             prepare(); play()
+            }
         }
     }
-    fun pause() { if (future.isDone) future.get().pause() }
-    fun resume() { if (future.isDone) future.get().play() }
-    fun seek(positionMs: Long) { if (future.isDone) future.get().seekTo(positionMs) }
+    fun pause() = withController(MediaController::pause)
+    fun resume() = withController(MediaController::play)
+    fun seek(positionMs: Long) = withController { it.seekTo(positionMs) }
     fun position() = if (future.isDone) future.get().currentPosition.coerceAtLeast(0) else 0L
     fun duration() = if (future.isDone) future.get().duration.coerceAtLeast(0) else 0L
     fun isPlaying() = future.isDone && future.get().isPlaying

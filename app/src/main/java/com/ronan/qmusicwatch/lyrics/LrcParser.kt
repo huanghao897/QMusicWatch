@@ -44,8 +44,9 @@ object LrcParser {
         }.sortedBy { it.timeMs }
     }
     private fun parseQrc(value: String): List<LyricLine> {
-        val decoded = value.replace("&#10;", "\n").replace("&quot;", "\"").replace("&amp;", "&")
-        val content = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL)).find(decoded)?.groupValues?.getOrNull(1) ?: decoded
+        val rawContent = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL)).find(value)?.groupValues?.getOrNull(1) ?: value
+        val content = rawContent.replace("&#13;&#10;", "\n").replace("&#10;", "\n").replace("&#13;", "\n")
+            .replace("&quot;", "\"").replace("&apos;", "'").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
         return content.lineSequence().mapNotNull { rawLine ->
             val match = qrcLine.find(rawLine.trim()) ?: return@mapNotNull null
             val start = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null

@@ -1,27 +1,14 @@
-- [x] 队列实时换位和圆角动画
-  - Acceptance：跨半行立即换位，其他项弹簧补位，筛选时不允许拖动
-  - Verify：队列落点单测 + Compose 编译
-- [x] 喜欢与歌单逐首选择导入
-  - Acceptance：先选来源再勾选歌曲，确认后仅添加勾选项
-  - Verify：选择合并单测 + Compose 编译
-- [x] 紧凑搜索与间距
-  - Acceptance：搜索框和标签缩小，删除顶部离线提示但保留快照
-  - Verify：Compose 编译 + 480×480 真机观察
-- [x] 当前歌词放大和逐字高亮
-  - Acceptance：QRC 精确字级时间，LRC 平滑回退，翻译缺失不显示文案
-  - Verify：QRC/进度单测 + Compose 编译
-- [x] 完整交付
-  - Acceptance：测试、lint、Release、签名和远端提交一致
-  - Verify：Gradle + apksigner + aapt + git ls-remote
-- [x] 恢复歌词可靠回退
-  - Acceptance：QQ 返回不可解析 QRC 时仍显示普通歌词
-  - Verify：真实接口样本 + LRC 回退单测
-- [x] 统一圆润搜索样式
-  - Acceptance：首页入口、搜索页和队列筛选框无绿色外框且更紧凑
-  - Verify：Compose 编译
-- [x] 队列拖动单次提交
-  - Acceptance：跨多格不乱序，被拖动项不闪烁，其他项实时补位
-  - Verify：连续跨三格单测 + Compose 编译
-- [x] 0.8.9 完整交付
-  - Acceptance：测试、lint、Release、签名和远端提交一致
-  - Verify：Gradle + apksigner + aapt + git ls-remote
+# QMusic Watch 0.9.0 checklist
+
+- [x] 播放快照和最近播放按账号隔离
+- [x] 退出时停止播放并清除内存队列，离线文件保留且锁定
+- [x] 下载执行时重新签发 URL，最多并发 2 个任务
+- [x] 离线缓存同时保存音频、封面和歌词
+- [x] 播放恢复锁、MediaController 主线程等待和搜索竞态修复
+- [x] 歌单删除确认、逐首选择目标歌单和歌词重试入口
+- [x] MIT 许可 QRC 精确逐字解码与 LRC 回退
+- [x] GitHub Release 404 友好处理
+- [x] 版本升级到 0.9.0 (30)
+- [x] JVM、Android 测试编译、Release lint 与 R8 构建全部通过
+- [x] APK 签名、版本、SHA-256 与安装包内容校验
+- [x] 提交推送到 `main` 并创建 GitHub Release `v0.9.0`

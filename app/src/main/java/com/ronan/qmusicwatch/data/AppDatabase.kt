@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "recent")
+@Entity(tableName = "recent", primaryKeys = ["trackId", "ownerAccountId"])
 data class RecentEntity(
-    @PrimaryKey val trackId: String, val title: String, val artists: String, val album: String,
+    val trackId: String, val ownerAccountId: String, val title: String, val artists: String, val album: String,
     val artworkUrl: String, val playedAt: Long,
 )
 
@@ -19,7 +19,7 @@ data class DownloadEntity(
 )
 
 @Dao interface RecentDao {
-    @Query("SELECT * FROM recent ORDER BY playedAt DESC LIMIT 100") suspend fun all(): List<RecentEntity>
+    @Query("SELECT * FROM recent WHERE ownerAccountId = :owner ORDER BY playedAt DESC LIMIT 100") suspend fun all(owner: String): List<RecentEntity>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(item: RecentEntity)
 }
 
@@ -33,7 +33,7 @@ data class DownloadEntity(
     @Query("DELETE FROM downloads WHERE trackId = :id AND ownerAccountId = :owner") suspend fun delete(id: String, owner: String)
 }
 
-@Database(entities = [RecentEntity::class, DownloadEntity::class], version = 2, exportSchema = false)
+@Database(entities = [RecentEntity::class, DownloadEntity::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun recent(): RecentDao
     abstract fun downloads(): DownloadDao
@@ -43,6 +43,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE downloads ADD COLUMN groupName TEXT NOT NULL DEFAULT '单曲缓存'")
             }
         }
-        fun create(context: Context) = Room.databaseBuilder(context, AppDatabase::class.java, "qmusic-watch.db").addMigrations(migration1To2).build()
+        private val migration2To3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE recent")
+                db.execSQL("CREATE TABLE IF NOT EXISTS recent (trackId TEXT NOT NULL, ownerAccountId TEXT NOT NULL, title TEXT NOT NULL, artists TEXT NOT NULL, album TEXT NOT NULL, artworkUrl TEXT NOT NULL, playedAt INTEGER NOT NULL, PRIMARY KEY(trackId, ownerAccountId))")
+            }
+        }
+        fun create(context: Context) = Room.databaseBuilder(context, AppDatabase::class.java, "qmusic-watch.db").addMigrations(migration1To2, migration2To3).build()
     }
 }
