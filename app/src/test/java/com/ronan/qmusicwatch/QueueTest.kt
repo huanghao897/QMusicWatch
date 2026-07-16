@@ -69,6 +69,12 @@ class QueueTest {
         assertEquals(listOf(1, 2), dailyBatch(listOf(1, 2), 0, 10))
     }
 
+    @Test fun downloadProgressShowsKnownTotalAndSafeFallback() {
+        assertEquals("1.0 / 4.0 MB · 25%", downloadProgressSummary(1L * 1024 * 1024, 4L * 1024 * 1024))
+        assertEquals("2.0 MB", downloadProgressSummary(2L * 1024 * 1024, -1))
+        assertEquals("4.0 / 4.0 MB · 100%", downloadProgressSummary(9L * 1024 * 1024, 4L * 1024 * 1024))
+    }
+
     @Test fun playbackSnapshotKeepsQueueDirectionAndReadsOldSnapshots() {
         val json = Json { ignoreUnknownKeys = true }
         val snapshot = PlaybackSnapshot(Track("a", "A"), listOf(Track("a", "A")), 12_345, queueReversed = true)

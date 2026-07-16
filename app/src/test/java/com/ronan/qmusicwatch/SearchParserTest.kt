@@ -15,4 +15,15 @@ class SearchParserTest {
         assertEquals(listOf("128", "320"), track.qualities)
         assertEquals(true, track.requiresVip)
     }
+
+    @Test fun readsModernNestedFileQualityFields() {
+        val item = Json.parseToJsonElement("""{"mid":"song-mid","title":"Song","id":42,"type":0,"isonly":1,"singer":[{"name":"Singer"}],"album":{"title":"Album","mid":"album-mid"},"file":{"media_mid":"media-mid","size_128mp3":100,"size_320mp3":200},"pay":{"pay_play":1}}""").jsonObject
+        val track = parseSearchTrack(item)!!
+        assertEquals(listOf("128", "320"), track.qualities)
+        assertEquals("media-mid", track.mediaMid)
+        assertEquals(42L, track.numericId)
+        assertEquals("Album", track.album)
+        assertEquals("https://y.gtimg.cn/music/photo_new/T002R300x300M000album-mid.jpg", track.artworkUrl)
+        assertEquals(true, track.requiresVip)
+    }
 }

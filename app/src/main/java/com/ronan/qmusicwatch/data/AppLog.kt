@@ -10,6 +10,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private val logUrlPattern = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE)
+private val logSecretPattern = Regex("(authorization|cookie|set-cookie|qm_keyst|qqmusic_key|p_skey|skey|qrcode_id|access[_-]?token|refresh[_-]?token)\\s*[:=]\\s*[^;\\s,]+", RegexOption.IGNORE_CASE)
+
 object AppLog {
     private lateinit var file: File
     @Synchronized fun init(context: Context) {
@@ -20,7 +23,7 @@ object AppLog {
         if (!::file.isInitialized) return
         if (file.length() > 256 * 1024) file.writeText("")
         val time = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
-        file.appendText("$time $tag ${message.replace('\n', ' ').take(1200)}\n")
+        file.appendText("$time $tag ${redactLogMessage(message).take(1200)}\n")
     }
     @Synchronized fun clear() { if (::file.isInitialized) file.writeText("") }
     fun shareIntent(context: Context): Intent {
@@ -29,4 +32,11 @@ object AppLog {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     fun copyTo(context: Context, uri: Uri) { context.contentResolver.openOutputStream(uri)?.use { output -> file.inputStream().use { it.copyTo(output) } } }
+}
+
+internal fun redactLogMessage(message: String): String {
+    var value = message.replace('\n', ' ').replace('\r', ' ')
+    value = logUrlPattern.replace(value, "<url>")
+    value = logSecretPattern.replace(value) { match -> "${match.groupValues[1]}=<redacted>" }
+    return value
 }
