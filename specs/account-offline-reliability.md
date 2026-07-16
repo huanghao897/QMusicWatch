@@ -18,5 +18,5 @@
 ## 验证
 
 - JVM 单测：账号快照、缓存路径、QRC、搜索/队列纯函数。
-- Android 测试：v2→v3 数据库迁移、主界面启动和免责声明交互。
+- Android 测试：v2→v3 数据库迁移、主界面启动和免责声明交互；Robolectric 在 API 24/36、480×480 环境执行迁移与 Activity 创建测试。
 - 交付：`testDebugUnitTest`、`compileDebugAndroidTestKotlin`、`lintRelease`、`assembleRelease`、签名与 SHA-256。

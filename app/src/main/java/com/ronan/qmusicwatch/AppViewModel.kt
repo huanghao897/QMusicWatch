@@ -372,17 +372,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun cache(track: Track, groupName: String = "单曲缓存") {
         val owner = accountId ?: return fail(IllegalStateException("请先登录"))
-        graph.downloads.enqueue(track, owner, preferredQuality(track), wifiOnlyDownload.value, groupName)
-        _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "已加入缓存，等待 Wi-Fi" else "已加入离线缓存") }
+        runCatching { graph.downloads.enqueue(track, owner, preferredQuality(track), wifiOnlyDownload.value, groupName) }
+            .onSuccess { _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "已加入缓存，等待 Wi-Fi" else "已加入离线缓存") } }
+            .onFailure(::fail)
     }
     fun cacheAll(tracks: List<Track>, groupName: String = "播放列表缓存") = tracks.forEach { cache(it, groupName) }
     fun resumeDownload(item: com.ronan.qmusicwatch.data.DownloadEntity) = cache(Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl, qualities = listOf("128", "320")), item.groupName)
-    fun pauseDownload(id: String) = viewModelScope.launch { accountId?.let { graph.downloads.pause(id, it) } }
-    fun deleteDownload(id: String, owner: String) = viewModelScope.launch { graph.downloads.delete(id, owner) }
+    fun pauseDownload(id: String) = viewModelScope.launch {
+        val owner = accountId ?: return@launch
+        runCatching { graph.downloads.pause(id, owner) }.onFailure(::fail)
+    }
+    fun deleteDownload(id: String, owner: String) = viewModelScope.launch {
+        runCatching { graph.downloads.delete(id, owner) }.onFailure(::fail)
+    }
     fun deleteInvalidDownloads() = viewModelScope.launch {
         val owner = accountId ?: return@launch
-        val count = graph.downloads.deleteInvalid(owner)
-        _state.update { it.copy(message = if (count == 0) "没有失效缓存" else "已删除 $count 个失效缓存") }
+        runCatching { graph.downloads.deleteInvalid(owner) }
+            .onSuccess { count -> _state.update { it.copy(message = if (count == 0) "没有失效缓存" else "已删除 $count 个失效缓存") } }
+            .onFailure(::fail)
     }
     fun like(track: Track, liked: Boolean) = viewModelScope.launch { runCatching { graph.api.like(track, liked) }.onSuccess { loadLibrary() }.onFailure(::fail) }
     fun loadDetail(type: String, collection: MusicCollection, editable: Boolean = false) = viewModelScope.launch { runCatching { graph.api.collection(type, collection) }.onSuccess { value -> _state.update { it.copy(detail = value, detailDirectoryId = collection.directoryId.takeIf { editable }) } }.onFailure(::fail) }
