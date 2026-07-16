@@ -30,7 +30,7 @@ class PlaybackConnection(context: Context) {
     var onError: ((PlaybackErrorEvent) -> Unit)? = null
     init {
         future.addListener({
-            future.get().addListener(object : Player.Listener {
+            controllerOrNull()?.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
                     if (state != Player.STATE_ENDED) return
                     if (stopAfterCurrent) { stopAfterCurrent = false; cancelSleepTimer(); pause() } else onEnded?.invoke()
@@ -38,7 +38,7 @@ class PlaybackConnection(context: Context) {
                 override fun onPlayerError(error: PlaybackException) {
                     val causes = generateSequence<Throwable>(error) { it.cause }.joinToString(" <- ") { "${it.javaClass.simpleName}:${it.message.orEmpty()}" }
                     AppLog.write("PLAYER", "${error.errorCodeName} $causes")
-                    val controller = future.get()
+                    val controller = controllerOrNull() ?: return
                     onError?.invoke(PlaybackErrorEvent(
                         error = error,
                         mediaId = controller.currentMediaItem?.mediaId.orEmpty(),
@@ -46,11 +46,16 @@ class PlaybackConnection(context: Context) {
                         isLocalFile = controller.currentMediaItem?.localConfiguration?.uri?.scheme == "file",
                     ))
                 }
-            })
+            }) ?: AppLog.write("PLAYER", "controller connection failed")
         }, mainExecutor)
     }
+    private fun controllerOrNull(): MediaController? =
+        if (!future.isDone || future.isCancelled) null else runCatching { future.get() }
+            .onFailure { AppLog.write("PLAYER", "controller ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
+            .getOrNull()
+
     private fun withController(action: (MediaController) -> Unit) {
-        val run = { runCatching { action(future.get()) }.onFailure { AppLog.write("PLAYER", "controller ${it.javaClass.simpleName}:${it.message.orEmpty()}") }; Unit }
+        val run = { controllerOrNull()?.let { controller -> runCatching { action(controller) }.onFailure { AppLog.write("PLAYER", "action ${it.javaClass.simpleName}:${it.message.orEmpty()}") } }; Unit }
         if (future.isDone) run() else future.addListener(run, mainExecutor)
     }
     fun play(id: String, uri: String, title: String, artist: String, artwork: String) {
@@ -65,9 +70,9 @@ class PlaybackConnection(context: Context) {
     fun pause() = withController(MediaController::pause)
     fun resume() = withController(MediaController::play)
     fun seek(positionMs: Long) = withController { it.seekTo(positionMs) }
-    fun position() = if (future.isDone) future.get().currentPosition.coerceAtLeast(0) else 0L
-    fun duration() = if (future.isDone) future.get().duration.coerceAtLeast(0) else 0L
-    fun isPlaying() = future.isDone && future.get().isPlaying
+    fun position() = controllerOrNull()?.currentPosition?.coerceAtLeast(0) ?: 0L
+    fun duration() = controllerOrNull()?.duration?.coerceAtLeast(0) ?: 0L
+    fun isPlaying() = controllerOrNull()?.isPlaying == true
     fun adjustVolume(direction: Int) = audio.adjustStreamVolume(
         AudioManager.STREAM_MUSIC,
         if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
@@ -81,21 +86,20 @@ class PlaybackConnection(context: Context) {
             _sleepRemaining.value = minutes.coerceIn(1, 1440) * 60L
             while (_sleepRemaining.value > 0) {
                 delay(1_000); _sleepRemaining.value--
-                if (!finishCurrent && _sleepRemaining.value <= 10 && future.isDone) {
-                    val player = future.get()
+                if (!finishCurrent && _sleepRemaining.value <= 10) {
+                    val player = controllerOrNull() ?: continue
                     val initial = sleepVolume ?: player.volume.also { sleepVolume = it }
                     player.volume = initial * (_sleepRemaining.value / 10f)
                 }
             }
             if (finishCurrent) stopAfterCurrent = true else {
-                if (future.isDone) {
-                    val player = future.get()
+                controllerOrNull()?.let { player ->
                     pause(); player.volume = sleepVolume ?: player.volume; sleepVolume = null
-                } else pause()
+                } ?: pause()
             }
         }
     }
-    fun cancelSleepTimer() { sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false; if (future.isDone) sleepVolume?.let { future.get().volume = it }; sleepVolume = null; _sleepRemaining.value = 0 }
+    fun cancelSleepTimer() { sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false; sleepVolume?.let { volume -> controllerOrNull()?.volume = volume }; sleepVolume = null; _sleepRemaining.value = 0 }
     fun release() { scope.cancel(); MediaController.releaseFuture(future) }
 }
 

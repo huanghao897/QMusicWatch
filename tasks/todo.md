@@ -1,5 +1,16 @@
 # QMusic Watch 0.9.0 checklist
 
+## 0.9.1
+
+- [x] MediaController 异常完成安全降级
+- [x] 缓存暂停/删除等待 Worker 停止并设置 15 秒上限
+- [x] API 24/36、480×480 Activity 启动测试实际执行
+- [x] API 24/36 Room v2→v3 迁移测试实际执行
+- [x] 0.9.1 Release lint、R8、签名和 SHA-256 校验
+- [x] 推送 `main` 并发布 GitHub Release `v0.9.1`
+
+## 0.9.0
+
 - [x] 播放快照和最近播放按账号隔离
 - [x] 退出时停止播放并清除内存队列，离线文件保留且锁定
 - [x] 下载执行时重新签发 URL，最多并发 2 个任务

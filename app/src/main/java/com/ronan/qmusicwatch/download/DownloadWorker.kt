@@ -15,6 +15,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 fun cachedLyricsFile(audioPath: String) = File(audioPath.removeSuffix(".audio") + ".lyrics.json")
 fun cachedArtworkFile(audioPath: String) = File(audioPath.removeSuffix(".audio") + ".cover")
@@ -85,7 +86,11 @@ class DownloadController(private val context: Context, private val db: AppDataba
         val network = if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
         WorkManager.getInstance(context).enqueueUniqueWork("download-${owner}-${track.id}", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(data).setConstraints(Constraints.Builder().setRequiredNetworkType(network).build()).build())
     }
-    suspend fun pause(trackId: String, owner: String) { WorkManager.getInstance(context).cancelUniqueWork("download-$owner-$trackId"); val item = db.downloads().find(trackId, owner); db.downloads().progress(trackId, owner, "paused", item?.downloadedBytes ?: 0, item?.totalBytes ?: -1) }
+    suspend fun pause(trackId: String, owner: String) {
+        withContext(Dispatchers.IO) { WorkManager.getInstance(context).cancelUniqueWork("download-$owner-$trackId").result.get(15, TimeUnit.SECONDS) }
+        val item = db.downloads().find(trackId, owner)
+        db.downloads().progress(trackId, owner, "paused", item?.downloadedBytes ?: 0, item?.totalBytes ?: -1)
+    }
     suspend fun delete(trackId: String, owner: String) { pause(trackId, owner); db.downloads().find(trackId, owner)?.let { File(it.filePath).delete(); File(it.filePath.removeSuffix(".audio") + ".part").delete(); cachedLyricsFile(it.filePath).delete(); cachedArtworkFile(it.filePath).delete() }; db.downloads().delete(trackId, owner) }
     suspend fun deleteInvalid(owner: String): Int {
         val invalid = db.downloads().all().filter { it.ownerAccountId == owner && (it.status == "complete" && !File(it.filePath).exists() || it.status.startsWith("failed")) }
