@@ -1,5 +1,15 @@
 # QMusic Watch checklist
 
+## 0.9.5
+
+- [x] 审计 `v0.9.0–v0.9.4` 证书并定位 `v0.9.3` 签名漂移
+- [x] 找回原始 `fbd5642c...408d1382` 私钥并建立仓库外固定备份
+- [x] Release 显式签名配置、指纹门禁和缺失配置失败
+- [x] 配置模板、构建文档与历史兼容说明
+- [x] JVM/Robolectric 测试、Android 仪器测试源码编译
+- [x] Release lint、R8、签名和 SHA-256
+- [x] 推送 `main` 并发布 GitHub Release `v0.9.5`
+
 ## 0.9.4
 
 - [x] QRC 与 LRC 高亮改为连续浮点进度和像素遮罩渲染
