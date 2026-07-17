@@ -1,0 +1,6 @@
+# Copy this file to release-signing.properties. Never commit the real keystore or passwords.
+storeFile=C:/path/outside/repository/qmusicwatch-release.keystore
+storePassword=replace-me
+keyAlias=androiddebugkey
+keyPassword=replace-me
+storeType=PKCS12

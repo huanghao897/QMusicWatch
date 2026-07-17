@@ -1,9 +1,52 @@
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.kapt")
+}
+
+val expectedReleaseCertificateSha256 = "fbd5642c3c1b5882545f6f1227cf2dc38a54bcd18609203935eedbef408d1382"
+val releaseSigningProperties = Properties()
+val releaseSigningPropertiesFile = rootProject.file("release-signing.properties")
+if (releaseSigningPropertiesFile.isFile) {
+    releaseSigningPropertiesFile.inputStream().use(releaseSigningProperties::load)
+}
+
+fun releaseSigningValue(environmentName: String, propertyName: String): String? =
+    System.getenv(environmentName)?.takeIf(String::isNotBlank)
+        ?: releaseSigningProperties.getProperty(propertyName)?.takeIf(String::isNotBlank)
+
+val releaseStorePath = releaseSigningValue("QMUSICWATCH_RELEASE_STORE_FILE", "storeFile")
+val releaseStorePassword = releaseSigningValue("QMUSICWATCH_RELEASE_STORE_PASSWORD", "storePassword")
+val releaseKeyAlias = releaseSigningValue("QMUSICWATCH_RELEASE_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = releaseSigningValue("QMUSICWATCH_RELEASE_KEY_PASSWORD", "keyPassword")
+val releaseStoreType = releaseSigningValue("QMUSICWATCH_RELEASE_STORE_TYPE", "storeType") ?: "PKCS12"
+val releaseSigningConfigured = listOf(
+    releaseStorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+val releaseStoreFile = releaseStorePath?.let(rootProject::file)
+
+fun releaseCertificateSha256(): String {
+    check(releaseSigningConfigured && releaseStoreFile?.isFile == true) {
+        "Release signing is not configured. Copy release-signing.properties.example to release-signing.properties."
+    }
+    val keyStore = KeyStore.getInstance(releaseStoreType)
+    releaseStoreFile!!.inputStream().use { keyStore.load(it, releaseStorePassword!!.toCharArray()) }
+    val certificate = keyStore.getCertificate(releaseKeyAlias)
+        ?: error("Release key alias '$releaseKeyAlias' was not found in ${releaseStoreFile.path}")
+    return MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
+        .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+}
+
+if (releaseSigningConfigured) {
+    check(releaseCertificateSha256() == expectedReleaseCertificateSha256) {
+        "Release signing certificate mismatch. Expected $expectedReleaseCertificateSha256."
+    }
 }
 
 android {
@@ -14,19 +57,27 @@ android {
         applicationId = "com.ronan.qmusicwatch"
         minSdk = 24
         targetSdk = 36
-        versionCode = 34
-        versionName = "0.9.4"
+        versionCode = 35
+        versionName = "0.9.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartext"] = "false"
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) create("canonicalRelease") {
+            storeFile = releaseStoreFile
+            storePassword = releaseStorePassword
+            keyAlias = releaseKeyAlias
+            keyPassword = releaseKeyPassword
+            storeType = releaseStoreType
+        }
+    }
     buildTypes {
         debug {
             manifestPlaceholders["usesCleartext"] = "true"
         }
         release {
-            // Preview builds use the debug certificate so the shrunk APK is directly installable.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("canonicalRelease")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -37,6 +88,23 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+}
+
+val verifyCanonicalReleaseSigning = tasks.register("verifyCanonicalReleaseSigning") {
+    group = "verification"
+    description = "Fails if the configured Release key is missing or is not the canonical QMusic Watch signer."
+    doLast {
+        check(releaseSigningConfigured) {
+            "Release signing is not configured. Copy release-signing.properties.example to release-signing.properties."
+        }
+        val actual = releaseCertificateSha256()
+        check(actual == expectedReleaseCertificateSha256) {
+            "Release signing certificate mismatch. Expected $expectedReleaseCertificateSha256, got $actual."
+        }
+    }
+}
+tasks.matching { it.name in setOf("packageRelease", "assembleRelease", "bundleRelease") }.configureEach {
+    dependsOn(verifyCanonicalReleaseSigning)
 }
 
 dependencies {
