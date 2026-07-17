@@ -11,7 +11,7 @@ import java.util.Date
 import java.util.Locale
 
 private val logUrlPattern = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE)
-private val logSecretPattern = Regex("(authorization|cookie|set-cookie|qm_keyst|qqmusic_key|p_skey|skey|qrcode_id|access[_-]?token|refresh[_-]?token)\\s*[:=]\\s*[^;\\s,]+", RegexOption.IGNORE_CASE)
+private val logSecretPattern = Regex("(authorization|cookie|set-cookie|qm_keyst|qqmusic_key|musickey|p_lskey|p_skey|skey|qrcode_id|qrsig|ptqrtoken|access[_-]?token|refresh[_-]?(?:token|key))\\s*[:=]\\s*[^;\\s,]+", RegexOption.IGNORE_CASE)
 
 object AppLog {
     private lateinit var file: File

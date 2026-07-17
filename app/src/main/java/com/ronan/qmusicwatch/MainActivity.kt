@@ -1,6 +1,8 @@
 package com.ronan.qmusicwatch
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
@@ -10,6 +12,8 @@ import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
@@ -32,6 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -65,6 +72,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import coil.compose.AsyncImage
@@ -74,6 +83,7 @@ import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.login.MusicCookie
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.lyrics.highlightedCharacters
+import com.ronan.qmusicwatch.lyrics.activeLyricIndex
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
 import kotlinx.coroutines.delay
@@ -83,6 +93,7 @@ import kotlin.math.abs
 
 private val Green = Color(0xFF6DFF9E)
 private val Surface = Color(0xFF111714)
+private const val OFFICIAL_LOGIN_URL = "https://y.qq.com/m/client/qr_code_login/index.html?tmeAppID=qqmusic&frame=1&ct=11&cv=20030508"
 @Composable private fun watchSearchColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = Color(0xFF59625E), unfocusedBorderColor = Color.Transparent,
     focusedContainerColor = Surface, unfocusedContainerColor = Surface,
@@ -92,14 +103,19 @@ private fun nextPlayMode(mode: String) = when (mode) { "sequential" -> "repeat_o
 private fun playModeName(mode: String) = when (mode) { "repeat_one" -> "单曲循环"; "loop_all" -> "列表循环"; "shuffle" -> "随机播放"; else -> "顺序播放" }
 private fun playModeIcon(mode: String) = when (mode) { "repeat_one" -> Icons.Default.RepeatOne; "loop_all" -> Icons.Default.Repeat; "shuffle" -> Icons.Default.Shuffle; else -> Icons.Default.FormatListNumbered }
 private fun lyricTime(ms: Long) = "${ms.coerceAtLeast(0) / 60_000}:${((ms.coerceAtLeast(0) / 1000) % 60).toString().padStart(2, '0')}"
+internal fun lyricLayers(showOriginal: Boolean, showTranslation: Boolean, hasTranslation: Boolean): Pair<Boolean, Boolean> =
+    (showOriginal || !hasTranslation) to (showTranslation && hasTranslation)
 private fun loginProviderName(provider: String) = if (provider == "wechat") "微信" else "QQ"
 private fun accountLabel(provider: String, accountId: String?) = if (provider == "wechat") "微信账号已绑定" else "QQ号 ${accountId.orEmpty()}"
-private fun vipSummary(profile: UserProfile?): String = when (profile?.isVip) {
-    true -> buildString { append(profile.vipName.ifBlank { "会员有效" }); profile.vipExpireAt?.let { append(" · 到期 "); append(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format(java.util.Date(it * 1000))) } }
-    false -> "未检测到会员播放权益"
-    null -> "正在读取会员状态"
+private fun vipSummary(profile: UserProfile?, loaded: Boolean, error: String?): String = when {
+    !loaded -> "正在读取会员状态"
+    error != null && profile == null -> error
+    profile?.isVip == true -> buildString { append(profile.vipName.ifBlank { "会员有效" }); profile.vipExpireAt?.let { append(" · 到期 "); append(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format(java.util.Date(it * 1000))) } }
+    profile?.isVip == false -> "未检测到会员播放权益"
+    else -> "暂无法确认会员权益，点检查登录重试"
 }
 internal fun <T> dailyBatch(items: List<T>, offset: Int, count: Int): List<T> = if (items.isEmpty()) emptyList() else List(minOf(count, items.size)) { items[(offset + it) % items.size] }
+internal fun writablePlaylists(items: List<MusicCollection>): List<MusicCollection> = items.filter { it.owned != false && (it.directoryId.toLongOrNull() ?: 0) > 0 }
 internal fun downloadProgressSummary(downloadedBytes: Long, totalBytes: Long): String {
     val safeDownloaded = if (totalBytes > 0) downloadedBytes.coerceIn(0, totalBytes) else downloadedBytes.coerceAtLeast(0)
     val downloadedMb = safeDownloaded / 1024f / 1024f
@@ -114,6 +130,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         hideStatusBar()
+        if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+        }
         setContent { QMusicTheme { QMusicApp() } }
     }
 
@@ -176,16 +195,16 @@ class MainActivity : ComponentActivity() {
             composable("login") { LoginScreen(state, vm) { nav.popBackStack() } }
             composable("search") { SearchScreen(nav, state, vm, searchHistory) }
             composable("library") { LaunchedEffect(Unit) { vm.loadLibrary() }; LibraryScreen(nav, state, vm) }
-            composable("recent") { LaunchedEffect(Unit) { vm.loadRecent() }; TrackListScreen("最近播放", state.recent, state.library?.playlists.orEmpty(), vm) }
+            composable("recent") { LaunchedEffect(Unit) { vm.loadRecent() }; TrackListScreen("最近播放", state.recent, writablePlaylists(state.library?.playlists.orEmpty()), vm) }
             composable("downloads") { DownloadScreen(downloads, vm) }
             composable("player") { PlayerScreen(state.currentTrack, state.lyrics, vm, playMode, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, lowPowerPlayer, { nav.navigate("queue") }) { nav.popBackStack() } }
             composable("queue") { LaunchedEffect(Unit) { if (vm.signedIn) vm.loadLibrary() }; QueueScreen(queue, queueIndex, queueReversed, state, vm) { nav.popBackStack() } }
-            composable("detail") { DetailScreen(state.detail, state.detailDirectoryId, state.library?.playlists.orEmpty(), vm) { nav.popBackStack() } }
+            composable("detail") { DetailScreen(state.detail, state.detailDirectoryId, writablePlaylists(state.library?.playlists.orEmpty()), vm) { nav.popBackStack() } }
             composable("settings") { SettingsCenter(nav) { nav.popBackStack() } }
             composable("settings/display") { DisplaySettingsScreen(vm, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, pureBlack, lowPowerPlayer) { nav.popBackStack() } }
             composable("settings/playback") { PlaybackSettingsScreen(vm, quality, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() } }
             composable("settings/network") {
-                NetworkSettingsScreen(vm, dailyCount, state.diagnostic, state.profile, onRelogin = {
+                NetworkSettingsScreen(vm, dailyCount, state.diagnostic, state.profile, state.profileLoaded, state.profileError, onRelogin = {
                     vm.logout()
                     nav.navigate("login") { popUpTo("home") }
                 }) { nav.popBackStack() }
@@ -207,14 +226,20 @@ class MainActivity : ComponentActivity() {
     var dailyOffset by remember { mutableIntStateOf(0) }
     val daily = state.home?.daily.orEmpty()
     val shown = dailyBatch(daily, dailyOffset, dailyCount)
-    LaunchedEffect(pager.settledPage, vm.signedIn) { if (pager.settledPage == 1 && vm.signedIn) { vm.loadProfile(); vm.loadLibrary(); vm.loadRecent() } }
+    LaunchedEffect(pager.settledPage, vm.signedIn, state.profileLoaded, state.library, state.recentLoaded) {
+        if (pager.settledPage == 1 && vm.signedIn) {
+            if (!state.profileLoaded) vm.loadProfile()
+            if (state.library == null) vm.loadLibrary()
+            if (!state.recentLoaded) vm.loadRecent()
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         HorizontalPager(state = pager, modifier = Modifier.weight(1f), beyondViewportPageCount = 1) { page ->
             if (page == 0) LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { Spacer(Modifier.height(8.dp)); Text("QMusic Watch", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("第三方非官方客户端", color = Color.Gray) }
                 item { Surface(Modifier.fillMaxWidth().height(52.dp).clickable { nav.navigate("search") }, shape = RoundedCornerShape(20.dp), color = Surface) { Row(Modifier.padding(horizontal = 15.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(9.dp)); Text("搜索歌曲、歌单、歌手、专辑", color = Color(0xFFB6BFBA), fontSize = 14.sp) } } }
                 item { SectionTitle("每日推荐", "换一换") { if (daily.isNotEmpty()) dailyOffset = (dailyOffset + dailyCount) % daily.size } }
-                items(shown, key = { it.id }) { TrackRow(it, vm, queue = shown, playlists = state.library?.playlists.orEmpty()) }
+                items(shown, key = { it.id }) { TrackRow(it, vm, queue = shown, playlists = writablePlaylists(state.library?.playlists.orEmpty())) }
             } else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { Spacer(Modifier.height(8.dp)); Text("我的", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
                 item {
@@ -222,14 +247,14 @@ class MainActivity : ComponentActivity() {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             val avatar = remember(state.profile?.avatarUrl) { state.profile?.avatarUrl?.takeIf(String::isNotBlank)?.let { ImageRequest.Builder(context).data(it).addHeader("Referer", "https://y.qq.com/").build() } }
                             AsyncImage(avatar, null, Modifier.size(68.dp).clip(RoundedCornerShape(50)).background(Color.DarkGray), fallback = androidx.compose.ui.res.painterResource(com.ronan.qmusicwatch.R.drawable.ic_launcher))
-                            Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(if (vm.signedIn) state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户" else "尚未登录", fontSize = 21.sp, fontWeight = FontWeight.Bold); Text(if (vm.signedIn) accountLabel(vm.loginProvider, vm.accountId) else "登录后同步收藏与歌单", color = Color.Gray); if (vm.signedIn) Text(vipSummary(state.profile), color = if (state.profile?.isVip == true) Color(0xFFFFC857) else Color.Gray, fontSize = 13.sp) }
+                            Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(if (vm.signedIn) state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户" else "尚未登录", fontSize = 21.sp, fontWeight = FontWeight.Bold); Text(if (vm.signedIn) accountLabel(vm.loginProvider, vm.accountId) else "登录后同步收藏与歌单", color = Color.Gray); if (vm.signedIn) Text(vipSummary(state.profile, state.profileLoaded, state.profileError), color = if (state.profile?.isVip == true) Color(0xFFFFC857) else Color.Gray, fontSize = 13.sp) }
                         }
                     }
                 }
                 if (!vm.signedIn) item { Button({ nav.navigate("login") }, Modifier.fillMaxWidth()) { Text("扫码登录") } }
                 else {
                     item { SettingsModule("我喜欢", "${state.library?.liked?.size ?: 0} 首歌曲", Icons.Default.Favorite) { nav.navigate("library") } }
-                    item { SettingsModule("我创建的歌单", "${state.library?.playlists?.count { it.owned != false } ?: 0} 个歌单", Icons.Default.QueueMusic) { nav.navigate("library") } }
+                    item { SettingsModule("我创建的歌单", "${state.library?.playlists?.count { it.owned != false } ?: 0} 个歌单", Icons.AutoMirrored.Filled.QueueMusic) { nav.navigate("library") } }
                     item { SettingsModule("收藏歌单", "${state.library?.playlists?.count { it.owned == false } ?: 0} 个歌单", Icons.Default.LibraryMusic) { nav.navigate("library") } }
                 }
                 item { SettingsModule("最近播放", "本机播放记录", Icons.Default.History) { nav.navigate("recent") } }
@@ -266,8 +291,11 @@ class MainActivity : ComponentActivity() {
 @Composable private fun OfficialQrLogin(provider: String, onCookie: (String) -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var submitted by remember(provider) { mutableStateOf(false) }
+    var loading by remember(provider) { mutableStateOf(true) }
+    var loadError by remember(provider) { mutableStateOf<String?>(null) }
     val cookieManager = remember { CookieManager.getInstance().apply { setAcceptCookie(true) } }
     val bridge = remember(provider) { QrLoginBridge { cookie -> if (!submitted) { submitted = true; onCookie(cookie) } } }
+    Box(Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(16.dp))) {
     AndroidView(factory = { context ->
         WebView(context).apply {
             webView = this
@@ -278,11 +306,22 @@ class MainActivity : ComponentActivity() {
             cookieManager.setAcceptThirdPartyCookies(this, true)
             addJavascriptInterface(bridge, "QMusicLogin")
             webViewClient = object : WebViewClient() {
+                override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                    loading = true
+                    loadError = null
+                }
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     val host = request.url.host.orEmpty()
                     return request.url.scheme != "https" || !(host == "qq.com" || host.endsWith(".qq.com"))
                 }
+                override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                    if (request.isForMainFrame) { loading = false; loadError = "二维码页面加载失败（${error.errorCode}）" }
+                }
+                override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
+                    if (request.isForMainFrame) { loading = false; loadError = "二维码页面响应 ${errorResponse.statusCode}" }
+                }
                 override fun onPageFinished(view: WebView, url: String) {
+                    if (loadError == null) loading = false
                     view.evaluateJavascript(
                         """(function(){if(window.__qmusicBridge)return;window.__qmusicBridge=true;window.addEventListener('message',function(e){try{var h=new URL(e.origin).hostname;if(!(h==='qq.com'||h.endsWith('.qq.com')))return;}catch(_){return;}QMusicLogin.onMessage(typeof e.data==='string'?e.data:JSON.stringify(e.data));});if(window.Music&&Music.client&&Music.client.open){var original=Music.client.open.bind(Music.client);Music.client.open=function(scope,action,payload){if(action==='scanLoginResult'){QMusicLogin.onMessage(JSON.stringify(payload||{}));return Promise.resolve({});}return original(scope,action,payload);};}})();""",
                         null
@@ -293,11 +332,14 @@ class MainActivity : ComponentActivity() {
             cookieManager.removeAllCookies {
                 target.post {
                     cookieManager.flush()
-                    if (webView === target) target.loadUrl("https://y.qq.com/m/client/qr_code_login/index.html?tmeAppID=qqmusic&frame=1&ct=11&cv=20030508")
+                    if (webView === target) target.loadUrl(OFFICIAL_LOGIN_URL)
                 }
             }
         }
-    }, modifier = Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(16.dp)))
+    }, modifier = Modifier.fillMaxSize())
+    if (loading && loadError == null) Surface(Modifier.fillMaxSize(), color = Surface.copy(alpha = .96f)) { Box(contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp); Spacer(Modifier.height(10.dp)); Text("正在加载登录二维码", color = Color.Gray) } } }
+    loadError?.let { error -> Surface(Modifier.fillMaxSize(), color = Surface) { Box(contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(8.dp)); Button({ loading = true; loadError = null; webView?.loadUrl(OFFICIAL_LOGIN_URL) }) { Text("重新加载") } } } } }
+    }
     DisposableEffect(Unit) { onDispose { webView?.stopLoading(); webView?.destroy(); webView = null } }
 }
 
@@ -320,8 +362,8 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
             Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) { Text("最近搜索", Modifier.weight(1f), color = Color.Gray, fontSize = 13.sp); TextButton(vm::clearSearchHistory, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("清空", fontSize = 13.sp) } }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) { history.forEach { value -> AssistChip({ query = value; vm.search(value, type) }, label = { Text(value, maxLines = 1, fontSize = 13.sp) }, leadingIcon = { Icon(Icons.Default.History, null, Modifier.size(14.dp)) }) } }
         }
-        ScrollableTabRow(names.keys.indexOf(type), edgePadding = 0.dp, modifier = Modifier.height(42.dp)) { names.forEach { (key, label) -> Tab(type == key, { type = key; if (query.isNotBlank()) vm.search(query, key) }, modifier = Modifier.height(42.dp), text = { Text(label, fontSize = 14.sp) }) } }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) { if (type == "track") items(state.searchTracks, key = { it.id }) { TrackRow(it, vm, queue = state.searchTracks, playlists = state.library?.playlists.orEmpty()) } else items(state.searchCollections, key = { it.id }) { CollectionRow(it) { vm.loadDetail(type, it); nav.navigate("detail") } }; if (state.searchCursor != null) item { TextButton({ vm.search(state.searchQuery, type, loadMore = true) }, Modifier.fillMaxWidth(), enabled = !state.searchLoading) { if (state.searchLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text("加载更多") } } }
+        PrimaryScrollableTabRow(names.keys.indexOf(type), edgePadding = 0.dp, modifier = Modifier.height(42.dp)) { names.forEach { (key, label) -> Tab(type == key, { type = key; if (query.isNotBlank()) vm.search(query, key) }, modifier = Modifier.height(42.dp), text = { Text(label, fontSize = 14.sp) }) } }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) { if (type == "track") items(state.searchTracks, key = { it.id }) { TrackRow(it, vm, queue = state.searchTracks, playlists = writablePlaylists(state.library?.playlists.orEmpty())) } else items(state.searchCollections, key = { it.id }) { CollectionRow(it) { vm.loadDetail(type, it); nav.navigate("detail") } }; if (state.searchCursor != null) item { TextButton({ vm.search(state.searchQuery, type, loadMore = true) }, Modifier.fillMaxWidth(), enabled = !state.searchLoading) { if (state.searchLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text("加载更多") } } }
     }
 }
 
@@ -337,7 +379,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
         items(state.library?.liked.orEmpty(), key = { it.id }) { TrackRow(it, vm, liked = true, queue = state.library?.liked.orEmpty(), playlists = created) }
         item { SectionTitle("我创建的歌单", "新建") { title = ""; creating = true } }
         items(created, key = { it.id }) { item ->
-            ListItem(modifier = Modifier.clickable { vm.loadDetail("playlist", item, editable = true); nav.navigate("detail") }, headlineContent = { Text(item.title) }, supportingContent = { Text("${item.trackCount} 首") }, leadingContent = { Icon(Icons.Default.QueueMusic, null, tint = Green) }, trailingContent = { Row { IconButton({ title = item.title; editing = item }) { Icon(Icons.Default.Edit, null) }; IconButton({ deleting = item }) { Icon(Icons.Default.Delete, "删除歌单") } } })
+            ListItem(modifier = Modifier.clickable { vm.loadDetail("playlist", item, editable = true); nav.navigate("detail") }, headlineContent = { Text(item.title) }, supportingContent = { Text("${item.trackCount} 首") }, leadingContent = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = Green) }, trailingContent = { Row { IconButton({ title = item.title; editing = item }) { Icon(Icons.Default.Edit, null) }; IconButton({ deleting = item }) { Icon(Icons.Default.Delete, "删除歌单") } } })
         }
         item { SectionTitle("收藏歌单") }
         items(collected, key = { it.id }) { item -> CollectionRow(item) { vm.loadDetail("playlist", item); nav.navigate("detail") } }
@@ -352,6 +394,8 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
 }
 
 @Composable private fun DownloadScreen(downloads: List<DownloadEntity>, vm: AppViewModel) {
+    var confirmDeleteLocked by remember { mutableStateOf(false) }
+    var deletingGroup by remember { mutableStateOf<String?>(null) }
     val own = downloads.filter { it.ownerAccountId == vm.accountId }
     val locked = downloads.filter { it.ownerAccountId != vm.accountId }
     val totalBytes = own.sumOf { item -> maxOf(item.downloadedBytes, java.io.File(item.filePath).takeIf { item.status == "complete" && it.exists() }?.length() ?: 0L) }
@@ -359,15 +403,20 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
         item { SectionTitle("离线缓存") }
         item { Text("当前账号占用 %.1f MB · ${own.size} 首".format(totalBytes / 1024f / 1024f), color = Color.Gray); TextButton(vm::deleteInvalidDownloads) { Text("一键删除失效缓存") } }
-        if (locked.isNotEmpty()) item { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Surface) { Column(Modifier.padding(12.dp, 9.dp)) { Text("其他账号缓存已锁定"); Text("${locked.size} 首 · %.1f MB，登录原账号后可恢复".format(lockedBytes / 1024f / 1024f), color = Color.Gray, fontSize = 13.sp) } } }
+        if (locked.isNotEmpty()) item { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Surface) { Row(Modifier.padding(12.dp, 9.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("其他账号缓存已锁定"); Text("${locked.size} 首 · %.1f MB，登录原账号后可恢复".format(lockedBytes / 1024f / 1024f), color = Color.Gray, fontSize = 13.sp) }; TextButton({ confirmDeleteLocked = true }) { Text("删除全部") } } } }
         own.groupBy(DownloadEntity::groupName).forEach { (group, values) ->
-            item(key = "group-$group") { Text(group, color = Green, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp)) }
+            item(key = "group-$group") { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(group, Modifier.weight(1f).padding(top = 10.dp), color = Green, fontWeight = FontWeight.Bold); TextButton({ deletingGroup = group }, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("删除本组", fontSize = 12.sp) } } }
             items(values, key = { "${it.ownerAccountId}-${it.trackId}" }) { item ->
-                val status = when (item.status) { "complete" -> "已完成"; "downloading" -> "下载中"; "paused" -> "已暂停"; "locked" -> "等待原账号登录"; "failed_storage" -> "存储不足，需保留 256MB"; else -> "下载失败" }
+                val status = when (item.status) { "complete" -> "已完成"; "queued_wifi" -> "等待 Wi-Fi"; "queued" -> "排队中"; "downloading" -> "下载中"; "paused" -> "已暂停"; "locked" -> "等待原账号登录"; "failed_storage" -> "存储不足，需保留 256MB"; else -> "下载失败" }
                 ListItem(headlineContent = { Text(item.title) }, supportingContent = { Text("$status · ${downloadProgressSummary(item.downloadedBytes, item.totalBytes)}${if (vm.accountId != item.ownerAccountId) " · 已锁定" else ""}") },
-                    trailingContent = { Row { if (item.status == "downloading") IconButton({ vm.pauseDownload(item.trackId) }) { Icon(Icons.Default.Pause, null) } else if (item.status == "paused" || item.status == "locked" || item.status.startsWith("failed")) IconButton({ vm.resumeDownload(item) }, enabled = vm.accountId == item.ownerAccountId) { Icon(Icons.Default.PlayArrow, null) }; IconButton({ vm.deleteDownload(item.trackId, item.ownerAccountId) }) { Icon(Icons.Default.Delete, null) } } })
+                    trailingContent = { Row { if (item.status in setOf("downloading", "queued", "queued_wifi")) IconButton({ vm.pauseDownload(item.trackId) }) { Icon(Icons.Default.Pause, null) } else if (item.status == "paused" || item.status == "locked" || item.status.startsWith("failed")) IconButton({ vm.resumeDownload(item) }, enabled = vm.accountId == item.ownerAccountId) { Icon(Icons.Default.PlayArrow, null) }; IconButton({ vm.deleteDownload(item.trackId, item.ownerAccountId) }) { Icon(Icons.Default.Delete, null) } } })
             }
         }
+    }
+    if (confirmDeleteLocked) AlertDialog(onDismissRequest = { confirmDeleteLocked = false }, title = { Text("删除全部锁定缓存？") }, text = { Text("将永久删除其他账号的 ${locked.size} 首离线歌曲；歌曲名称和账号信息不会显示。") }, confirmButton = { TextButton({ vm.deleteLockedDownloads(); confirmDeleteLocked = false }) { Text("确认删除", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ confirmDeleteLocked = false }) { Text("取消") } })
+    deletingGroup?.let { group ->
+        val count = own.count { it.groupName == group }
+        AlertDialog(onDismissRequest = { deletingGroup = null }, title = { Text("删除“$group”？") }, text = { Text("将永久删除本组的 $count 首离线歌曲。") }, confirmButton = { TextButton({ vm.deleteDownloadGroup(group); deletingGroup = null }) { Text("确认删除", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ deletingGroup = null }) { Text("取消") } })
     }
 }
 
@@ -377,11 +426,13 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     lyricAnimation: String, lowPowerPlayer: Boolean,
     openQueue: () -> Unit, onBack: () -> Unit,
 ) {
-    if (track == null) return Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { IconButton(onBack, Modifier.align(Alignment.TopStart).padding(8.dp)) { Icon(Icons.Default.ArrowBack, "返回") }; Text("尚未播放") }
+    if (track == null) return Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { IconButton(onBack, Modifier.align(Alignment.TopStart).padding(8.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }; Text("尚未播放") }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var playing by remember { mutableStateOf(false) }
-    val active = lyrics.indexOfLast { it.timeMs <= position + lyricOffset }.coerceAtLeast(0)
+    val hasTimeline = lyrics.any { it.timeMs >= 0 }
+    val active = activeLyricIndex(lyrics, position + lyricOffset)
+    val (renderOriginal, renderTranslation) = lyricLayers(showOriginal, showTranslation, lyrics.any { !it.translation.isNullOrBlank() })
     val lyricSp = when (lyricSize) { "small" -> 16; "large" -> 22; else -> 18 }
     val listState = rememberLazyListState()
     val pager = rememberPagerState(initialPage = 0) { 2 }
@@ -397,7 +448,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     LaunchedEffect(Unit) { delay(100); focusRequester.requestFocus() }
     LaunchedEffect(track.id, lowPowerPlayer) { var ticks = 0; val interval = if (lowPowerPlayer) 500L else 100L; while (true) { position = vm.playbackPosition(); duration = vm.playbackDuration(); playing = vm.isPlaying(); if (++ticks * interval >= 10_000) { ticks = 0; vm.savePlaybackState() }; delay(interval) } }
     LaunchedEffect(active, lyrics.size) {
-        if (lyrics.isNotEmpty() && !listState.isScrollInProgress) {
+        if (active >= 0 && lyrics.isNotEmpty() && !listState.isScrollInProgress) {
             while (listState.layoutInfo.viewportSize.height == 0) delay(16)
             listState.animateScrollToItem(active)
         }
@@ -414,20 +465,21 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
                     items(lyrics.size) { index ->
                         val line = lyrics[index]
                         val nextTime = lyrics.getOrNull(index + 1)?.timeMs ?: (line.timeMs + 4_000)
-                        val distance = kotlin.math.abs(index - active)
-                        val targetAlpha = when (lyricAnimation) { "off" -> if (distance == 0) 1f else .55f; "strong" -> when (distance) { 0 -> 1f; 1 -> .48f; 2 -> .22f; else -> .08f }; else -> when (distance) { 0 -> 1f; 1 -> .65f; 2 -> .4f; else -> .2f } }
+                        val distance = if (active >= 0) kotlin.math.abs(index - active) else Int.MAX_VALUE
+                        val targetAlpha = if (!hasTimeline) .82f else when (lyricAnimation) { "off" -> if (distance == 0) 1f else .55f; "strong" -> when (distance) { 0 -> 1f; 1 -> .48f; 2 -> .22f; else -> .08f }; else -> when (distance) { 0 -> 1f; 1 -> .65f; 2 -> .4f; else -> .2f } }
                         val lineAlpha by androidx.compose.animation.core.animateFloatAsState(targetAlpha, androidx.compose.animation.core.tween(if (lyricAnimation == "off") 0 else if (lyricAnimation == "strong") 650 else 350), label = "lyricFade")
-                        val targetSize = if (index == active) lyricSp + 5f else (lyricSp - 2).coerceAtLeast(13).toFloat()
+                        val targetSize = if (index == active) lyricSp + 5f else if (!hasTimeline) lyricSp.toFloat() else (lyricSp - 2).coerceAtLeast(13).toFloat()
                         val animatedSize by androidx.compose.animation.core.animateFloatAsState(targetSize, androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow), label = "lyricSize")
                         val highlighted = if (index == active) highlightedCharacters(line, position + lyricOffset, nextTime) else 0
                         val karaoke = buildAnnotatedString {
                             if (highlighted > 0) withStyle(SpanStyle(color = Green)) { append(line.text.take(highlighted)) }
                             if (highlighted < line.text.length) withStyle(SpanStyle(color = if (index == active) Color.White.copy(alpha = .72f) else Color.White)) { append(line.text.drop(highlighted)) }
                         }
-                        Column(Modifier.fillMaxWidth().alpha(lineAlpha).clickable { vm.seek((line.timeMs - lyricOffset).coerceAtLeast(0)) }.padding(vertical = if (index == active) 7.dp else 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (showOriginal) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(karaoke, Modifier.weight(1f), fontSize = animatedSize.sp, fontWeight = if (index == active) FontWeight.Bold else FontWeight.Normal, textAlign = androidx.compose.ui.text.style.TextAlign.Center); Text(lyricTime(line.timeMs), color = if (index == active) Green else Color.Gray, fontSize = 11.sp) }
-                            if (showTranslation) line.translation?.let { Text(it, color = if (index == active) Green.copy(alpha = .78f) else Color(0xFFB7C9FF), fontSize = (animatedSize - 4).coerceAtLeast(11f).sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
-                            if (!showOriginal && showTranslation) Text(lyricTime(line.timeMs), color = if (index == active) Green else Color.Gray, fontSize = 12.sp)
+                        val seekModifier = if (line.timeMs >= 0) Modifier.clickable { vm.seek((line.timeMs - lyricOffset).coerceAtLeast(0)) } else Modifier
+                        Column(Modifier.fillMaxWidth().alpha(lineAlpha).then(seekModifier).padding(vertical = if (index == active) 7.dp else 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (renderOriginal) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(karaoke, Modifier.weight(1f), fontSize = animatedSize.sp, fontWeight = if (index == active) FontWeight.Bold else FontWeight.Normal, textAlign = androidx.compose.ui.text.style.TextAlign.Center); if (line.timeMs >= 0) Text(lyricTime(line.timeMs), color = if (index == active) Green else Color.Gray, fontSize = 11.sp) }
+                            if (renderTranslation) line.translation?.let { Text(it, color = if (index == active) Green.copy(alpha = .78f) else Color(0xFFB7C9FF), fontSize = (animatedSize - 4).coerceAtLeast(11f).sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+                            if (!renderOriginal && renderTranslation && line.timeMs >= 0) Text(lyricTime(line.timeMs), color = if (index == active) Green else Color.Gray, fontSize = 12.sp)
                         }
                     }
                 }
@@ -441,14 +493,14 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
                     Spacer(Modifier.height(10.dp)); Text(track.title, fontSize = 23.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(track.artists.joinToString(" / "), color = Color.Gray, maxLines = 1)
                     Slider(position.toFloat(), { vm.seek(it.toLong()); position = it.toLong() }, valueRange = 0f..duration.coerceAtLeast(1).toFloat())
-                    Row { IconButton(vm::skipPrevious) { Icon(Icons.Default.SkipPrevious, "上一首") }; IconButton({ if (playing) vm.pausePlayback() else vm.resumePlayback() }) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(38.dp)) }; IconButton(vm::skipNext) { Icon(Icons.Default.SkipNext, "下一首") }; IconButton(openQueue) { Icon(Icons.Default.QueueMusic, "播放列表") } }
+                    Row { IconButton(vm::skipPrevious) { Icon(Icons.Default.SkipPrevious, "上一首") }; IconButton({ if (playing) vm.pausePlayback() else vm.resumePlayback() }) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(38.dp)) }; IconButton(vm::skipNext) { Icon(Icons.Default.SkipNext, "下一首") }; IconButton(openQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "播放列表") } }
                     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) { listOf("sequential", "loop_all", "repeat_one", "shuffle").forEach { mode -> IconToggleButton(playMode == mode, { vm.setPlayMode(mode) }) { Icon(playModeIcon(mode), playModeName(mode), tint = if (playMode == mode) Green else Color.Gray) } } }
                     Text(playModeName(playMode), color = Green, fontSize = 13.sp)
                     Text("向左滑查看歌词", color = Color.Gray, fontSize = 13.sp)
                 }
             }
         }
-        IconButton(onBack, Modifier.align(Alignment.TopStart).padding(8.dp).background(Color.Black.copy(alpha = .35f), RoundedCornerShape(20.dp))) { Icon(Icons.Default.ArrowBack, "返回") }
+        IconButton(onBack, Modifier.align(Alignment.TopStart).padding(8.dp).background(Color.Black.copy(alpha = .35f), RoundedCornerShape(20.dp))) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         if (!locked) IconButton({ locked = true }, Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = .35f), RoundedCornerShape(20.dp))) { Icon(Icons.Default.LockOpen, "锁定触控") }
         Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             repeat(2) { page -> Box(Modifier.size(if (pager.currentPage == page) 7.dp else 5.dp).background(if (pager.currentPage == page) Green else Color.Gray, RoundedCornerShape(50))) }
@@ -461,7 +513,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
 }
 
 @Composable private fun DetailScreen(detail: CollectionDetail?, editableDirectoryId: String?, playlists: List<MusicCollection>, vm: AppViewModel, onBack: () -> Unit) = LazyColumn(Modifier.fillMaxSize().padding(horizontal = 14.dp)) {
-    item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.Default.ArrowBack, "返回") }; Text(detail?.title ?: "加载中", Modifier.weight(1f), fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (detail != null) TextButton({ vm.cacheAll(detail.tracks, detail.title) }) { Text("全部缓存") } } }
+    item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }; Text(detail?.title ?: "加载中", Modifier.weight(1f), fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (detail != null) TextButton({ vm.cacheAll(detail.tracks, detail.title) }) { Text("全部缓存") } } }
     items(detail?.tracks.orEmpty(), key = { it.id }) { TrackRow(it, vm, playlistId = editableDirectoryId, removeFromPlaylist = editableDirectoryId != null, queue = detail?.tracks.orEmpty(), playlists = playlists) }
 }
 
@@ -470,7 +522,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
 ) { ListItem(colors = ListItemDefaults.colors(containerColor = Color.Transparent), headlineContent = { Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold) }, supportingContent = { Text(subtitle, color = Color.Gray) }, leadingContent = { Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFF252A28)) { Icon(icon, null, Modifier.padding(12.dp), tint = Color.White) } }, trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = Color.Gray) }) }
 
 @Composable private fun SettingsHeader(title: String, onBack: () -> Unit) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    IconButton(onBack) { Icon(Icons.Default.ArrowBack, "返回") }; Text(title, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+    IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }; Text(title, fontSize = 27.sp, fontWeight = FontWeight.Bold)
 }
 
 @Composable private fun SettingsCenter(nav: NavHostController, onBack: () -> Unit) = LazyColumn(
@@ -512,7 +564,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     if (customTimer) AlertDialog(onDismissRequest = { customTimer = false }, title = { Text("自定义播放时间") }, text = { OutlinedTextField(customMinutes, { customMinutes = it.filter(Char::isDigit).take(4) }, label = { Text("分钟（1-1440）") }, singleLine = true) }, confirmButton = { TextButton({ customMinutes.toIntOrNull()?.coerceIn(1, 1440)?.let { vm.startSleepTimer(it, finishCurrent) }; customTimer = false }) { Text("开始") } }, dismissButton = { TextButton({ customTimer = false }) { Text("取消") } })
 }
 
-@Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, diagnostic: String?, profile: UserProfile?, onRelogin: () -> Unit, onBack: () -> Unit) {
+@Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, diagnostic: String?, profile: UserProfile?, profileLoaded: Boolean, profileError: String?, onRelogin: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val saveLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> uri?.let { runCatching { AppLog.copyTo(context, it) } } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -520,7 +572,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
         item { Column(Modifier.fillMaxWidth().padding(16.dp, 8.dp)) { Text("每日推荐显示数量"); Row { FilterChip(dailyCount == 5, { vm.setDailyCount(5) }, label = { Text("5 首") }); Spacer(Modifier.width(7.dp)); FilterChip(dailyCount == 10, { vm.setDailyCount(10) }, label = { Text("10 首") }) } } }
         if (vm.signedIn) {
             item { Text("账号", color = Green, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
-            item { ListItem(headlineContent = { Text(profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户") }, supportingContent = { Text("${accountLabel(vm.loginProvider, vm.accountId)}\n${vipSummary(profile)}") }, leadingContent = { Icon(Icons.Default.AccountCircle, null, tint = Green) }) }
+            item { ListItem(headlineContent = { Text(profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户") }, supportingContent = { Text("${accountLabel(vm.loginProvider, vm.accountId)}\n${vipSummary(profile, profileLoaded, profileError)}") }, leadingContent = { Icon(Icons.Default.AccountCircle, null, tint = Green) }) }
             item { FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { OutlinedButton(vm::diagnose) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(5.dp)); Text("检查登录") }; OutlinedButton(onRelogin) { Text("重新登录") } } }
         }
         diagnostic?.let { item { Text(it, color = if (it.startsWith("诊断失败")) MaterialTheme.colorScheme.error else Green, fontSize = 14.sp) } }
@@ -574,9 +626,9 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     val currentTrackId = state.currentTrack?.id ?: queue.getOrNull(currentIndex)?.id
     val shown = remember(workingQueue, query) { workingQueue.withIndex().filter { query.isBlank() || it.value.title.contains(query, true) || it.value.artists.any { artist -> artist.contains(query, true) } } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), state = listState, contentPadding = PaddingValues(bottom = 18.dp)) {
-        item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.Default.ArrowBack, "返回") }; Text("当前播放列表", Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.Bold); TextButton(vm::reverseQueue) { Icon(if (reversed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null); Text(if (reversed) "倒序" else "正序") } } }
+        item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }; Text("当前播放列表", Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.Bold); TextButton(vm::reverseQueue) { Icon(if (reversed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null); Text(if (reversed) "倒序" else "正序") } } }
         item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(48.dp), singleLine = true, shape = RoundedCornerShape(19.dp), colors = watchSearchColors(), placeholder = { Text("筛选播放列表", fontSize = 13.sp, color = Color.Gray) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp), leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(19.dp)) }) }
-        item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalArrangement = Arrangement.spacedBy(0.dp)) { TextButton({ vm.cacheAll(queue, "当前播放列表") }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Text("缓存", fontSize = 13.sp) }; TextButton({ vm.clearQueueImport(); importDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.LibraryAdd, null, Modifier.size(18.dp)); Text("选歌添加", fontSize = 13.sp) }; TextButton({ saveDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.PlaylistAdd, null, Modifier.size(18.dp)); Text("保存", fontSize = 13.sp) }; TextButton(vm::removeQueueDuplicates, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("去重", fontSize = 13.sp) }; TextButton(vm::clearQueue, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("清空", fontSize = 13.sp) } } }
+        item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalArrangement = Arrangement.spacedBy(0.dp)) { TextButton({ vm.cacheAll(queue, "当前播放列表") }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Text("缓存", fontSize = 13.sp) }; TextButton({ vm.clearQueueImport(); importDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.LibraryAdd, null, Modifier.size(18.dp)); Text("选歌添加", fontSize = 13.sp) }; TextButton({ saveDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, Modifier.size(18.dp)); Text("保存", fontSize = 13.sp) }; TextButton(vm::removeQueueDuplicates, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("去重", fontSize = 13.sp) }; TextButton(vm::clearQueue, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("清空", fontSize = 13.sp) } } }
         item { Text("${workingQueue.size} 首", color = Color.Gray) }
         if (workingQueue.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("播放列表为空", color = Color.Gray) } }
         itemsIndexed(shown, key = { _, item -> item.value.id }) { _, indexed ->
@@ -651,7 +703,7 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
             when {
                 state.queueImportTitle.isBlank() -> LazyColumn(Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     item { Surface(Modifier.fillMaxWidth().clickable { vm.loadQueueImportLiked() }, shape = RoundedCornerShape(14.dp), color = Surface) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Favorite, null, tint = Green); Spacer(Modifier.width(9.dp)); Column { Text("我喜欢"); Text("${library?.liked?.size ?: 0} 首", color = Color.Gray, fontSize = 13.sp) } } } }
-                    items(library?.playlists.orEmpty(), key = { it.id }) { playlist -> Surface(Modifier.fillMaxWidth().clickable { vm.loadQueueImportPlaylist(playlist) }, shape = RoundedCornerShape(14.dp), color = Surface) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.QueueMusic, null, tint = Green); Spacer(Modifier.width(9.dp)); Column { Text(playlist.title, maxLines = 1); Text(if (playlist.trackCount >= 0) "${playlist.trackCount} 首" else "点击读取", color = Color.Gray, fontSize = 13.sp) } } } } }
+                    items(library?.playlists.orEmpty(), key = { it.id }) { playlist -> Surface(Modifier.fillMaxWidth().clickable { vm.loadQueueImportPlaylist(playlist) }, shape = RoundedCornerShape(14.dp), color = Surface) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = Green); Spacer(Modifier.width(9.dp)); Column { Text(playlist.title, maxLines = 1); Text(if (playlist.trackCount >= 0) "${playlist.trackCount} 首" else "点击读取", color = Color.Gray, fontSize = 13.sp) } } } } }
                 state.queueImportLoading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 else -> Column {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("已选 ${selectedIds.size} 首", Modifier.weight(1f), color = Green); TextButton({ if (selectedIds.size == state.queueImportTracks.size) selectedIds.clear() else { selectedIds.clear(); selectedIds.addAll(state.queueImportTracks.map(Track::id)) } }) { Text(if (selectedIds.size == state.queueImportTracks.size) "取消全选" else "全选") } }
@@ -669,6 +721,6 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     )
 }
 
-@Composable private fun CollectionRow(value: MusicCollection, open: () -> Unit = {}) = ListItem(modifier = Modifier.clickable(onClick = open), headlineContent = { Text(value.title) }, supportingContent = { Text(if (value.trackCount >= 0) "${value.trackCount} 首" else "点击查看") }, leadingContent = { Icon(Icons.Default.QueueMusic, null, tint = Green) })
+@Composable private fun CollectionRow(value: MusicCollection, open: () -> Unit = {}) = ListItem(modifier = Modifier.clickable(onClick = open), headlineContent = { Text(value.title) }, supportingContent = { Text(if (value.trackCount >= 0) "${value.trackCount} 首" else "点击查看") }, leadingContent = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = Green) })
 @Composable private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) = Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) { Text(text, fontSize = 21.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); action?.let { TextButton(onAction) { Text(it) } } }
 @Composable private fun MiniPlayer(track: Track?, open: () -> Unit) { if (track != null) Surface(Modifier.fillMaxWidth().clickable(onClick = open), color = Surface) { Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.GraphicEq, null, tint = Green); Spacer(Modifier.width(8.dp)); Text(track.title, Modifier.weight(1f), maxLines = 1); Icon(Icons.Default.KeyboardArrowUp, null) } } }

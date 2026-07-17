@@ -26,15 +26,11 @@ class PlaybackConnection(context: Context) {
     private var stopAfterCurrent = false
     private var sleepVolume: Float? = null
     private val mainExecutor = ContextCompat.getMainExecutor(context)
-    var onEnded: (() -> Unit)? = null
     var onError: ((PlaybackErrorEvent) -> Unit)? = null
+    var onMediaItemChanged: ((String, String) -> Unit)? = null
     init {
         future.addListener({
             controllerOrNull()?.addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(state: Int) {
-                    if (state != Player.STATE_ENDED) return
-                    if (stopAfterCurrent) { stopAfterCurrent = false; cancelSleepTimer(); pause() } else onEnded?.invoke()
-                }
                 override fun onPlayerError(error: PlaybackException) {
                     val causes = generateSequence<Throwable>(error) { it.cause }.joinToString(" <- ") { "${it.javaClass.simpleName}:${it.message.orEmpty()}" }
                     AppLog.write("PLAYER", "${error.errorCodeName} $causes")
@@ -45,6 +41,10 @@ class PlaybackConnection(context: Context) {
                         positionMs = controller.currentPosition.coerceAtLeast(0),
                         isLocalFile = controller.currentMediaItem?.localConfiguration?.uri?.scheme == "file",
                     ))
+                }
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    mediaItem ?: return
+                    onMediaItemChanged?.invoke(mediaItem.mediaId, mediaItem.localConfiguration?.uri?.toString().orEmpty())
                 }
             }) ?: AppLog.write("PLAYER", "controller connection failed")
         }, mainExecutor)
@@ -76,6 +76,8 @@ class PlaybackConnection(context: Context) {
     fun seek(positionMs: Long) = withController { it.seekTo(positionMs) }
     fun position() = controllerOrNull()?.currentPosition?.coerceAtLeast(0) ?: 0L
     fun duration() = controllerOrNull()?.duration?.coerceAtLeast(0) ?: 0L
+    fun currentMediaId() = controllerOrNull()?.currentMediaItem?.mediaId.orEmpty()
+    fun currentUri() = controllerOrNull()?.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
     fun isPlaying() = controllerOrNull()?.isPlaying == true
     fun adjustVolume(direction: Int) = audio.adjustStreamVolume(
         AudioManager.STREAM_MUSIC,
@@ -104,6 +106,13 @@ class PlaybackConnection(context: Context) {
         }
     }
     fun cancelSleepTimer() { sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false; sleepVolume?.let { volume -> controllerOrNull()?.volume = volume }; sleepVolume = null; _sleepRemaining.value = 0 }
+    fun consumeStopAfterCurrentAtEnd(): Boolean {
+        if (!stopAfterCurrent) return false
+        stopAfterCurrent = false
+        cancelSleepTimer()
+        pause()
+        return true
+    }
     fun release() { scope.cancel(); MediaController.releaseFuture(future) }
 }
 

@@ -6,6 +6,9 @@ data class LyricLine(
     val words: List<LyricWord> = emptyList(),
 )
 
+fun activeLyricIndex(lines: List<LyricLine>, positionMs: Long): Int =
+    lines.indexOfLast { it.timeMs >= 0 && it.timeMs <= positionMs }
+
 fun highlightedCharacters(line: LyricLine, positionMs: Long, nextLineTimeMs: Long): Int {
     if (positionMs <= line.timeMs) return 0
     if (line.words.isNotEmpty()) {
@@ -31,15 +34,26 @@ fun highlightedCharacters(line: LyricLine, positionMs: Long, nextLineTimeMs: Lon
 
 object LrcParser {
     private val stamp = Regex("\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?]")
+    private val metadata = Regex("^\\[(ar|ti|al|by|offset|re|ve|length):.*]$", RegexOption.IGNORE_CASE)
     private val qrcLine = Regex("\\[(\\d+),(\\d+)](.*)")
     private val qrcWord = Regex("(.*?)\\((\\d+),(\\d+)\\)")
     fun parse(original: String, translation: String? = null, wordSync: String? = null): List<LyricLine> {
-        val originalLines = parseQrc(wordSync.orEmpty()).ifEmpty { parseOne(original).map { LyricLine(it.first, it.second) } }
+        val originalLines = parseQrc(wordSync.orEmpty()).ifEmpty {
+            parseOne(original).map { LyricLine(it.first, it.second) }.ifEmpty {
+                parsePlain(original).map { LyricLine(-1, it) }
+            }
+        }
         val translated = parseOne(translation.orEmpty())
+        val plainTranslation = parsePlain(translation.orEmpty())
         return originalLines.mapIndexed { index, line ->
-            val translatedText = translated.firstOrNull { it.first == line.timeMs }?.second
-                ?: translated.minByOrNull { kotlin.math.abs(it.first - line.timeMs) }?.takeIf { kotlin.math.abs(it.first - line.timeMs) <= 350 }?.second
-                ?: translated.getOrNull(index)?.second.takeIf { translated.size == originalLines.size }
+            val translatedText = if (line.timeMs >= 0) {
+                translated.firstOrNull { it.first == line.timeMs }?.second
+                    ?: translated.minByOrNull { kotlin.math.abs(it.first - line.timeMs) }?.takeIf { kotlin.math.abs(it.first - line.timeMs) <= 350 }?.second
+                    ?: translated.getOrNull(index)?.second.takeIf { translated.size == originalLines.size }
+                    ?: plainTranslation.getOrNull(index).takeIf { plainTranslation.size == originalLines.size }
+            } else {
+                plainTranslation.getOrNull(index) ?: translated.getOrNull(index)?.second
+            }
             line.copy(translation = translatedText)
         }.sortedBy { it.timeMs }
     }
@@ -68,4 +82,9 @@ object LrcParser {
             (match.groupValues[1].toLong() * 60_000 + match.groupValues[2].toLong() * 1_000 + fraction) to text
         }
     }.filter { it.second.isNotBlank() }.toList()
+
+    private fun parsePlain(value: String): List<String> = value.lineSequence()
+        .map(String::trim)
+        .filter { it.isNotBlank() && !metadata.matches(it) }
+        .toList()
 }

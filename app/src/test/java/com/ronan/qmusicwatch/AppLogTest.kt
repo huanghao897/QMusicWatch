@@ -19,4 +19,12 @@ class AppLogTest {
         assertTrue(result.contains("<redacted>"))
         assertFalse(result.contains('\n'))
     }
+
+    @Test fun removesEveryUpstreamCredentialAlias() {
+        val result = redactLogMessage("musickey=music-secret refresh_key=refresh-secret qrsig=qr-secret ptqrtoken=12345")
+        assertFalse(result.contains("music-secret"))
+        assertFalse(result.contains("refresh-secret"))
+        assertFalse(result.contains("qr-secret"))
+        assertFalse(result.contains("12345"))
+    }
 }

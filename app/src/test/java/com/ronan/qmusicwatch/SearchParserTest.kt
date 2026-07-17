@@ -1,12 +1,23 @@
 package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.network.parseSearchTrack
+import com.ronan.qmusicwatch.network.nextSearchCursor
+import com.ronan.qmusicwatch.network.normalizeHttpsUrl
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SearchParserTest {
+    @Test fun paginationUsesRawPageSizeInsteadOfSuccessfullyParsedCount() {
+        assertEquals("3", nextSearchCursor(page = 2, rawItemCount = 20))
+        assertEquals(null, nextSearchCursor(page = 2, rawItemCount = 19))
+    }
+
+    @Test fun protocolRelativeArtworkUrlsBecomeHttps() {
+        assertEquals("https://img.qq.com/a.jpg", normalizeHttpsUrl("//img.qq.com/a.jpg"))
+        assertEquals("https://img.qq.com/a.jpg", normalizeHttpsUrl("http://img.qq.com/a.jpg"))
+    }
     @Test fun parsesFullSearchSongShape() {
         val item = Json.parseToJsonElement("""{"songmid":"001","songname":"搁浅","songid":12,"albummid":"alb","albumname":"七里香","size128":10,"size320":20,"singer":[{"name":"周杰伦"}],"pay":{"payplay":1}}""").jsonObject
         val track = parseSearchTrack(item)!!

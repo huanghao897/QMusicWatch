@@ -1,6 +1,8 @@
 package com.ronan.qmusicwatch
 
+import com.ronan.qmusicwatch.network.mergeUserProfiles
 import com.ronan.qmusicwatch.network.parseUserProfile
+import com.ronan.qmusicwatch.model.UserProfile
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -38,5 +40,20 @@ class UserProfileParserTest {
         val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_response":{"svip":1,"userinfo":{"expire":9}}}"""))!!
         assertEquals(true, profile.isVip)
         assertEquals(null, profile.vipExpireAt)
+    }
+
+    @Test fun inactiveSuperVipDoesNotOverrideActiveGreenMembership() {
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"superVip":{"isSVip":0,"vipEndTime":2051222400},"greenVip":{"isVip":1,"vipEndTime":1893456000}}"""))!!
+        assertEquals("豪华绿钻", profile.vipName)
+        assertEquals(1893456000L, profile.vipExpireAt)
+    }
+
+    @Test fun mergedMembershipKeepsTypeAndExpiryFromSameHighestTier() {
+        val merged = mergeUserProfiles(listOf(
+            UserProfile(displayName = "Ronan", isVip = true, vipExpireAt = 1893456000, vipName = "豪华绿钻"),
+            UserProfile(isVip = true, vipExpireAt = 1800000000, vipName = "超级会员（SVIP）"),
+        ))!!
+        assertEquals("超级会员（SVIP）", merged.vipName)
+        assertEquals(1800000000L, merged.vipExpireAt)
     }
 }

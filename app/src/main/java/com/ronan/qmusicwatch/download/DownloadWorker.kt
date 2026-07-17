@@ -19,9 +19,16 @@ import java.util.concurrent.TimeUnit
 
 fun cachedLyricsFile(audioPath: String) = File(audioPath.removeSuffix(".audio") + ".lyrics.json")
 fun cachedArtworkFile(audioPath: String) = File(audioPath.removeSuffix(".audio") + ".cover")
+internal fun offlineAudioRelativePath(owner: String, trackId: String): String =
+    "offline/${downloadHash(owner)}/${downloadHash("$owner:$trackId")}.audio"
+private fun downloadHash(value: String) = java.security.MessageDigest.getInstance("SHA-256").digest(value.encodeToByteArray()).joinToString("") { "%02x".format(it) }
 private val downloadSlots = Semaphore(2)
 private val downloadHttp = OkHttpClient()
 private val downloadJson = Json { ignoreUnknownKeys = true }
+private const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
+private class StorageReserveException : IllegalStateException("存储空间不足，需保留 256MB")
+internal fun hasDownloadSpace(availableBytes: Long, remainingDownloadBytes: Long): Boolean =
+    availableBytes >= STORAGE_RESERVE_BYTES && (remainingDownloadBytes < 0 || availableBytes - remainingDownloadBytes >= STORAGE_RESERVE_BYTES)
 
 class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = downloadSlots.withPermit { withContext(Dispatchers.IO) {
@@ -29,15 +36,13 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val owner = inputData.getString("owner") ?: return@withContext Result.failure()
         val graph = applicationContext as QMusicApplication
         val db = graph.db
-        val ownerDir = hash(owner)
-        val fileName = hash("$owner:$id")
-        val dir = File(applicationContext.filesDir, "offline/$ownerDir").apply { mkdirs() }
-        val part = File(dir, "$fileName.part")
-        val target = File(dir, "$fileName.audio")
+        val target = File(applicationContext.filesDir, offlineAudioRelativePath(owner, id))
+        val dir = target.parentFile!!.apply { mkdirs() }
+        val part = File(dir, target.name.removeSuffix(".audio") + ".part")
         db.downloads().upsert(DownloadEntity(id, owner, inputData.getString("title").orEmpty(), inputData.getString("artists").orEmpty(), inputData.getString("artwork").orEmpty(), target.absolutePath, "downloading", part.length(), groupName = inputData.getString("group").orEmpty().ifBlank { "单曲缓存" }))
         if (graph.vault.load()?.accountId != owner) { db.downloads().progress(id, owner, "locked", part.length(), -1); return@withContext Result.failure() }
-        val available = if (android.os.Build.VERSION.SDK_INT >= 26) applicationContext.getSystemService(android.os.storage.StorageManager::class.java).getAllocatableBytes(android.os.storage.StorageManager.UUID_DEFAULT) else dir.usableSpace
-        if (available < 256L * 1024 * 1024) { db.downloads().progress(id, owner, "failed_storage", part.length(), -1); return@withContext Result.failure(workDataOf("reason" to "存储空间不足，需保留 256MB")) }
+        fun availableBytes() = if (android.os.Build.VERSION.SDK_INT >= 26) runCatching { applicationContext.getSystemService(android.os.storage.StorageManager::class.java).getAllocatableBytes(android.os.storage.StorageManager.UUID_DEFAULT) }.getOrDefault(dir.usableSpace) else dir.usableSpace
+        if (!hasDownloadSpace(availableBytes(), -1)) { db.downloads().progress(id, owner, "failed_storage", part.length(), -1); return@withContext Result.failure(workDataOf("reason" to "存储空间不足，需保留 256MB")) }
         runCatching {
             val track = Track(
                 id = id, title = inputData.getString("title").orEmpty(), artists = inputData.getString("artists").orEmpty().split(" / ").filter(String::isNotBlank),
@@ -50,7 +55,9 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 if (!response.isSuccessful) error("download ${response.code}")
                 val append = response.code == 206 && part.length() > 0
                 val start = if (append) part.length() else 0
-                val total = response.body?.contentLength()?.let { if (it < 0) -1 else start + it } ?: -1
+                val remaining = response.body?.contentLength() ?: -1
+                val total = if (remaining < 0) -1 else start + remaining
+                if (!hasDownloadSpace(availableBytes(), remaining)) throw StorageReserveException()
                 response.body!!.byteStream().use { input ->
                     java.io.FileOutputStream(part, append).buffered().use { output ->
                             val buffer = ByteArray(64 * 1024)
@@ -59,7 +66,11 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                                 if (isStopped) throw kotlinx.coroutines.CancellationException("paused")
                                 val read = input.read(buffer); if (read < 0) break
                                 output.write(buffer, 0, read)
-                                if (part.length() - last > 512 * 1024) { last = part.length(); setProgress(workDataOf("bytes" to last, "total" to total)); db.downloads().progress(id, owner, "downloading", last, total) }
+                                if (part.length() - last > 512 * 1024) {
+                                    last = part.length()
+                                    if (!hasDownloadSpace(availableBytes(), 0)) throw StorageReserveException()
+                                    setProgress(workDataOf("bytes" to last, "total" to total)); db.downloads().progress(id, owner, "downloading", last, total)
+                                }
                             }
                     }
                 }
@@ -80,14 +91,24 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                     if (!coverPart.renameTo(cover)) error("cannot finalize cover")
                 }.onFailure { coverPart.delete() }
             }
-        }.fold(onSuccess = { Result.success() }, onFailure = { db.downloads().progress(id, owner, if (isStopped) "paused" else "failed", part.length(), -1); if (!isStopped && runAttemptCount < 2) Result.retry() else Result.failure() })
+        }.fold(onSuccess = { Result.success() }, onFailure = { error ->
+            val status = when { isStopped -> "paused"; error is StorageReserveException -> "failed_storage"; else -> "failed" }
+            db.downloads().progress(id, owner, status, part.length(), -1)
+            if (!isStopped && error !is StorageReserveException && runAttemptCount < 2) Result.retry() else Result.failure(workDataOf("reason" to error.message.orEmpty()))
+        })
     } }
-    private fun hash(value: String) = java.security.MessageDigest.getInstance("SHA-256").digest(value.encodeToByteArray()).joinToString("") { "%02x".format(it) }
 }
 
 class DownloadController(private val context: Context, private val db: AppDatabase) {
     val downloads = db.downloads().observeAll()
-    fun enqueue(track: Track, owner: String, quality: String, wifiOnly: Boolean, groupName: String) {
+    suspend fun enqueue(track: Track, owner: String, quality: String, wifiOnly: Boolean, groupName: String) {
+        val target = File(context.filesDir, offlineAudioRelativePath(owner, track.id))
+        val part = File(target.parentFile, target.name.removeSuffix(".audio") + ".part")
+        val existing = db.downloads().find(track.id, owner)
+        db.downloads().upsert(DownloadEntity(
+            track.id, owner, track.title, track.artists.joinToString(" / "), track.artworkUrl, target.absolutePath,
+            if (wifiOnly) "queued_wifi" else "queued", part.length(), existing?.totalBytes ?: -1, groupName = groupName,
+        ))
         val data = workDataOf(
             "id" to track.id, "owner" to owner, "quality" to quality, "title" to track.title, "artists" to track.artists.joinToString(" / "), "artwork" to track.artworkUrl, "group" to groupName,
             "qualities" to track.qualities.joinToString(","), "numericId" to track.numericId, "mediaMid" to track.mediaMid, "songType" to track.songType, "requiresVip" to track.requiresVip,
@@ -98,14 +119,32 @@ class DownloadController(private val context: Context, private val db: AppDataba
     suspend fun pause(trackId: String, owner: String) {
         withContext(Dispatchers.IO) { WorkManager.getInstance(context).cancelUniqueWork("download-$owner-$trackId").result.get(15, TimeUnit.SECONDS) }
         val item = db.downloads().find(trackId, owner)
-        val finalized = item?.filePath?.let(::File)?.takeIf(File::exists)
-        if (finalized != null) db.downloads().progress(trackId, owner, "complete", finalized.length(), finalized.length())
-        else db.downloads().progress(trackId, owner, "paused", item?.downloadedBytes ?: 0, item?.totalBytes ?: -1)
+        markStopped(item)
+    }
+    suspend fun pauseAll() {
+        withContext(Dispatchers.IO) { WorkManager.getInstance(context).cancelAllWork().result.get(15, TimeUnit.SECONDS) }
+        db.downloads().all().filter { it.status in setOf("downloading", "queued", "queued_wifi") }.forEach { markStopped(it) }
+    }
+    private suspend fun markStopped(item: DownloadEntity?) {
+        item ?: return
+        val finalized = File(item.filePath).takeIf(File::exists)
+        if (finalized != null) db.downloads().progress(item.trackId, item.ownerAccountId, "complete", finalized.length(), finalized.length())
+        else db.downloads().progress(item.trackId, item.ownerAccountId, "paused", item.downloadedBytes, item.totalBytes)
     }
     suspend fun delete(trackId: String, owner: String) { pause(trackId, owner); db.downloads().find(trackId, owner)?.let { File(it.filePath).delete(); File(it.filePath.removeSuffix(".audio") + ".part").delete(); cachedLyricsFile(it.filePath).delete(); cachedArtworkFile(it.filePath).let { cover -> cover.delete(); File("${cover.absolutePath}.part").delete() } }; db.downloads().delete(trackId, owner) }
     suspend fun deleteInvalid(owner: String): Int {
         val invalid = db.downloads().all().filter { it.ownerAccountId == owner && (it.status == "complete" && !File(it.filePath).exists() || it.status.startsWith("failed")) }
         invalid.forEach { delete(it.trackId, owner) }
         return invalid.size
+    }
+    suspend fun deleteLocked(currentOwner: String?): Int {
+        val locked = db.downloads().all().filter { it.ownerAccountId != currentOwner }
+        locked.forEach { delete(it.trackId, it.ownerAccountId) }
+        return locked.size
+    }
+    suspend fun deleteGroup(owner: String, groupName: String): Int {
+        val items = db.downloads().all().filter { it.ownerAccountId == owner && it.groupName == groupName }
+        items.forEach { delete(it.trackId, owner) }
+        return items.size
     }
 }

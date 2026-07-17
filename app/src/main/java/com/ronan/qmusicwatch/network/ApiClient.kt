@@ -16,6 +16,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 
+internal fun normalizeHttpsUrl(value: String): String = when {
+    value.startsWith("//") -> "https:$value"
+    value.startsWith("http://", true) -> "https://${value.substringAfter("://")}"
+    else -> value
+}
+
 internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
     fun objects(value: JsonElement, ownedHint: Boolean? = null): Sequence<Pair<JsonObject, Boolean?>> = sequence {
         when (value) {
@@ -42,10 +48,32 @@ internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
         val title = item.text("dirName").ifBlank { item.text("title") }.ifBlank { item.text("name") }
         val owned = item.text("isOwn").ifBlank { item.text("is_self") }.toIntOrNull()?.let { it > 0 } ?: ownedHint
         if (dirId.isBlank() || id.isBlank() || title.isBlank()) null else MusicCollection(
-            id, title, item.text("picUrl").ifBlank { item.text("picurl") }.replace("http://", "https://"),
+            id, title, normalizeHttpsUrl(item.text("picUrl").ifBlank { item.text("picurl") }),
             item.number("songNum").takeIf { it > 0 } ?: item.number("songnum"), dirId, owned,
         )
     }.distinctBy { it.directoryId }.toList()
+}
+
+internal fun parseFavoritePlaylists(root: JsonElement): List<MusicCollection> {
+    fun objects(value: JsonElement): Sequence<JsonObject> = sequence {
+        when (value) {
+            is JsonObject -> { yield(value); value.values.forEach { yieldAll(objects(it)) } }
+            is JsonArray -> value.forEach { yieldAll(objects(it)) }
+            else -> Unit
+        }
+    }
+    fun JsonObject.text(vararg names: String) = names.firstNotNullOfOrNull { (this[it] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }.orEmpty()
+    fun JsonObject.number(vararg names: String) = names.firstNotNullOfOrNull { (this[it] as? JsonPrimitive)?.intOrNull } ?: -1
+    return objects(root).mapNotNull { item ->
+        val id = item.text("tid", "dissid", "id", "dirId", "dirid")
+        val title = item.text("dissname", "dirName", "title", "name")
+        val hasPlaylistShape = item.keys.any { it in setOf("tid", "dissid", "songNum", "songnum", "song_count") }
+        if (!hasPlaylistShape || id.isBlank() || title.isBlank()) null else MusicCollection(
+            id, title, normalizeHttpsUrl(item.text("picUrl", "picurl", "logo", "imgurl", "pic")),
+            item.number("songNum", "songnum", "song_count", "total"),
+            directoryId = item.text("dirId", "dirid").ifBlank { id }, owned = false,
+        )
+    }.distinctBy(MusicCollection::id).toList()
 }
 
 internal fun parseUserProfile(root: JsonElement): UserProfile? {
@@ -64,7 +92,7 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
     val identity = all.firstOrNull { (_, item) -> item.value("nick", "nickname", "nickName", "userName") != null }?.second
     val name = identity?.value("nick", "nickname", "nickName", "userName").orEmpty()
     val avatarKeys = arrayOf("logo", "logoUrl", "headurl", "headUrl", "headpic", "headPic", "head_pic", "headPicUrl", "avatarurl", "avatarUrl")
-    val avatar = (identity?.value(*avatarKeys) ?: all.firstNotNullOfOrNull { (_, item) -> item.value(*avatarKeys) }).orEmpty().let { if (it.startsWith("//")) "https:$it" else it.replace("http://", "https://") }
+    val avatar = normalizeHttpsUrl((identity?.value(*avatarKeys) ?: all.firstNotNullOfOrNull { (_, item) -> item.value(*avatarKeys) }).orEmpty())
     val now = System.currentTimeMillis() / 1000
     val memberships = all.mapNotNull { (path, item) ->
         val membershipPath = path.contains("vip", true) || path.contains("member", true)
@@ -91,12 +119,20 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
         }
         if (!membershipPath && end == null && label.isBlank()) null else Triple(enabled, end, label)
     }
-    val active = memberships.filter { it.first == true || (it.second ?: 0) > now }.maxByOrNull { it.second ?: 0 }
+    val active = memberships.filter { it.first == true || (it.first == null && (it.second ?: 0) > now) }
+        .maxWithOrNull(compareBy<Triple<Boolean?, Long?, String>> { membershipRank(it.third) }.thenBy { it.second ?: 0 })
     val expire = active?.second ?: memberships.mapNotNull { it.second }.maxOrNull()
     val isVip = when { active != null -> true; memberships.any { it.first == false } -> false; else -> null }
-    val labels = memberships.map { it.third }.filter(String::isNotBlank)
-    val vipName = if (active == null) "" else labels.firstOrNull { it.contains("超级") } ?: labels.firstOrNull() ?: "QQ 音乐会员"
+    val vipName = if (active == null) "" else active.third.ifBlank { "QQ 音乐会员" }
     return UserProfile(name, avatar, isVip, expire, vipName).takeIf { it.displayName.isNotBlank() || it.avatarUrl.isNotBlank() || it.isVip != null || it.vipExpireAt != null }
+}
+
+private fun membershipRank(name: String): Int = when {
+    name.contains("超级") || name.contains("SVIP", true) -> 3
+    name.contains("绿钻") -> 2
+    name.contains("听书") -> 1
+    name.isNotBlank() -> 1
+    else -> 0
 }
 
 private fun profileEpoch(value: String): Long? {
@@ -112,9 +148,16 @@ private fun profileEpoch(value: String): Long? {
 
 internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {
     if (values.isEmpty()) return null
-    val expire = values.mapNotNull(UserProfile::vipExpireAt).maxOrNull()
-    val isVip = when { values.any { it.isVip == true } || expire?.let { it > System.currentTimeMillis() / 1000 } == true -> true; values.any { it.isVip == false } -> false; else -> null }
-    return UserProfile(values.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(), values.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(), isVip, expire, values.firstNotNullOfOrNull { it.takeIf { profile -> profile.isVip == true }?.vipName?.takeIf(String::isNotBlank) } ?: values.firstNotNullOfOrNull { it.vipName.takeIf(String::isNotBlank) }.orEmpty())
+    val now = System.currentTimeMillis() / 1000
+    val active = values.filter { it.isVip == true || (it.isVip == null && (it.vipExpireAt ?: 0) > now) }
+        .maxWithOrNull(compareBy<UserProfile> { membershipRank(it.vipName) }.thenBy { it.vipExpireAt ?: 0 })
+    val isVip = when { active != null -> true; values.any { it.isVip == false } -> false; else -> null }
+    val expire = active?.vipExpireAt ?: values.mapNotNull(UserProfile::vipExpireAt).maxOrNull()
+    return UserProfile(
+        values.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(),
+        values.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(),
+        isVip, expire, active?.vipName.orEmpty(),
+    )
 }
 
 internal fun isVersionNewer(latest: String, current: String): Boolean {
@@ -160,6 +203,12 @@ internal fun parseSearchTrack(item: JsonObject): Track? {
     val albumName = text("albumname").ifBlank { (album["title"] as? JsonPrimitive)?.contentOrNull.orEmpty() }.ifBlank { (album["name"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
     return Track(mid, title, (item["singer"] as? JsonArray).orEmpty().mapNotNull { ((it as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull }, albumName, albumMid.takeIf(String::isNotBlank)?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" }.orEmpty(), true, buildList { if (number("size128") > 0 || fileNumber("size_128mp3") > 0) add("128"); if (number("size320") > 0 || fileNumber("size_320mp3") > 0) add("320") }.ifEmpty { listOf("128") }, numericId = number("songid").takeIf { it > 0 } ?: number("id"), mediaMid = fileText("media_mid"), songType = number("type").toInt(), requiresVip = text("isonly") == "1" || pay("payplay") != 0 || pay("pay_play") != 0)
 }
+
+internal fun nextSearchCursor(page: Int, rawItemCount: Int, pageSize: Int = 20): String? =
+    (page + 1).toString().takeIf { rawItemCount >= pageSize }
+
+internal fun playlistDirectoryNumber(value: String): Long =
+    value.toLongOrNull()?.takeIf { it > 0 } ?: throw IllegalArgumentException("歌单目录标识无效")
 
 /**
  * QQ Music HTTP client. Requests go from the watch straight to QQ Music; no QMusicWatch gateway is used.
@@ -224,7 +273,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         val page = cursor?.toIntOrNull()?.coerceAtLeast(1) ?: 1
         val items = webSearch(query, page, 0)["song"]?.jsonObject?.get("list") as? JsonArray ?: JsonArray(emptyList())
         val tracks = items.mapNotNull { it as? JsonObject }.mapNotNull(::parseSearchTrack)
-        PagedTracks(tracks, (page + 1).toString().takeIf { tracks.size == 20 })
+        PagedTracks(tracks, nextSearchCursor(page, items.size))
     }
 
     suspend fun searchCollections(type: String, query: String, cursor: String? = null): PagedCollections = withContext(Dispatchers.IO) {
@@ -243,7 +292,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             val suggestions = smartSearch(query)[key]?.jsonObject?.get("itemlist") as? JsonArray ?: JsonArray(emptyList())
             collections = suggestions.mapNotNull { it as? JsonObject }.mapNotNull { searchCollection(type, it) }
         }
-        PagedCollections(collections, (page + 1).toString().takeIf { collections.size == 20 })
+        PagedCollections(collections, nextSearchCursor(page, items.size))
     }
 
     suspend fun lyrics(id: String): LyricsData = withContext(Dispatchers.IO) {
@@ -285,7 +334,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
                 if (purl.isNotBlank()) {
                     val base = walkObjects(data).firstNotNullOfOrNull { item ->
                         (item["sip"] as? JsonArray)?.firstNotNullOfOrNull { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
-                    }.orEmpty().replace("http://", "https://")
+                    }.orEmpty().let(::normalizeHttpsUrl)
                     val url = if (purl.startsWith("http")) purl else "${base.ifBlank { "https://isure.stream.qqmusic.qq.com/" }}${if (base.endsWith('/')) "" else "/"}$purl"
                     AppLog.write("STREAM", "issued quality=$requested via=$module")
                     return@withContext StreamData(url, requested, System.currentTimeMillis() + data.long("expiration", 3600) * 1000)
@@ -299,6 +348,20 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     suspend fun library(): LibraryData = withContext(Dispatchers.IO) {
         requireLogin()
         val playlists = api("music.musicasset.PlaylistBaseRead", "GetPlaylistByUin", obj("uin" to accountId()))
+        val collectedPlaylists = mutableListOf<MusicCollection>()
+        val collectedIds = mutableSetOf<String>()
+        for (page in 0 until 20) {
+            val result = runCatching {
+                api(
+                    "music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo",
+                    obj("uin" to accountId(), "offset" to page * 100, "size" to 100),
+                ).let(::parseFavoritePlaylists)
+            }.onFailure { AppLog.write("LIBRARY", "favorite playlists ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
+            val batch = result.getOrNull() ?: break
+            val previousSize = collectedPlaylists.size
+            collectedPlaylists += batch.filter { collectedIds.add(it.id) }
+            if (batch.size < 100 || collectedPlaylists.size == previousSize) break
+        }
         val likedTracks = mutableListOf<Track>()
         val likedIds = mutableSetOf<String>()
         for (page in 0 until 20) {
@@ -311,7 +374,8 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             likedTracks += batch.filter { likedIds.add(it.id) }
             if (batch.size < 100 || likedTracks.size == previousSize) break
         }
-        LibraryData(likedTracks, parseAccountPlaylists(playlists).filterNot { it.directoryId == "201" })
+        val accountPlaylists = parseAccountPlaylists(playlists).filterNot { it.directoryId == "201" }
+        LibraryData(likedTracks, (accountPlaylists.filterNot { it.id in collectedIds } + collectedPlaylists).distinctBy(MusicCollection::id))
     }
 
     suspend fun profile(): UserProfile = withContext(Dispatchers.IO) {
@@ -368,9 +432,11 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
 
     suspend fun like(track: Track, liked: Boolean): Ack = withContext(Dispatchers.IO) {
         requireLogin()
+        val complete = if (track.numericId > 0) track else trackDetail(track.id)
+        if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改喜欢状态")
         api(
             "music.musicasset.SongFavWrite", if (liked) "CgiAddSongFav" else "CgiDelSongFav",
-            obj("v_songId" to listOf(track.numericId.takeIf { it > 0 } ?: track.id.toLongOrNull().orEmptyLong()))
+            obj("v_songId" to listOf(complete.numericId))
         )
         Ack(true)
     }
@@ -400,26 +466,29 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         val data = api("music.musicasset.PlaylistBaseWrite", "AddPlaylist", obj("dirName" to title))
         val item = walkObjects(data).firstOrNull { it["dirId"] != null || it["tid"] != null } ?: JsonObject(emptyMap())
         val dirId = item.string("dirId")
+        playlistDirectoryNumber(dirId)
         MusicCollection(item.string("tid").ifBlank { dirId }, title, directoryId = dirId)
     }
 
     suspend fun renamePlaylist(id: String, title: String): Ack = withContext(Dispatchers.IO) {
         requireLogin()
-        api("music.musicasset.PlaylistBaseWrite", "ModifyPlaylist", obj("dirId" to id.toLongOrNull(), "dirName" to title))
+        api("music.musicasset.PlaylistBaseWrite", "ModifyPlaylist", obj("dirId" to playlistDirectoryNumber(id), "dirName" to title))
         Ack(true)
     }
 
     suspend fun deletePlaylist(id: String): Ack = withContext(Dispatchers.IO) {
         requireLogin()
-        api("music.musicasset.PlaylistBaseWrite", "DelPlaylist", obj("dirId" to id.toLongOrNull()))
+        api("music.musicasset.PlaylistBaseWrite", "DelPlaylist", obj("dirId" to playlistDirectoryNumber(id)))
         Ack(true)
     }
 
     suspend fun changePlaylistTrack(id: String, track: Track, add: Boolean): Ack = withContext(Dispatchers.IO) {
         requireLogin()
+        val complete = if (track.numericId > 0) track else trackDetail(track.id)
+        if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改歌单")
         api(
             "music.musicasset.PlaylistDetailWrite", if (add) "AddSonglist" else "DelSonglist",
-            obj("dirId" to id.toLongOrNull(), "tid" to 0, "bFmtUtf8" to true, "v_songInfo" to listOf(mapOf("songId" to track.numericId, "songType" to track.songType)))
+            obj("dirId" to playlistDirectoryNumber(id), "tid" to 0, "bFmtUtf8" to true, "v_songInfo" to listOf(mapOf("songId" to complete.numericId, "songType" to complete.songType)))
         )
         Ack(true)
     }
@@ -448,7 +517,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         val title = when (type) { "artist" -> item.string("singerName").ifBlank { item.string("name") }; "album" -> item.string("albumName").ifBlank { item.string("name") }; else -> item.string("dissname").ifBlank { item.string("name") } }
         if (id.isBlank() || title.isBlank()) return null
         val count = listOf("songNum", "song_count", "songnum", "total").firstNotNullOfOrNull { key -> item[key]?.jsonPrimitive?.intOrNull } ?: -1
-        return MusicCollection(id, title, item.string("singerPic").ifBlank { item.string("imgurl") }.ifBlank { item.string("pic") }.replace("http://", "https://"), count)
+        return MusicCollection(id, title, normalizeHttpsUrl(item.string("singerPic").ifBlank { item.string("imgurl") }.ifBlank { item.string("pic") }), count)
     }
 
     private suspend fun trackDetail(mid: String): Track {
@@ -487,6 +556,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             val req = root["req_0"]?.jsonObject ?: error("QQ 音乐响应格式已变化")
             val code = req.int("code")
             AppLog.write("API", "$module/$method http=${response.code} code=$code ms=${System.currentTimeMillis() - started}")
+            if (code in setOf(1000, 104400, 104401)) error("登录凭据已失效，请重新登录")
             if (code != 0 && !tolerateBusinessError) error(req.string("msg").ifBlank { "QQ 音乐接口拒绝请求 ($code)" })
             return req["data"]?.jsonObject ?: JsonObject(emptyMap())
         }
@@ -546,7 +616,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         }
         if (!looksRight || id.isBlank() || title.isBlank()) null else MusicCollection(
             id, title,
-            value.string("picUrl").ifBlank { value.string("picurl") }.ifBlank { value.string("pic") }.replace("http://", "https://"),
+            normalizeHttpsUrl(value.string("picUrl").ifBlank { value.string("picurl") }.ifBlank { value.string("pic") }),
             value.int("songNum").takeIf { it > 0 } ?: value.int("songnum"),
             directoryId.ifBlank { id },
         )
@@ -581,8 +651,6 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     private fun cookieValue(vararg names: String): String? = cookie()?.split(';')?.map(String::trim)?.firstNotNullOfOrNull { part -> names.firstOrNull { part.startsWith("$it=") }?.let { part.substringAfter('=') } }
     private fun accountId() = cookieValue("qqmusic_uin", "uin", "wxuin").orEmpty().trimStart('o')
     private fun requireLogin() { if (cookie().isNullOrBlank()) error("请先扫码登录") }
-    private fun Long?.orEmptyLong() = this ?: 0L
-
     companion object {
         private const val MUSIC_API = "https://u.y.qq.com/cgi-bin/musicu.fcg"
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
