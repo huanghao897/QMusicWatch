@@ -1,5 +1,7 @@
 package com.ronan.qmusicwatch
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.view.ViewGroup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,6 +17,14 @@ import org.robolectric.annotation.LooperMode
 @Config(sdk = [24, 36], qualifiers = "w480dp-h480dp-mdpi")
 @LooperMode(LooperMode.Mode.PAUSED)
 class WatchActivityRobolectricTest {
+    @Test fun manifestDeclaresNotificationPermissionForMediaControls() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).create()
+        val activity = controller.get()
+        val permissions = activity.packageManager.getPackageInfo(activity.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty()
+        assertTrue(Manifest.permission.POST_NOTIFICATIONS in permissions)
+        controller.destroy()
+    }
+
     @Test fun mainActivityCreatesAndLaysOutOnA480SquareDisplay() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).create().start().resume()
         val activity = controller.get()

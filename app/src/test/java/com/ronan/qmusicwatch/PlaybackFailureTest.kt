@@ -24,4 +24,16 @@ class PlaybackFailureTest {
         val failure = classifyPlaybackFailure(IllegalStateException("QQ 音乐响应格式已变化"))
         assertEquals(PlaybackFailureType.API_CHANGED, failure.type)
     }
+
+    @Test fun genericMissingStreamIsNotMisreportedAsVipOnly() {
+        val failure = classifyPlaybackFailure(IllegalStateException("QQ 音乐未提供播放地址，可能存在版权、地区或账号权益限制"))
+        assertEquals(PlaybackFailureType.UNKNOWN, failure.type)
+        assertEquals("QQ 音乐未提供播放地址，可能受版权、地区或账号权益限制", failure.message)
+    }
+
+    @Test fun expiredSessionIsNotMisreportedAsEntitlement() {
+        val failure = classifyPlaybackFailure(IllegalStateException("登录凭据已失效，请重新登录"))
+        assertEquals(PlaybackFailureType.SESSION_EXPIRED, failure.type)
+        assertEquals("登录状态已失效，请重新登录", failure.message)
+    }
 }

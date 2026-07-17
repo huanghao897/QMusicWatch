@@ -7,8 +7,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import android.view.KeyEvent
+import com.ronan.qmusicwatch.playback.mediaButtonSkipDelta
 
 class QueueTest {
+    @Test fun headsetNextAndPreviousKeysMapToQueueDirections() {
+        assertEquals(1, mediaButtonSkipDelta(KeyEvent.KEYCODE_MEDIA_NEXT))
+        assertEquals(-1, mediaButtonSkipDelta(KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+        assertEquals(null, mediaButtonSkipDelta(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+    }
     @Test fun edgeScrollDirectionMatchesViewportEdges() {
         assertEquals(-1, queueEdgeScrollDirection(20f, 480, 72f))
         assertEquals(0, queueEdgeScrollDirection(240f, 480, 72f))
@@ -31,6 +38,13 @@ class QueueTest {
     @Test fun selectedImportAddsOnlyCheckedTracksWithoutDuplicates() {
         val a = Track("a", "A"); val b = Track("b", "B"); val c = Track("c", "C")
         assertEquals(listOf("a", "c"), mergeSelectedQueue(listOf(a), listOf(a, b, c), setOf("a", "c")).map(Track::id))
+    }
+
+    @Test fun onlyOwnedPlaylistsWithWritableDirectoryCanReceiveTracks() {
+        val owned = com.ronan.qmusicwatch.model.MusicCollection("a", "我的", directoryId = "100", owned = true)
+        val collected = com.ronan.qmusicwatch.model.MusicCollection("b", "收藏", directoryId = "200", owned = false)
+        val missingDirectory = com.ronan.qmusicwatch.model.MusicCollection("c", "无目录", owned = true)
+        assertEquals(listOf("a"), writablePlaylists(listOf(owned, collected, missingDirectory)).map { it.id })
     }
     @Test fun insertsNextWithoutDuplicatingTrack() {
         val a = Track("a", "A")
@@ -55,13 +69,14 @@ class QueueTest {
         assertEquals(9, queueDropIndex(visible, 1, 500f, 60))
     }
 
-    @Test fun profileCacheRefreshesOnlyWhenMissingWrongAccountUnknownOrExpired() {
+    @Test fun profileCacheRefreshesOnlyWhenMissingWrongAccountOrExpired() {
         val now = 2_000_000_000_000L
         val fresh = com.ronan.qmusicwatch.model.CachedUserProfile("1", com.ronan.qmusicwatch.model.UserProfile(displayName = "Ronan", isVip = true, vipExpireAt = now / 1000 + 86_400), now - 100L * 24 * 60 * 60 * 1000)
         assertEquals(false, profileCacheNeedsRefresh(fresh, "1", now))
         assertEquals(true, profileCacheNeedsRefresh(fresh, "2", now))
-        assertEquals(true, profileCacheNeedsRefresh(fresh.copy(profile = fresh.profile.copy(isVip = null)), "1", now))
+        assertEquals(false, profileCacheNeedsRefresh(fresh.copy(profile = fresh.profile.copy(isVip = null)), "1", now))
         assertEquals(true, profileCacheNeedsRefresh(fresh.copy(profile = fresh.profile.copy(vipExpireAt = now / 1000)), "1", now))
+        assertEquals(false, profileCacheNeedsRefresh(fresh.copy(profile = fresh.profile.copy(isVip = false, vipExpireAt = now / 1000)), "1", now))
     }
 
     @Test fun dailyRecommendationWrapsWithoutGrowingPastCount() {
@@ -73,6 +88,12 @@ class QueueTest {
         assertEquals("1.0 / 4.0 MB · 25%", downloadProgressSummary(1L * 1024 * 1024, 4L * 1024 * 1024))
         assertEquals("2.0 MB", downloadProgressSummary(2L * 1024 * 1024, -1))
         assertEquals("4.0 / 4.0 MB · 100%", downloadProgressSummary(9L * 1024 * 1024, 4L * 1024 * 1024))
+    }
+
+    @Test fun qualityDowngradeIsExplainedOnlyWhen320WasRequested() {
+        assertEquals("已选择 320k，但当前歌曲或账号仅提供 128k，已自动降级", qualityFallbackMessage("320", "128"))
+        assertEquals(null, qualityFallbackMessage("128", "128"))
+        assertEquals(null, qualityFallbackMessage("320", "320"))
     }
 
     @Test fun playbackSnapshotKeepsQueueDirectionAndReadsOldSnapshots() {
