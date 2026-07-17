@@ -1,5 +1,14 @@
 # QMusic Watch checklist
 
+## 0.9.4
+
+- [x] QRC 与 LRC 高亮改为连续浮点进度和像素遮罩渲染
+- [x] 当前歌词淡入、缩放与轻微左移动画
+- [x] 原文、翻译和时间单行布局与动态字号适配
+- [x] JVM/Robolectric 测试、Android 仪器测试源码编译
+- [x] Release lint、R8、签名和 SHA-256
+- [x] 推送 `main` 并发布 GitHub Release `v0.9.4`
+
 ## 0.9.3
 
 - [x] 纯文本歌词回退、无翻译时保留原文、首句开始前不误高亮

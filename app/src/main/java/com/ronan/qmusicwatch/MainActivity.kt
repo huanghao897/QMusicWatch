@@ -34,6 +34,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,8 +51,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
@@ -56,13 +63,15 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,8 +91,8 @@ import com.ronan.qmusicwatch.data.DownloadEntity
 import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.login.MusicCookie
 import com.ronan.qmusicwatch.lyrics.LyricLine
-import com.ronan.qmusicwatch.lyrics.highlightedCharacters
 import com.ronan.qmusicwatch.lyrics.activeLyricIndex
+import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
 import kotlinx.coroutines.delay
@@ -105,6 +114,52 @@ private fun playModeIcon(mode: String) = when (mode) { "repeat_one" -> Icons.Def
 private fun lyricTime(ms: Long) = "${ms.coerceAtLeast(0) / 60_000}:${((ms.coerceAtLeast(0) / 1000) % 60).toString().padStart(2, '0')}"
 internal fun lyricLayers(showOriginal: Boolean, showTranslation: Boolean, hasTranslation: Boolean): Pair<Boolean, Boolean> =
     (showOriginal || !hasTranslation) to (showTranslation && hasTranslation)
+internal fun fitSingleLineFontSp(requestedSp: Float, measuredWidthPx: Float, availableWidthPx: Float): Float {
+    if (requestedSp <= 0f || measuredWidthPx <= 0f || availableWidthPx <= 0f) return requestedSp.coerceAtLeast(1f)
+    if (measuredWidthPx <= availableWidthPx) return requestedSp
+    return (requestedSp * availableWidthPx / measuredWidthPx).coerceIn(minOf(10f, requestedSp), requestedSp)
+}
+
+@Composable private fun SingleLineLyricText(
+    text: String,
+    modifier: Modifier = Modifier,
+    requestedFontSp: Float,
+    color: Color,
+    fontWeight: FontWeight = FontWeight.Normal,
+    renderProgress: Float? = null,
+    lowPower: Boolean = false,
+) = BoxWithConstraints(modifier, contentAlignment = Alignment.CenterStart) {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val availableWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
+    val measuredWidthPx = remember(text, requestedFontSp, fontWeight, measurer, availableWidthPx) {
+        measurer.measure(
+            text = AnnotatedString(text),
+            style = TextStyle(fontSize = requestedFontSp.sp, fontWeight = fontWeight),
+            maxLines = 1,
+            softWrap = false,
+        ).size.width.toFloat()
+    }
+    val fontSizeSp = fitSingleLineFontSp(requestedFontSp, measuredWidthPx, availableWidthPx)
+    val smoothProgress by animateFloatAsState(
+        targetValue = renderProgress?.coerceIn(0f, 1f) ?: 0f,
+        animationSpec = tween(if (lowPower) 520 else 130, easing = LinearEasing),
+        label = "lyricRender",
+    )
+    Box(Modifier.wrapContentWidth()) {
+        Text(
+            text, color = color, fontSize = fontSizeSp.sp, fontWeight = fontWeight,
+            maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+        )
+        if (renderProgress != null) Text(
+            text, color = Green, fontSize = fontSizeSp.sp, fontWeight = fontWeight,
+            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+            modifier = Modifier.drawWithContent {
+                clipRect(right = size.width * smoothProgress) { this@drawWithContent.drawContent() }
+            },
+        )
+    }
+}
 private fun loginProviderName(provider: String) = if (provider == "wechat") "微信" else "QQ"
 private fun accountLabel(provider: String, accountId: String?) = if (provider == "wechat") "微信账号已绑定" else "QQ号 ${accountId.orEmpty()}"
 private fun vipSummary(profile: UserProfile?, loaded: Boolean, error: String?): String = when {
@@ -467,19 +522,63 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
                         val nextTime = lyrics.getOrNull(index + 1)?.timeMs ?: (line.timeMs + 4_000)
                         val distance = if (active >= 0) kotlin.math.abs(index - active) else Int.MAX_VALUE
                         val targetAlpha = if (!hasTimeline) .82f else when (lyricAnimation) { "off" -> if (distance == 0) 1f else .55f; "strong" -> when (distance) { 0 -> 1f; 1 -> .48f; 2 -> .22f; else -> .08f }; else -> when (distance) { 0 -> 1f; 1 -> .65f; 2 -> .4f; else -> .2f } }
-                        val lineAlpha by androidx.compose.animation.core.animateFloatAsState(targetAlpha, androidx.compose.animation.core.tween(if (lyricAnimation == "off") 0 else if (lyricAnimation == "strong") 650 else 350), label = "lyricFade")
-                        val targetSize = if (index == active) lyricSp + 5f else if (!hasTimeline) lyricSp.toFloat() else (lyricSp - 2).coerceAtLeast(13).toFloat()
-                        val animatedSize by androidx.compose.animation.core.animateFloatAsState(targetSize, androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow), label = "lyricSize")
-                        val highlighted = if (index == active) highlightedCharacters(line, position + lyricOffset, nextTime) else 0
-                        val karaoke = buildAnnotatedString {
-                            if (highlighted > 0) withStyle(SpanStyle(color = Green)) { append(line.text.take(highlighted)) }
-                            if (highlighted < line.text.length) withStyle(SpanStyle(color = if (index == active) Color.White.copy(alpha = .72f) else Color.White)) { append(line.text.drop(highlighted)) }
-                        }
+                        val isActive = index == active
+                        val lineAlpha by animateFloatAsState(targetAlpha, tween(if (lyricAnimation == "off") 0 else if (lyricAnimation == "strong") 520 else 300), label = "lyricFade")
+                        val lineScale by animateFloatAsState(if (isActive) 1f else .96f, spring(stiffness = Spring.StiffnessMediumLow), label = "lyricFocus")
+                        val lineShiftDp by animateFloatAsState(if (isActive) -4f else 0f, tween(if (lyricAnimation == "off") 0 else 260), label = "lyricShift")
+                        val targetSize = if (isActive) lyricSp + 3f else if (!hasTimeline) lyricSp.toFloat() else (lyricSp - 2).coerceAtLeast(13).toFloat()
+                        val karaokeProgress = if (isActive) lyricRenderProgress(line, position + lyricOffset, nextTime) else null
                         val seekModifier = if (line.timeMs >= 0) Modifier.clickable { vm.seek((line.timeMs - lyricOffset).coerceAtLeast(0)) } else Modifier
-                        Column(Modifier.fillMaxWidth().alpha(lineAlpha).then(seekModifier).padding(vertical = if (index == active) 7.dp else 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (renderOriginal) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(karaoke, Modifier.weight(1f), fontSize = animatedSize.sp, fontWeight = if (index == active) FontWeight.Bold else FontWeight.Normal, textAlign = androidx.compose.ui.text.style.TextAlign.Center); if (line.timeMs >= 0) Text(lyricTime(line.timeMs), color = if (index == active) Green else Color.Gray, fontSize = 11.sp) }
-                            if (renderTranslation) line.translation?.let { Text(it, color = if (index == active) Green.copy(alpha = .78f) else Color(0xFFB7C9FF), fontSize = (animatedSize - 4).coerceAtLeast(11f).sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
-                            if (!renderOriginal && renderTranslation && line.timeMs >= 0) Text(lyricTime(line.timeMs), color = if (index == active) Green else Color.Gray, fontSize = 12.sp)
+                        val density = LocalDensity.current
+                        Column(
+                            Modifier.fillMaxWidth().alpha(lineAlpha).graphicsLayer {
+                                scaleX = lineScale
+                                scaleY = lineScale
+                                translationX = lineShiftDp * density.density
+                            }.then(seekModifier).padding(vertical = if (isActive) 7.dp else 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            if (renderOriginal) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                SingleLineLyricText(
+                                    text = line.text,
+                                    modifier = Modifier.weight(1f),
+                                    requestedFontSp = targetSize,
+                                    color = if (isActive) Color.White.copy(alpha = .62f) else Color.White,
+                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                    renderProgress = karaokeProgress,
+                                    lowPower = lowPowerPlayer,
+                                )
+                                if (line.timeMs >= 0) Text(
+                                    lyricTime(line.timeMs),
+                                    modifier = Modifier.width(38.dp),
+                                    color = if (isActive) Green else Color.Gray,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    textAlign = TextAlign.End,
+                                )
+                            }
+                            if (renderTranslation) line.translation?.let { translation ->
+                                if (renderOriginal) SingleLineLyricText(
+                                    text = translation,
+                                    modifier = Modifier.fillMaxWidth().padding(end = 38.dp),
+                                    requestedFontSp = (targetSize - 4).coerceAtLeast(11f),
+                                    color = if (isActive) Green.copy(alpha = .78f) else Color(0xFFB7C9FF),
+                                ) else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    SingleLineLyricText(
+                                        text = translation,
+                                        modifier = Modifier.weight(1f),
+                                        requestedFontSp = targetSize,
+                                        color = if (isActive) Green.copy(alpha = .84f) else Color(0xFFB7C9FF),
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                    )
+                                    if (line.timeMs >= 0) Text(
+                                        lyricTime(line.timeMs), modifier = Modifier.width(38.dp),
+                                        color = if (isActive) Green else Color.Gray, fontSize = 11.sp,
+                                        maxLines = 1, softWrap = false, textAlign = TextAlign.End,
+                                    )
+                                }
+                            }
                         }
                     }
                 }

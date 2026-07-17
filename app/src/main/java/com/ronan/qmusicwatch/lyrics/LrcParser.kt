@@ -9,28 +9,31 @@ data class LyricLine(
 fun activeLyricIndex(lines: List<LyricLine>, positionMs: Long): Int =
     lines.indexOfLast { it.timeMs >= 0 && it.timeMs <= positionMs }
 
-fun highlightedCharacters(line: LyricLine, positionMs: Long, nextLineTimeMs: Long): Int {
-    if (positionMs <= line.timeMs) return 0
+fun lyricRenderProgress(line: LyricLine, positionMs: Long, nextLineTimeMs: Long): Float {
+    if (line.text.isEmpty() || positionMs <= line.timeMs) return 0f
     if (line.words.isNotEmpty()) {
-        var count = 0
+        var completedCharacters = 0f
         line.words.forEach { word ->
             val end = word.startMs + word.durationMs.coerceAtLeast(1)
             when {
-                positionMs >= end -> count += word.text.length
+                positionMs >= end -> completedCharacters += word.text.length
                 positionMs > word.startMs -> {
-                    val progress = (positionMs - word.startMs).toFloat() / (end - word.startMs)
-                    count += kotlin.math.ceil(word.text.length * progress).toInt()
-                    return count.coerceIn(0, line.text.length)
+                    val wordProgress = (positionMs - word.startMs).toFloat() / (end - word.startMs)
+                    completedCharacters += word.text.length * wordProgress
+                    return (completedCharacters / line.text.length).coerceIn(0f, 1f)
                 }
-                else -> return count.coerceIn(0, line.text.length)
+                else -> return (completedCharacters / line.text.length).coerceIn(0f, 1f)
             }
         }
-        return count.coerceIn(0, line.text.length)
+        return (completedCharacters / line.text.length).coerceIn(0f, 1f)
     }
     val duration = (nextLineTimeMs - line.timeMs).coerceIn(1_000, 8_000)
-    val progress = ((positionMs - line.timeMs).toFloat() / duration).coerceIn(0f, 1f)
-    return kotlin.math.ceil(line.text.length * progress).toInt().coerceIn(0, line.text.length)
+    return ((positionMs - line.timeMs).toFloat() / duration).coerceIn(0f, 1f)
 }
+
+fun highlightedCharacters(line: LyricLine, positionMs: Long, nextLineTimeMs: Long): Int =
+    kotlin.math.ceil(line.text.length * lyricRenderProgress(line, positionMs, nextLineTimeMs))
+        .toInt().coerceIn(0, line.text.length)
 
 object LrcParser {
     private val stamp = Regex("\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?]")

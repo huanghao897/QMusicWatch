@@ -3,6 +3,7 @@ package com.ronan.qmusicwatch
 import com.ronan.qmusicwatch.lyrics.LrcParser
 import com.ronan.qmusicwatch.lyrics.highlightedCharacters
 import com.ronan.qmusicwatch.lyrics.activeLyricIndex
+import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -38,11 +39,20 @@ class LrcParserTest {
         assertEquals(2, lines.single().words.size)
         assertEquals(1, highlightedCharacters(lines.single(), 1_200, 2_000))
         assertEquals(2, highlightedCharacters(lines.single(), 1_450, 2_000))
+        assertEquals(0.25f, lyricRenderProgress(lines.single(), 1_200, 2_000), 0.001f)
+        assertEquals(0.541f, lyricRenderProgress(lines.single(), 1_450, 2_000), 0.001f)
     }
 
     @Test fun lrcFallsBackToEvenCharacterProgress() {
         val line = LrcParser.parse("[00:01]四个文字").single()
         assertEquals(2, highlightedCharacters(line, 3_000, 5_000))
+        assertEquals(0.5f, lyricRenderProgress(line, 3_000, 5_000), 0.001f)
+    }
+
+    @Test fun singleLineFontShrinksOnlyWhenContentExceedsAvailableWidth() {
+        assertEquals(20f, fitSingleLineFontSp(20f, 280f, 300f), 0.001f)
+        assertEquals(15f, fitSingleLineFontSp(20f, 400f, 300f), 0.001f)
+        assertEquals(10f, fitSingleLineFontSp(20f, 1_000f, 300f), 0.001f)
     }
 
     @Test fun invalidWordSyncMetadataDoesNotHideLrc() {
