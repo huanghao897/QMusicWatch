@@ -24,7 +24,7 @@ class UpdateManagerTest {
     private val release = ControlUpdate(
         hasUpdate = true, releaseId = 71, versionName = "0.9.6", versionCode = 36,
         apk = ControlApk(
-            url = "https://8.138.134.236:8443/download/qmusic-watch/QMusic.apk",
+            url = "https://8.138.134.236/download/qmusic-watch/QMusic.apk",
             sizeBytes = 100L * 1024 * 1024,
             sha256 = apkSha256,
             packageName = "com.ronan.qmusicwatch",

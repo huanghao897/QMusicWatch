@@ -22,7 +22,7 @@ internal const val MAX_DIAGNOSTIC_REQUEST_BYTES = 64 * 1024
 internal fun requireControlPlaneBaseUrl(value: String, allowCleartext: Boolean = false): HttpUrl {
     val url = value.toHttpUrlOrNull() ?: throw IllegalArgumentException("控制面地址无效")
     require(url.scheme == "https" || allowCleartext && url.scheme == "http") { "控制面必须使用 HTTPS" }
-    require(url.host == "8.138.134.236" && url.port == 8443) { "控制面主机或端口不匹配" }
+    require(url.host == "8.138.134.236" && url.port == 443) { "控制面主机或端口不匹配" }
     require(url.username.isEmpty() && url.password.isEmpty() && url.query == null && url.fragment == null) { "控制面地址包含不允许的字段" }
     require(url.encodedPath == "/") { "控制面地址不能包含路径" }
     return url
