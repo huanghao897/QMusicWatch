@@ -8,6 +8,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore by preferencesDataStore("settings")
+internal fun normalizeLyricAlignment(value: String?): String = if (value == "center") "center" else "left"
 
 class SettingsStore(private val context: Context) {
     private val qualityKey = stringPreferencesKey("quality")
@@ -19,6 +20,7 @@ class SettingsStore(private val context: Context) {
     private val lyricOriginalKey = booleanPreferencesKey("lyric_original")
     private val lyricOffsetKey = stringPreferencesKey("lyric_offset")
     private val lyricAnimationKey = stringPreferencesKey("lyric_animation")
+    private val lyricAlignmentKey = stringPreferencesKey("lyric_alignment")
     private val pureBlackKey = booleanPreferencesKey("pure_black")
     private val lowPowerPlayerKey = booleanPreferencesKey("low_power_player")
     private val wifiOnlyDownloadKey = booleanPreferencesKey("wifi_only_download")
@@ -37,6 +39,7 @@ class SettingsStore(private val context: Context) {
     val lyricOriginal = context.settingsDataStore.data.map { it[lyricOriginalKey] ?: true }
     val lyricOffset = context.settingsDataStore.data.map { it[lyricOffsetKey]?.toLongOrNull() ?: 0L }
     val lyricAnimation = context.settingsDataStore.data.map { it[lyricAnimationKey] ?: "soft" }
+    val lyricAlignment = context.settingsDataStore.data.map { normalizeLyricAlignment(it[lyricAlignmentKey]) }
     val pureBlack = context.settingsDataStore.data.map { it[pureBlackKey] ?: false }
     val lowPowerPlayer = context.settingsDataStore.data.map { it[lowPowerPlayerKey] ?: false }
     val wifiOnlyDownload = context.settingsDataStore.data.map { it[wifiOnlyDownloadKey] ?: true }
@@ -55,6 +58,7 @@ class SettingsStore(private val context: Context) {
     suspend fun setLyricOriginal(value: Boolean) = context.settingsDataStore.edit { it[lyricOriginalKey] = value }
     suspend fun setLyricOffset(value: Long) = context.settingsDataStore.edit { it[lyricOffsetKey] = value.coerceIn(-10_000, 10_000).toString() }
     suspend fun setLyricAnimation(value: String) = context.settingsDataStore.edit { it[lyricAnimationKey] = value.takeIf { mode -> mode in setOf("off", "soft", "strong") } ?: "soft" }
+    suspend fun setLyricAlignment(value: String) = context.settingsDataStore.edit { it[lyricAlignmentKey] = normalizeLyricAlignment(value) }
     suspend fun setPureBlack(value: Boolean) = context.settingsDataStore.edit { it[pureBlackKey] = value }
     suspend fun setLowPowerPlayer(value: Boolean) = context.settingsDataStore.edit { it[lowPowerPlayerKey] = value }
     suspend fun setWifiOnlyDownload(value: Boolean) = context.settingsDataStore.edit { it[wifiOnlyDownloadKey] = value }

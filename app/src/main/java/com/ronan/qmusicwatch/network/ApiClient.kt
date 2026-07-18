@@ -22,6 +22,47 @@ internal fun normalizeHttpsUrl(value: String): String = when {
     else -> value
 }
 
+private val systemLikedPlaylistTitles = setOf(
+    "我喜欢", "我喜欢的音乐", "我喜欢的歌曲",
+    "我喜歡", "我喜歡的音樂", "我喜歡的歌曲",
+)
+
+internal fun isSystemLikedPlaylist(value: MusicCollection): Boolean {
+    val directoryId = value.directoryId.trim().toLongOrNull()
+    if (directoryId == 201L) return true
+
+    val normalizedTitle = value.title.filterNot(Char::isWhitespace)
+    return value.owned == false && directoryId == 0L && normalizedTitle in systemLikedPlaylistTitles
+}
+
+internal fun normalizeLibraryData(value: LibraryData): LibraryData =
+    value.copy(playlists = deduplicatePlaylists(value.playlists.filterNot(::isSystemLikedPlaylist)))
+
+private fun playlistIdentityKey(value: MusicCollection): String? =
+    value.directoryId.trim().takeIf(String::isNotBlank)?.let { "directory:$it" }
+        ?: value.id.trim().takeIf(String::isNotBlank)?.let { "id:$it" }
+
+private fun deduplicatePlaylists(values: List<MusicCollection>): List<MusicCollection> {
+    val seen = mutableSetOf<String>()
+    return values.filter { value ->
+        playlistIdentityKey(value)?.let(seen::add) ?: true
+    }
+}
+
+internal fun mergeLibraryPlaylists(
+    accountPlaylists: List<MusicCollection>,
+    favoritePlaylists: List<MusicCollection>,
+): List<MusicCollection> {
+    val favorites = deduplicatePlaylists(favoritePlaylists.filterNot(::isSystemLikedPlaylist))
+    val favoriteKeys = favorites.mapNotNullTo(mutableSetOf(), ::playlistIdentityKey)
+    val account = deduplicatePlaylists(
+        accountPlaylists.filterNot(::isSystemLikedPlaylist).filter { playlist ->
+            playlistIdentityKey(playlist) !in favoriteKeys
+        },
+    )
+    return account + favorites
+}
+
 internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
     fun objects(value: JsonElement, ownedHint: Boolean? = null): Sequence<Pair<JsonObject, Boolean?>> = sequence {
         when (value) {
@@ -51,7 +92,7 @@ internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
             id, title, normalizeHttpsUrl(item.text("picUrl").ifBlank { item.text("picurl") }),
             item.number("songNum").takeIf { it > 0 } ?: item.number("songnum"), dirId, owned,
         )
-    }.distinctBy { it.directoryId }.toList()
+    }.distinctBy { it.directoryId }.filterNot(::isSystemLikedPlaylist).toList()
 }
 
 internal fun parseFavoritePlaylists(root: JsonElement): List<MusicCollection> {
@@ -73,7 +114,7 @@ internal fun parseFavoritePlaylists(root: JsonElement): List<MusicCollection> {
             item.number("songNum", "songnum", "song_count", "total"),
             directoryId = item.text("dirId", "dirid").ifBlank { id }, owned = false,
         )
-    }.distinctBy(MusicCollection::id).toList()
+    }.distinctBy(MusicCollection::directoryId).filterNot(::isSystemLikedPlaylist).toList()
 }
 
 internal fun parseUserProfile(root: JsonElement): UserProfile? {
@@ -349,7 +390,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         requireLogin()
         val playlists = api("music.musicasset.PlaylistBaseRead", "GetPlaylistByUin", obj("uin" to accountId()))
         val collectedPlaylists = mutableListOf<MusicCollection>()
-        val collectedIds = mutableSetOf<String>()
+        val collectedDirectories = mutableSetOf<String>()
         for (page in 0 until 20) {
             val result = runCatching {
                 api(
@@ -359,7 +400,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             }.onFailure { AppLog.write("LIBRARY", "favorite playlists ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
             val batch = result.getOrNull() ?: break
             val previousSize = collectedPlaylists.size
-            collectedPlaylists += batch.filter { collectedIds.add(it.id) }
+            collectedPlaylists += batch.filter { collectedDirectories.add(it.directoryId) }
             if (batch.size < 100 || collectedPlaylists.size == previousSize) break
         }
         val likedTracks = mutableListOf<Track>()
@@ -374,8 +415,10 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             likedTracks += batch.filter { likedIds.add(it.id) }
             if (batch.size < 100 || likedTracks.size == previousSize) break
         }
-        val accountPlaylists = parseAccountPlaylists(playlists).filterNot { it.directoryId == "201" }
-        LibraryData(likedTracks, (accountPlaylists.filterNot { it.id in collectedIds } + collectedPlaylists).distinctBy(MusicCollection::id))
+        val accountPlaylists = parseAccountPlaylists(playlists)
+        normalizeLibraryData(
+            LibraryData(likedTracks, mergeLibraryPlaylists(accountPlaylists, collectedPlaylists)),
+        )
     }
 
     suspend fun profile(): UserProfile = withContext(Dispatchers.IO) {

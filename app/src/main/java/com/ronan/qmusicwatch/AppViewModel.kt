@@ -11,6 +11,7 @@ import com.ronan.qmusicwatch.download.cachedLyricsFile
 import com.ronan.qmusicwatch.lyrics.LrcParser
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.model.*
+import com.ronan.qmusicwatch.network.normalizeLibraryData
 import com.ronan.qmusicwatch.playback.PlaybackErrorEvent
 import com.ronan.qmusicwatch.playback.classifyPlaybackFailure
 import kotlinx.coroutines.flow.*
@@ -110,6 +111,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val lyricOriginal = graph.settings.lyricOriginal.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val lyricOffset = graph.settings.lyricOffset.stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
     val lyricAnimation = graph.settings.lyricAnimation.stateIn(viewModelScope, SharingStarted.Eagerly, "soft")
+    val lyricAlignment = graph.settings.lyricAlignment.stateIn(viewModelScope, SharingStarted.Eagerly, "left")
     val pureBlack = graph.settings.pureBlack.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val lowPowerPlayer = graph.settings.lowPowerPlayer.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val wifiOnlyDownload = graph.settings.wifiOnlyDownload.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -317,8 +319,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val generation = sessionGeneration
         restoreAccountSnapshot()
         if (generation != sessionGeneration) return@launch
-        runCatching { graph.api.library() }.onSuccess { value ->
+        runCatching { graph.api.library() }.onSuccess { rawValue ->
             if (generation != sessionGeneration) return@onSuccess
+            val value = normalizeLibraryData(rawValue)
             _state.update { it.copy(library = value, offlineSnapshot = false) }
             cacheAccountSnapshot(library = value)
         }.onFailure { error ->
@@ -334,7 +337,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             ?.items?.firstOrNull { it.accountId == owner } ?: return
         _state.update { state -> state.copy(
             home = state.home ?: cached.home,
-            library = state.library ?: cached.library,
+            library = state.library ?: cached.library?.let(::normalizeLibraryData),
             offlineSnapshot = true,
         ) }
     }
@@ -343,7 +346,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val owner = accountId ?: "guest"
         val cache = runCatching { json.decodeFromString<CachedAccountSnapshots>(graph.settings.accountSnapshots.first()) }.getOrDefault(CachedAccountSnapshots())
         val old = cache.items.firstOrNull { it.accountId == owner }
-        val updated = CachedAccountSnapshot(owner, home ?: old?.home, library ?: old?.library, System.currentTimeMillis())
+        val normalizedLibrary = (library ?: old?.library)?.let(::normalizeLibraryData)
+        val updated = CachedAccountSnapshot(owner, home ?: old?.home, normalizedLibrary, System.currentTimeMillis())
         graph.settings.setAccountSnapshots(json.encodeToString(upsertAccountSnapshot(cache, updated)))
     }
     fun loadProfile(force: Boolean = false) = viewModelScope.launch {
@@ -531,6 +535,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setLyricOriginal(value: Boolean) = viewModelScope.launch { graph.settings.setLyricOriginal(value) }
     fun setLyricOffset(value: Long) = viewModelScope.launch { graph.settings.setLyricOffset(value) }
     fun setLyricAnimation(value: String) = viewModelScope.launch { graph.settings.setLyricAnimation(value) }
+    fun setLyricAlignment(value: String) = viewModelScope.launch { graph.settings.setLyricAlignment(value) }
     fun setPureBlack(value: Boolean) = viewModelScope.launch { graph.settings.setPureBlack(value) }
     fun setLowPowerPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setLowPowerPlayer(value) }
     fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch { graph.settings.setWifiOnlyDownload(value) }
