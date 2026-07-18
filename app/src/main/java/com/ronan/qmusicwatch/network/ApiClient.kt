@@ -117,6 +117,52 @@ internal fun parseFavoritePlaylists(root: JsonElement): List<MusicCollection> {
     }.distinctBy(MusicCollection::directoryId).filterNot(::isSystemLikedPlaylist).toList()
 }
 
+private data class MembershipEvidence(
+    val enabled: Boolean?,
+    val expiry: Long?,
+    val label: String,
+    val type: String,
+    val rank: Int,
+)
+
+private val membershipStatusKeys = arrayOf(
+    "isVip", "is_vip", "isSVip", "is_svip", "isSvip", "vip", "svip",
+    "vipFlag", "vip_flag", "svipFlag", "svip_flag", "svip_status", "vipStatus",
+    "HugeVip", "LMFlag",
+)
+private val membershipTypeKeys = arrayOf(
+    "vip_type", "vipType", "viptype", "svip_type", "svipType",
+    "music_vip_level", "green_vip_level", "luxury_vip_level", "super_vip_level",
+)
+private val membershipExpiryKeys = arrayOf(
+    "HugeVipEnd", "LMEnd", "vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime", "svip_end_time",
+    "vipExpireTime", "vip_expire_time", "vipExpireDate", "vip_expire_date",
+    "expireTime", "expire_time", "expireDate", "expire_date", "endTime", "end_time", "endDate",
+    "expiry", "expiration", "expire",
+)
+
+private fun membershipBoolean(value: String): Boolean? = when (value.trim().lowercase()) {
+    "1", "true", "yes", "on", "vip", "svip", "valid", "active" -> true
+    "0", "false", "no", "off", "none", "invalid", "inactive" -> false
+    else -> value.trim().toLongOrNull()?.let { it > 0 }
+}
+
+private fun membershipTypeFrom(rank: Int, path: String, label: String): String = when {
+    rank >= 3 || path.contains("svip", true) || label.contains("超级") || label.contains("SVIP", true) -> "svip"
+    rank == 2 || path.contains("green", true) || path.contains("luxury", true) || label.contains("绿钻") -> "green_diamond"
+    rank == 1 || label.isNotBlank() -> "vip"
+    else -> ""
+}
+
+private fun rankForMembership(path: String, label: String, typeCode: Int?, superFlag: Boolean): Int = when {
+    superFlag || path.contains("svip", true) || label.contains("超级") || label.contains("SVIP", true) -> 3
+    typeCode != null && typeCode >= 11 -> 3
+    path.contains("green", true) || path.contains("luxury", true) || label.contains("绿钻") -> 2
+    typeCode != null && typeCode >= 2 -> 2
+    label.contains("会员") || label.contains("vip", true) || typeCode == 1 -> 1
+    else -> 0
+}
+
 internal fun parseUserProfile(root: JsonElement): UserProfile? {
     fun objects(value: JsonElement, path: String = "root"): Sequence<Pair<String, JsonObject>> = sequence {
         when (value) {
@@ -130,75 +176,160 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
     }
     val all = objects(root).toList()
     fun JsonObject.value(vararg names: String) = names.firstNotNullOfOrNull { name -> (this[name] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+    fun JsonObject.values(vararg names: String): List<String> = names.mapNotNull { name ->
+        (this[name] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+    }
     val identity = all.firstOrNull { (_, item) -> item.value("nick", "nickname", "nickName", "userName") != null }?.second
     val name = identity?.value("nick", "nickname", "nickName", "userName").orEmpty()
     val avatarKeys = arrayOf("logo", "logoUrl", "headurl", "headUrl", "headpic", "headPic", "head_pic", "headPicUrl", "avatarurl", "avatarUrl")
     val avatar = normalizeHttpsUrl((identity?.value(*avatarKeys) ?: all.firstNotNullOfOrNull { (_, item) -> item.value(*avatarKeys) }).orEmpty())
     val now = System.currentTimeMillis() / 1000
     val memberships = all.mapNotNull { (path, item) ->
-        val membershipPath = path.contains("vip", true) || path.contains("member", true)
-        val raw = item.value(
-            "isVip", "is_vip", "isSVip", "is_svip", "isSvip", "vip", "svip",
-            "vipFlag", "vip_flag", "svipFlag", "svip_flag", "svip_status", "vipStatus",
-            "vip_type", "vipType", "viptype", "music_vip_level", "green_vip_level",
-            "luxury_vip_level", "super_vip_level", "svip_type", "svipType", "HugeVip", "LMFlag",
-        )
-        val enabled = raw?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 }
-        val end = item.value(
-            "HugeVipEnd", "LMEnd", "vipEndTime", "vip_end_time", "vip_endtime", "svipEndTime",
-            "vipExpireTime", "vipExpireDate", "expireTime", "expire_time", "expireDate", "expire_date",
-            "endTime", "end_time", "endDate",
-        )?.let(::profileEpoch)
-        var label = item.value("vipName", "vip_name", "vipLevelName", "levelName", "svipName", "name", "title").orEmpty()
-        val pathAndLabel = "$path $label"
-        label = when {
+        val rawStatuses = item.values(*membershipStatusKeys).mapNotNull(::membershipBoolean)
+        val rawTypes = item.values(*membershipTypeKeys).mapNotNull { it.toIntOrNull() }
+        val superFlag = item.values("isSVip", "is_svip", "isSvip", "svip", "HugeVip", "svipFlag", "svip_flag", "svip_status")
+            .mapNotNull(::membershipBoolean).any { it }
+        val labelRaw = item.value("vipName", "vip_name", "vipLevelName", "levelName", "svipName", "name", "title").orEmpty()
+        val pathAndLabel = "$path $labelRaw"
+        val expiry = item.values(*membershipExpiryKeys).mapNotNull(::profileEpoch).maxOrNull()
+        val typeCode = rawTypes.maxOrNull()
+        val rank = rankForMembership(path, labelRaw, typeCode, superFlag)
+        val label = when {
             pathAndLabel.contains("听书", true) || pathAndLabel.contains("book", true) -> "听书会员"
-            pathAndLabel.contains("svip", true) || pathAndLabel.contains("超级", true) || item.value("isSVip", "is_svip", "isSvip", "svip", "huge_vip", "svipFlag", "svip_flag", "svip_status")?.let { it == "true" || (it.toLongOrNull() ?: 0) > 0 } == true -> "超级会员（SVIP）"
-            pathAndLabel.contains("绿钻", true) || pathAndLabel.contains("green", true) || pathAndLabel.contains("luxury", true) -> "豪华绿钻"
-            label.contains("会员") || label.contains("vip", true) -> label
+            rank >= 3 -> "超级会员（SVIP）"
+            pathAndLabel.contains("绿钻", true) || pathAndLabel.contains("green", true) || pathAndLabel.contains("luxury", true) || rank == 2 -> "豪华绿钻"
+            labelRaw.contains("会员") || labelRaw.contains("vip", true) -> labelRaw
             else -> ""
         }
-        if (!membershipPath && end == null && label.isBlank()) null else Triple(enabled, end, label)
+        val pathParts = path.lowercase().replace('[', '.').replace(']', '.').split('.')
+        val songContext = pathParts.any { it in setOf("song", "track", "songinfo", "trackinfo", "songlist", "searchsong") }
+        val pathMembership = path.contains("vip", true) || path.contains("member", true) ||
+            path.contains("identity", true) || path.contains("userinfo", true)
+        val rootMembership = path == "root" && (rawStatuses.isNotEmpty() || rawTypes.isNotEmpty() || expiry != null)
+        val membershipPath = !songContext && (pathMembership || rootMembership)
+        val hasMembershipSignal = membershipPath || (!songContext && (rawStatuses.isNotEmpty() || rawTypes.isNotEmpty() || expiry != null || label.isNotBlank()))
+        if (!hasMembershipSignal) null else {
+            val enabled = when {
+                rawStatuses.any { it } -> true
+                rawStatuses.any { !it } -> false
+                rawTypes.any { it > 0 } -> true
+                rawTypes.isNotEmpty() -> false
+                else -> null
+            }
+            MembershipEvidence(enabled, expiry, label, membershipTypeFrom(rank, path, label), rank)
+        }
     }
-    val active = memberships.filter { it.first == true || (it.first == null && (it.second ?: 0) > now) }
-        .maxWithOrNull(compareBy<Triple<Boolean?, Long?, String>> { membershipRank(it.third) }.thenBy { it.second ?: 0 })
-    val expire = active?.second ?: memberships.mapNotNull { it.second }.maxOrNull()
-    val isVip = when { active != null -> true; memberships.any { it.first == false } -> false; else -> null }
-    val vipName = if (active == null) "" else active.third.ifBlank { "QQ 音乐会员" }
-    return UserProfile(name, avatar, isVip, expire, vipName).takeIf { it.displayName.isNotBlank() || it.avatarUrl.isNotBlank() || it.isVip != null || it.vipExpireAt != null }
+    val active = memberships.filter { evidence ->
+        when {
+            evidence.enabled == true -> evidence.expiry == null || evidence.expiry > now
+            evidence.enabled == false -> false
+            else -> evidence.expiry?.let { it > now } == true
+        }
+    }.maxWithOrNull(compareBy<MembershipEvidence> { it.rank }.thenBy { it.expiry ?: 0L })
+    val known = memberships.maxWithOrNull(compareBy<MembershipEvidence> { it.rank }.thenBy { it.expiry ?: 0L })
+    val expire = active?.expiry ?: memberships.mapNotNull(MembershipEvidence::expiry).maxOrNull()
+    val isVip = when {
+        active != null -> true
+        memberships.isNotEmpty() -> false
+        else -> null
+    }
+    val chosen = active ?: known
+    val vipName = chosen?.label.orEmpty().ifBlank { if (active != null) "QQ 音乐会员" else "" }
+    val provisional = UserProfile(
+        displayName = name, avatarUrl = avatar, isVip = isVip, vipExpireAt = expire, vipName = vipName,
+        vipType = chosen?.type.orEmpty(), vipLevel = chosen?.rank ?: 0,
+    )
+    return provisional.copy(qualityEntitlements = profileQualityOptions(provisional, now * 1_000L))
+        .takeIf { it.displayName.isNotBlank() || it.avatarUrl.isNotBlank() || it.isVip != null || it.vipExpireAt != null }
 }
 
 private fun membershipRank(name: String): Int = when {
-    name.contains("超级") || name.contains("SVIP", true) -> 3
-    name.contains("绿钻") -> 2
-    name.contains("听书") -> 1
-    name.isNotBlank() -> 1
+    name.contains("SVIP", true) || name.contains("\u8d85\u7ea7") -> 3
+    name.contains("\u7eff\u94bb") -> 2
+    name.contains("\u4f1a\u5458") || name.isNotBlank() -> 1
     else -> 0
 }
 
-private fun profileEpoch(value: String): Long? {
+/**
+ * QQ Music has returned this value as seconds, milliseconds, compact dates,
+ * and both local/ISO date strings over time. Keep the conversion in one place
+ * and reject counters such as `userinfo.expire=9`.
+ */
+internal fun profileEpoch(value: String): Long? {
     val text = value.trim()
-    val date = when {
-        text.length >= 10 && text[4] in "-/" && text[7] in "-/" -> text.take(10).replace('/', '-')
-        text.length == 8 && text.startsWith("20") && text.all(Char::isDigit) -> "${text.take(4)}-${text.substring(4, 6)}-${text.takeLast(2)}"
-        else -> null
+    if (text.isBlank()) return null
+
+    fun parse(pattern: String, input: String, timezone: java.util.TimeZone = java.util.TimeZone.getDefault()): Long? {
+        val format = java.text.SimpleDateFormat(pattern, java.util.Locale.US).apply {
+            isLenient = false
+            timeZone = timezone
+        }
+        val position = java.text.ParsePosition(0)
+        val parsed = format.parse(input, position) ?: return null
+        return parsed.time.div(1_000L).takeIf { position.index == input.length && it >= 946_684_800L }
     }
-    date?.let { runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply { isLenient = false }.parse(it)?.time?.div(1000) }.getOrNull() }?.let { return it }
-    return text.toLongOrNull()?.let { if (it > 10_000_000_000L) it / 1000 else it }?.takeIf { it >= 946_684_800L }
+
+    // Compact calendar values need to be checked before treating them as an epoch.
+    if (text.length == 14 && text.startsWith("20") && text.all(Char::isDigit)) {
+        parse("yyyyMMddHHmmss", text)?.let { return it }
+    }
+    if (text.length == 8 && text.startsWith("20") && text.all(Char::isDigit)) {
+        parse("yyyyMMdd", text)?.let { return it }
+    }
+
+    text.toLongOrNull()?.let { raw ->
+        val seconds = when {
+            raw >= 100_000_000_000_000_000L -> raw / 1_000_000_000L
+            raw >= 100_000_000_000_000L -> raw / 1_000_000L
+            raw >= 100_000_000_000L -> raw / 1_000L
+            else -> raw
+        }
+        if (seconds >= 946_684_800L) return seconds
+    }
+
+    // Keep timestamp precision while retaining the device-local interpretation
+    // for date-only values.
+    val normalizedFraction = Regex("(\\.\\d{3})\\d+").replace(text) { it.value.take(4) }
+    val timezonePatterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd HH:mm:ss.SSSXXX", "yyyy-MM-dd HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSX", "yyyy-MM-dd'T'HH:mm:ssX",
+    )
+    timezonePatterns.firstNotNullOfOrNull { pattern -> parse(pattern, normalizedFraction) }?.let { return it }
+    listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSS", "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss",
+        "yyyy/MM/dd HH:mm:ss.SSS", "yyyy/MM/dd HH:mm:ss",
+        "yyyy-MM-dd", "yyyy/MM/dd",
+    ).firstNotNullOfOrNull { pattern -> parse(pattern, normalizedFraction) }?.let { return it }
+    return null
 }
 
 internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {
     if (values.isEmpty()) return null
-    val now = System.currentTimeMillis() / 1000
-    val active = values.filter { it.isVip == true || (it.isVip == null && (it.vipExpireAt ?: 0) > now) }
-        .maxWithOrNull(compareBy<UserProfile> { membershipRank(it.vipName) }.thenBy { it.vipExpireAt ?: 0 })
-    val isVip = when { active != null -> true; values.any { it.isVip == false } -> false; else -> null }
-    val expire = active?.vipExpireAt ?: values.mapNotNull(UserProfile::vipExpireAt).maxOrNull()
-    return UserProfile(
-        values.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(),
-        values.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(),
-        isVip, expire, active?.vipName.orEmpty(),
+    val nowMillis = System.currentTimeMillis()
+    val normalized = values.map(::normalizeUserProfile)
+    val active = normalized.filter { it.isVipActive(nowMillis) }
+        .maxWithOrNull(compareBy<UserProfile> { maxOf(it.vipLevel, membershipRank(it.vipName)) }.thenBy { it.vipExpireAt ?: 0L })
+    val known = normalized.maxWithOrNull(compareBy<UserProfile> { maxOf(it.vipLevel, membershipRank(it.vipName)) }.thenBy { it.vipExpireAt ?: 0L })
+    val hasMembershipSignal = normalized.any { it.isVip != null || it.vipExpireAt != null || it.vipName.isNotBlank() }
+    val isVip = when {
+        active != null -> true
+        hasMembershipSignal -> false
+        else -> null
+    }
+    val expire = active?.vipExpireAt ?: normalized.mapNotNull(UserProfile::vipExpireAt).maxOrNull()
+    val chosen = active ?: known
+    val merged = UserProfile(
+        displayName = normalized.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(),
+        avatarUrl = normalized.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(),
+        isVip = isVip,
+        vipExpireAt = expire,
+        vipName = chosen?.vipName.orEmpty(),
+        vipType = chosen?.vipType.orEmpty(),
+        vipLevel = chosen?.vipLevel ?: 0,
     )
+    return merged.copy(qualityEntitlements = profileQualityOptions(merged, nowMillis))
 }
 
 internal fun isVersionNewer(latest: String, current: String): Boolean {

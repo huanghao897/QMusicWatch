@@ -85,8 +85,12 @@ internal fun moveQueuePreview(queue: List<Track>, from: Int, to: Int): List<Trac
     return queue.toMutableList().apply { add(to, removeAt(from)) }
 }
 
-internal fun profileCacheNeedsRefresh(cache: CachedUserProfile?, accountId: String?, now: Long): Boolean =
-    cache == null || cache.accountId != accountId || (cache.profile.isVip == true && cache.profile.vipExpireAt?.let { it * 1000 <= now } == true)
+internal fun profileCacheNeedsRefresh(cache: CachedUserProfile?, accountId: String?, now: Long): Boolean {
+    val profile = cache?.profile?.let(::normalizeUserProfile)
+    val expiry = normalizeEpochSeconds(profile?.vipExpireAt)
+    val expiredMembership = profile?.isVip != false && expiry?.let { it <= now / 1_000L } == true
+    return cache == null || cache.accountId != accountId || expiredMembership
+}
 
 internal fun upsertAccountSnapshot(cache: CachedAccountSnapshots, value: CachedAccountSnapshot): CachedAccountSnapshots =
     CachedAccountSnapshots((listOf(value) + cache.items.filterNot { it.accountId == value.accountId }).take(4))
@@ -96,6 +100,13 @@ internal fun mergeSelectedQueue(queue: List<Track>, source: List<Track>, selecte
 
 internal fun qualityFallbackMessage(preferred: String, resolved: String): String? =
     "已选择 320k，但当前歌曲或账号仅提供 128k，已自动降级".takeIf { preferred == "320" && resolved != "320" }
+
+internal fun qualityFallbackMessage(preferred: String, resolved: String, track: Track, profile: UserProfile?): String? {
+    if (normalizeQualityId(preferred) == normalizeQualityId(resolved)) return null
+    val decision = resolveQuality(preferred, track, profile)
+    val reason = decision.reason.ifBlank { "当前歌曲或账号仅提供 128k" }
+    return "已选择 ${normalizeQualityId(preferred)}k，但$reason，已自动使用 ${normalizeQualityId(resolved)}k"
+}
 
 internal fun nextQueueIndex(size: Int, current: Int, delta: Int, mode: String, ended: Boolean, shuffled: Int = -1): Int = when {
     size <= 0 -> -1
@@ -112,6 +123,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val state = _state.asStateFlow()
     val downloads = graph.downloads.downloads.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val quality = graph.settings.quality.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "128")
+    /** Account-level options for the compact watch quality picker. */
+    val qualityEntitlements = state.map { profileQualityOptions(it.profile) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, profileQualityOptions(null))
     val headphoneWarning = graph.settings.headphoneWarning.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val autoOpenPlayer = graph.settings.autoOpenPlayer.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val playMode = graph.settings.playMode.stateIn(viewModelScope, SharingStarted.Eagerly, "sequential")
@@ -180,7 +194,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             var refresh = false
             try {
                 if (signedIn) {
-                    val cached = runCatching { json.decodeFromString<CachedUserProfile>(graph.settings.profileCache.first()) }.getOrNull()
+                    val cached = runCatching { json.decodeFromString<CachedUserProfile>(graph.settings.profileCache.first()) }
+                        .getOrNull()?.let(::normalizeCachedUserProfile)
                     cached?.takeIf { it.accountId == accountId && generation == sessionGeneration }?.let { _state.update { state -> state.copy(profile = it.profile, profileLoaded = true, profileError = null) } }
                     refresh = profileCacheNeedsRefresh(cached, accountId, System.currentTimeMillis())
                 }
@@ -236,7 +251,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 lastStreamQuality = stream.quality
                 persistSnapshot(event.positionMs)
             }.onSuccess {
-                val qualityNote = qualityFallbackMessage(quality.value, lastStreamQuality)
+                val qualityNote = qualityFallbackMessage(quality.value, lastStreamQuality, track, _state.value.profile)
                 _state.update { it.copy(message = "已从 ${lyricTimeForMessage(event.positionMs)} 自动恢复播放" + qualityNote?.let { note -> " · $note" }.orEmpty()) }
                 delay(10_000)
                 if (_state.value.currentTrack?.id == track.id) retryingTrackId = null
@@ -379,8 +394,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         profileCacheReady.await()
         if (!signedIn || (!force && _state.value.profileLoaded)) return@launch
         if (!featureEnabled("profile")) return@launch _state.update { it.copy(profileLoaded = true, profileError = featureMessage("profile").ifBlank { "账号资料服务暂时维护" }) }
-        runCatching { graph.api.profile() }.onSuccess { profile ->
+        runCatching { graph.api.profile() }.onSuccess { rawProfile ->
             if (generation != sessionGeneration) return@onSuccess
+            val profile = normalizeUserProfile(rawProfile)
             _state.update { it.copy(profile = profile, profileLoaded = true, profileError = null) }
             graph.settings.setProfileCache(json.encodeToString(CachedUserProfile(accountId.orEmpty(), profile, System.currentTimeMillis())))
         }
@@ -390,11 +406,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update { it.copy(profileLoaded = true, profileError = "会员状态读取失败，可点检查登录重试") }
             }
     }
+    /** Refreshes only the account profile, so the settings page can update VIP rights without a full playback diagnostic. */
+    fun refreshMembership() = viewModelScope.launch {
+        if (!signedIn) return@launch fail(IllegalStateException("请先登录"))
+        _state.update { it.copy(profileError = null, message = "正在读取会员权益…") }
+        loadProfile(force = true).join()
+        val result = _state.value
+        _state.update { it.copy(message = if (result.profileError == null) "会员权益已更新" else result.profileError) }
+    }
     fun diagnose() = viewModelScope.launch {
         _state.update { it.copy(message = "正在检查登录、歌单和播放地址…") }
+        val profileJob = loadProfile(force = true)
         runCatching { graph.api.diagnose() }
-            .onSuccess { result -> _state.update { it.copy(message = result, diagnostic = result) }; loadProfile(force = true) }
+            .onSuccess { result -> _state.update { it.copy(message = result, diagnostic = result) } }
             .onFailure { error -> _state.update { it.copy(diagnostic = "诊断失败：${error.message ?: "未知错误"}") }; fail(error) }
+        profileJob.join()
     }
     fun loadRecent() = viewModelScope.launch {
         val generation = sessionGeneration
@@ -612,7 +638,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             lastStreamUrl = issuedUrl
             lastStreamExpiresAt = issuedExpiresAt
             lastStreamQuality = issuedQuality
-            _state.update { it.copy(currentTrack = resolvedTrack, lyrics = parsedLyrics, pendingSpeakerTrack = null, playEvent = System.nanoTime(), message = qualityFallbackMessage(quality.value, issuedQuality)) }
+            _state.update { it.copy(currentTrack = resolvedTrack, lyrics = parsedLyrics, pendingSpeakerTrack = null, playEvent = System.nanoTime(), message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile)) }
             persistSnapshot()
         }.onFailure { error -> if (error !is CancellationException) failPlayback(error) }
         }
@@ -699,7 +725,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             .onFailure(::fail)
     }
-    fun setQuality(value: String) = viewModelScope.launch { graph.settings.setQuality(value) }
+    fun setQuality(value: String) = viewModelScope.launch {
+        val requested = normalizeQualityId(value)
+        val profile = _state.value.profile
+        if (requested == QUALITY_HIGH && profile?.isVipActive() != true) {
+            _state.update {
+                it.copy(message = if (profile == null || profile.isVip == null) "请先检查登录以确认 320k 会员权益" else "320k 需要有效会员权益，已保留标准 128k")
+            }
+            return@launch
+        }
+        graph.settings.setQuality(requested)
+    }
     fun setHeadphoneWarning(value: Boolean) = viewModelScope.launch { graph.settings.setHeadphoneWarning(value) }
     fun setAutoOpenPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setAutoOpenPlayer(value) }
     fun setPlayMode(value: String) = viewModelScope.launch { graph.settings.setPlayMode(value) }
@@ -810,6 +846,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             lastStreamUrl, lastStreamExpiresAt, lastStreamQuality, owner,
         )))
     }
-    private fun preferredQuality(track: Track) = if (quality.value == "320" && "320" in track.qualities) "320" else "128"
+    private fun preferredQuality(track: Track): String =
+        resolveQuality(quality.value, track, _state.value.profile).resolved
     override fun onCleared() { graph.playback.onError = null; graph.playback.onMediaItemChanged = null; super.onCleared() }
 }

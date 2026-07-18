@@ -2,6 +2,7 @@ package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.network.mergeUserProfiles
 import com.ronan.qmusicwatch.network.parseUserProfile
+import com.ronan.qmusicwatch.network.profileEpoch
 import com.ronan.qmusicwatch.model.UserProfile
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -33,7 +34,7 @@ class UserProfileParserTest {
         val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_response":{"svip":1,"identity":{"vip":1,"HugeVip":1,"HugeVipEnd":"2026-07-22 23:59:59","LMFlag":1,"LMEnd":"2026-07-22 23:59:59"},"userinfo":{"expire":9,"music_level":8}}}"""))!!
         assertEquals(true, profile.isVip)
         assertEquals("超级会员（SVIP）", profile.vipName)
-        assertEquals(1784649600L, profile.vipExpireAt)
+        assertEquals(profileEpoch("2026-07-22 23:59:59"), profile.vipExpireAt)
     }
 
     @Test fun doesNotTreatVipExpireCounterAsUnixTimestamp() {
@@ -55,5 +56,13 @@ class UserProfileParserTest {
         ))!!
         assertEquals("超级会员（SVIP）", merged.vipName)
         assertEquals(1800000000L, merged.vipExpireAt)
+    }
+
+    @Test fun preservesDateTimeAndNormalizesEpochUnits() {
+        val exact = profileEpoch("2026-07-22 23:59:59")!!
+        val midnight = profileEpoch("2026-07-22")!!
+        assertEquals(23 * 60 * 60 + 59 * 60 + 59, exact - midnight)
+        assertEquals(exact, profileEpoch((exact * 1_000L).toString()))
+        assertEquals(exact, profileEpoch("2026-07-22T23:59:59+08:00"))
     }
 }
