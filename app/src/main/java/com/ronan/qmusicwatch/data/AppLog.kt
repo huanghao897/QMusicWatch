@@ -12,6 +12,10 @@ import java.util.Locale
 
 private val logUrlPattern = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE)
 private val logSecretPattern = Regex("(authorization|cookie|set-cookie|qm_keyst|qqmusic_key|musickey|p_lskey|p_skey|skey|qrcode_id|qrsig|ptqrtoken|access[_-]?token|refresh[_-]?(?:token|key))\\s*[:=]\\s*[^;\\s,]+", RegexOption.IGNORE_CASE)
+private val diagnosticSensitiveFieldPattern = Regex(
+    "[\\\"']?(query|keyword|search(?:[_-]?query)?|q|track(?:[_-]?id)?|song[_-]?id|account(?:[_-]?id)?|uin|qq|user[_-]?(?:id|name)|nickname|media[_-]?id)[\\\"']?\\s*[:=]\\s*(?:\\\"[^\\\"]*\\\"|'[^']*'|[^;,\\r\\n]+)",
+    RegexOption.IGNORE_CASE,
+)
 
 object AppLog {
     private lateinit var file: File
@@ -26,6 +30,20 @@ object AppLog {
         file.appendText("$time $tag ${redactLogMessage(message).take(1200)}\n")
     }
     @Synchronized fun clear() { if (::file.isInitialized) file.writeText("") }
+    @Synchronized fun diagnosticExcerpt(maxBytes: Int = 48 * 1024): String {
+        if (!::file.isInitialized || !file.isFile || maxBytes <= 0) return ""
+        val lines = file.readLines().asReversed()
+        val selected = ArrayDeque<String>()
+        var bytes = 0
+        for (line in lines) {
+            val clean = redactDiagnosticMessage(line)
+            val size = clean.encodeToByteArray().size + 1
+            if (bytes + size > maxBytes) break
+            selected.addFirst(clean)
+            bytes += size
+        }
+        return selected.joinToString("\n")
+    }
     fun shareIntent(context: Context): Intent {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         return Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_STREAM, uri)
@@ -40,3 +58,6 @@ internal fun redactLogMessage(message: String): String {
     value = logSecretPattern.replace(value) { match -> "${match.groupValues[1]}=<redacted>" }
     return value
 }
+
+internal fun redactDiagnosticMessage(message: String): String =
+    diagnosticSensitiveFieldPattern.replace(redactLogMessage(message)) { match -> "${match.groupValues[1]}=<redacted>" }

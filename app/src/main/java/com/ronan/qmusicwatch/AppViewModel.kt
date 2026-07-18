@@ -6,18 +6,22 @@ import androidx.lifecycle.viewModelScope
 import com.ronan.qmusicwatch.data.RecentEntity
 import com.ronan.qmusicwatch.data.mergeRecent
 import com.ronan.qmusicwatch.data.AppLog
+import com.ronan.qmusicwatch.data.redactDiagnosticMessage
 import com.ronan.qmusicwatch.download.cachedArtworkFile
 import com.ronan.qmusicwatch.download.cachedLyricsFile
 import com.ronan.qmusicwatch.lyrics.LrcParser
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.network.normalizeLibraryData
+import com.ronan.qmusicwatch.network.*
 import com.ronan.qmusicwatch.playback.PlaybackErrorEvent
 import com.ronan.qmusicwatch.playback.classifyPlaybackFailure
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
@@ -41,6 +45,11 @@ data class AppUiState(
     val diagnostic: String? = null, val profile: UserProfile? = null, val profileLoaded: Boolean = false,
     val profileError: String? = null, val offlineSnapshot: Boolean = false,
     val releaseInfo: ReleaseInfo? = null, val updateChecking: Boolean = false,
+    val controlConfig: RemoteFeatureConfig = RemoteFeatureConfig(),
+    val announcements: List<ControlAnnouncement> = emptyList(),
+    val controlFetchedAt: Long = 0, val controlRefreshing: Boolean = false, val controlError: String? = null,
+    val updateState: UpdateUiState = UpdateUiState.Idle,
+    val diagnosticUploadState: DiagnosticUploadState = DiagnosticUploadState.Idle,
     val queueImportTitle: String = "", val queueImportTracks: List<Track> = emptyList(), val queueImportLoading: Boolean = false,
 )
 
@@ -118,6 +127,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val lastSleepMinutes = graph.settings.lastSleepMinutes.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val dailyCount = graph.settings.dailyCount.stateIn(viewModelScope, SharingStarted.Eagerly, 5)
     val searchHistory = graph.settings.searchHistory.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val seenAnnouncements = graph.settings.seenAnnouncements.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue = _queue.asStateFlow()
     private val _queueIndex = MutableStateFlow(-1)
@@ -136,6 +146,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var searchJob: Job? = null
     private var detailJob: Job? = null
     private var queueImportJob: Job? = null
+    private var updateJob: Job? = null
     private val json = Json { ignoreUnknownKeys = true }
     private val profileCacheReady = CompletableDeferred<Unit>()
     private val snapshotMutex = Mutex()
@@ -177,6 +188,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (refresh && generation == sessionGeneration) loadProfile(force = true)
         }
         viewModelScope.launch { while (isActive) { delay(10_000); if (_state.value.currentTrack != null) persistSnapshot() } }
+        viewModelScope.launch { restoreControlPlaneAndRefresh() }
+        viewModelScope.launch { restorePendingUpdate() }
+        viewModelScope.launch {
+            while (isActive) {
+                delay(60_000)
+                val current = _state.value
+                val cache = CachedControlPlane(current.controlConfig, current.announcements, current.controlFetchedAt)
+                if (!current.controlRefreshing && !controlCacheIsFresh(cache, System.currentTimeMillis())) {
+                    refreshControlPlane(showStatus = false)
+                }
+            }
+        }
         loadHome()
         if (signedIn) { loadLibrary(); loadRecent() }
     }
@@ -261,6 +284,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }.onFailure { if (generation == sessionGeneration) _state.update { s -> s.copy(loading = false, offlineSnapshot = s.home != null) } }
     }
     fun completeOfficialLogin(provider: String, cookie: String) = viewModelScope.launch {
+        if (!featureEnabled("qrLogin")) return@launch _state.update { it.copy(qrStatus = featureMessage("qrLogin").ifBlank { "扫码登录暂时维护" }) }
         _state.update { it.copy(qrStatus = "已确认，正在完成登录…") }
         runCatching {
             val finalCookie = graph.api.finishQrLogin(cookie)
@@ -354,6 +378,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val generation = sessionGeneration
         profileCacheReady.await()
         if (!signedIn || (!force && _state.value.profileLoaded)) return@launch
+        if (!featureEnabled("profile")) return@launch _state.update { it.copy(profileLoaded = true, profileError = featureMessage("profile").ifBlank { "账号资料服务暂时维护" }) }
         runCatching { graph.api.profile() }.onSuccess { profile ->
             if (generation != sessionGeneration) return@onSuccess
             _state.update { it.copy(profile = profile, profileLoaded = true, profileError = null) }
@@ -398,11 +423,153 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun clearSearchHistory() = viewModelScope.launch { graph.settings.clearSearchHistory() }
+    fun featureEnabled(name: String): Boolean = _state.value.controlConfig.featureEnabled(name)
+    fun featureMessage(name: String): String = _state.value.controlConfig.messages[name].orEmpty()
+
+    private suspend fun restoreControlPlaneAndRefresh() {
+        val cached = runCatching { json.decodeFromString<CachedControlPlane>(graph.settings.controlPlaneCache.first()) }.getOrNull()
+        val now = System.currentTimeMillis()
+        cached?.let { value -> _state.update { it.copy(
+            controlConfig = value.config.takeIf { controlCacheIsFresh(value, now) } ?: RemoteFeatureConfig(),
+            announcements = visibleAnnouncements(value.announcements, BuildConfig.VERSION_CODE, now),
+            controlFetchedAt = value.fetchedAt,
+        ) } }
+        if (cached == null || !controlCacheIsFresh(cached, now)) refreshControlPlane(showStatus = false)
+    }
+
+    fun refreshControlPlane(showStatus: Boolean = true) = viewModelScope.launch {
+        if (_state.value.controlRefreshing) return@launch
+        _state.update { it.copy(controlRefreshing = true, controlError = null) }
+        val (configResult, announcementsResult) = coroutineScope {
+            val config = async { runCatching { graph.controlPlane.config() } }
+            val announcements = async { runCatching { graph.controlPlane.announcements() } }
+            config.await() to announcements.await()
+        }
+        val previous = _state.value
+        if (configResult.isSuccess || announcementsResult.isSuccess) {
+            val now = System.currentTimeMillis()
+            val previousCache = CachedControlPlane(previous.controlConfig, previous.announcements, previous.controlFetchedAt)
+            val partialError = configResult.exceptionOrNull() ?: announcementsResult.exceptionOrNull()
+            val cache = CachedControlPlane(
+                config = configResult.getOrNull()
+                    ?: previous.controlConfig.takeIf { controlCacheIsFresh(previousCache, now) }
+                    ?: RemoteFeatureConfig(),
+                announcements = visibleAnnouncements(
+                    announcementsResult.getOrDefault(previous.announcements),
+                    BuildConfig.VERSION_CODE,
+                    now,
+                ),
+                fetchedAt = now.takeIf { configResult.isSuccess } ?: previous.controlFetchedAt,
+            )
+            graph.settings.setControlPlaneCache(json.encodeToString(cache))
+            _state.update { it.copy(
+                controlConfig = cache.config, announcements = cache.announcements, controlFetchedAt = cache.fetchedAt,
+                controlRefreshing = false, controlError = partialError?.message?.take(160),
+                message = (if (partialError == null) "服务配置已同步" else "部分服务暂不可用，音乐功能继续直连")
+                    .takeIf { showStatus },
+            ) }
+        } else {
+            val message = configResult.exceptionOrNull()?.message ?: announcementsResult.exceptionOrNull()?.message ?: "控制面不可用"
+            _state.update { current ->
+                val cached = CachedControlPlane(current.controlConfig, current.announcements, current.controlFetchedAt)
+                current.copy(
+                    controlConfig = current.controlConfig.takeIf { controlCacheIsFresh(cached, System.currentTimeMillis()) } ?: RemoteFeatureConfig(),
+                    announcements = visibleAnnouncements(current.announcements, BuildConfig.VERSION_CODE, System.currentTimeMillis()),
+                    controlRefreshing = false, controlError = message.take(160),
+                    message = "服务暂不可用，音乐功能继续直连".takeIf { showStatus },
+                )
+            }
+        }
+    }
+
+    fun markAnnouncementSeen(id: String) = viewModelScope.launch { graph.settings.markAnnouncementSeen(id) }
+
+    private suspend fun restorePendingUpdate() {
+        val serialized = graph.settings.pendingUpdateRelease.first()
+        if (serialized.isBlank()) return
+        val release = runCatching { json.decodeFromString<ControlUpdate>(serialized) }.getOrNull()
+        if (release == null || !release.hasUpdate || release.versionCode <= BuildConfig.VERSION_CODE) {
+            graph.settings.setPendingUpdateRelease(null)
+            return
+        }
+        val recovered = runCatching { graph.updates.recover(release) }.getOrElse {
+            graph.settings.setPendingUpdateRelease(null)
+            return
+        }
+        _state.update { current ->
+            if (current.updateState != UpdateUiState.Idle) current else current.copy(
+                updateState = recovered.ready?.let { UpdateUiState.Ready(release, it.absolutePath) }
+                    ?: UpdateUiState.Available(release),
+                message = when {
+                    recovered.ready != null -> "已恢复校验通过的更新安装包"
+                    recovered.partialBytes > 0 -> "上次下载已保留，可继续下载"
+                    else -> current.message
+                },
+            )
+        }
+    }
+
     fun checkForUpdate() = viewModelScope.launch {
-        _state.update { it.copy(updateChecking = true) }
-        runCatching { graph.api.latestRelease(BuildConfig.VERSION_NAME) }
-            .onSuccess { release -> _state.update { it.copy(updateChecking = false, releaseInfo = release, message = if (release.newer) "发现新版本 ${release.tag}" else "当前已是最新版本") } }
-            .onFailure { error -> _state.update { it.copy(updateChecking = false) }; fail(error) }
+        _state.update { it.copy(updateState = UpdateUiState.Checking) }
+        try {
+            val release = graph.controlPlane.latestRelease()
+            runCatching { graph.settings.setPendingUpdateRelease(json.encodeToString(release).takeIf { release.hasUpdate }) }
+            _state.update { it.copy(
+                updateState = if (release.hasUpdate) UpdateUiState.Available(release) else UpdateUiState.NoUpdate,
+                message = if (release.hasUpdate) "发现新版本 ${release.versionName}" else "当前已是最新版本",
+            ) }
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "检查更新失败")) }
+        }
+    }
+
+    fun downloadUpdate(release: ControlUpdate) {
+        updateJob?.cancel()
+        updateJob = viewModelScope.launch {
+            runCatching { graph.settings.setPendingUpdateRelease(json.encodeToString(release)) }
+            _state.update { it.copy(updateState = UpdateUiState.Downloading(release, 0, release.apk.sizeBytes)) }
+            runCatching {
+                graph.updates.downloadAndVerify(
+                    release,
+                    onProgress = { bytes, total -> _state.update { it.copy(updateState = UpdateUiState.Downloading(release, bytes, total)) } },
+                    onVerifying = { _state.update { it.copy(updateState = UpdateUiState.Verifying(release)) } },
+                )
+            }.onSuccess { file -> _state.update { it.copy(updateState = UpdateUiState.Ready(release, file.absolutePath), message = "更新已校验，可以安装") } }
+                .onFailure { error -> if (error !is CancellationException) _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "更新下载失败", release)) } }
+        }
+    }
+
+    fun submitDiagnostics() = viewModelScope.launch {
+        if (!featureEnabled("diagnostics")) return@launch _state.update { it.copy(message = featureMessage("diagnostics").ifBlank { "诊断提交暂不可用" }) }
+        _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Uploading) }
+        val payload = DiagnosticUpload(
+            version = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE,
+            sdk = android.os.Build.VERSION.SDK_INT,
+            manufacturer = android.os.Build.MANUFACTURER.orEmpty().replace('\n', ' ').take(40),
+            model = android.os.Build.MODEL.orEmpty().replace('\n', ' ').take(60),
+            report = buildString {
+                append("QMusic Watch diagnostics\n")
+                append("version=${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n")
+                append("sdk=${android.os.Build.VERSION.SDK_INT}\n")
+                append("signedIn=${signedIn}\n")
+                append("networkControl=${redactDiagnosticMessage(_state.value.controlError ?: "ok")}\n\n")
+                append(AppLog.diagnosticExcerpt())
+            }.take(58_000),
+        )
+        runCatching { graph.controlPlane.uploadDiagnostics(payload) }
+            .onSuccess { receipt -> _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Success(receipt.requestId), message = "诊断已提交") } }
+            .onFailure { error -> _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Error(error.message ?: "诊断提交失败")) } }
+    }
+
+    fun resetDiagnosticUpload() = _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Idle) }
+
+    fun prepareUpdateInstall(release: ControlUpdate, filePath: String, onReady: (File) -> Unit) = viewModelScope.launch {
+        val file = File(filePath)
+        _state.update { it.copy(updateState = UpdateUiState.Verifying(release)) }
+        runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { graph.updates.verifyDownloadedApk(file, release) }; file }
+            .onSuccess { verified -> _state.update { it.copy(updateState = UpdateUiState.Ready(release, verified.absolutePath)) }; onReady(verified) }
+            .onFailure { error -> _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "安装包校验失败", release)) } }
     }
     fun requestPlay(track: Track, allowSpeaker: Boolean = false, sourceQueue: List<Track>? = null) {
         recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
@@ -420,6 +587,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         var resolvedTrack = track
         runCatching {
             val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
+            if (local == null && !featureEnabled("stream")) error(featureMessage("stream").ifBlank { "在线播放暂时维护，仍可播放已缓存歌曲" })
             val stream = if (local == null) graph.api.stream(track, preferredQuality(track)) else null
             val uri = local?.let { android.net.Uri.fromFile(File(it.filePath)).toString() } ?: stream!!.url
             local?.let { item -> cachedArtworkFile(item.filePath).takeIf(File::exists)?.let { resolvedTrack = track.copy(artworkUrl = android.net.Uri.fromFile(it).toString()) } }
@@ -430,7 +598,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), resolvedTrack.artworkUrl)
             if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
             graph.db.recent().upsert(RecentEntity(track.id, owner, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
-            runCatching { loadLyrics(track, local?.filePath) }.onFailure { AppLog.write("LYRICS", "${track.id} ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrDefault(emptyList())
+            runCatching { loadLyrics(track, local?.filePath) }.onFailure { AppLog.write("LYRICS", "track=${track.id} ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrDefault(emptyList())
         }.onSuccess { parsedLyrics ->
             sourceQueue?.takeIf(List<Track>::isNotEmpty)?.let { source ->
                 _queue.value = source.distinctBy(Track::id)
@@ -454,6 +622,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun loadLyrics(track: Track, localAudioPath: String?): List<LyricLine> {
         var data = localAudioPath?.let { cachedLyricsFile(it).takeIf(File::exists)?.let { file -> runCatching { json.decodeFromString<LyricsData>(file.readText()) }.getOrNull() } }
         if (data == null) {
+            if (!featureEnabled("lyrics")) return emptyList()
             data = graph.api.lyrics(track.id)
             localAudioPath?.let { cachedLyricsFile(it).writeText(json.encodeToString(data)) }
         }
@@ -502,7 +671,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onSuccess { count -> _state.update { it.copy(message = "已删除“$groupName”中的 $count 首缓存") } }
             .onFailure(::fail)
     }
-    fun like(track: Track, liked: Boolean) = viewModelScope.launch { runCatching { graph.api.like(track, liked) }.onSuccess { loadLibrary() }.onFailure(::fail) }
+    fun like(track: Track, liked: Boolean) = viewModelScope.launch {
+        if (!featureEnabled("playlistWrites")) return@launch fail(IllegalStateException(featureMessage("playlistWrites").ifBlank { "收藏与歌单编辑暂时维护" }))
+        runCatching { graph.api.like(track, liked) }.onSuccess { loadLibrary() }.onFailure(::fail)
+    }
     fun loadDetail(type: String, collection: MusicCollection, editable: Boolean = false) {
         detailJob?.cancel()
         val generation = sessionGeneration
@@ -514,11 +686,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) { throw cancelled } catch (error: Throwable) { if (generation == sessionGeneration) fail(error) }
         }
     }
-    fun createPlaylist(title: String) = viewModelScope.launch { runCatching { graph.api.createPlaylist(title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
-    fun renamePlaylist(id: String, title: String) = viewModelScope.launch { runCatching { graph.api.renamePlaylist(id, title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
-    fun deletePlaylist(id: String) = viewModelScope.launch { runCatching { graph.api.deletePlaylist(id) }.onSuccess { loadLibrary() }.onFailure(::fail) }
-    fun addToPlaylist(track: Track, id: String) = viewModelScope.launch { runCatching { graph.api.changePlaylistTrack(id, track, true) }.onSuccess { _state.update { it.copy(message = "已加入歌单") }; loadLibrary() }.onFailure(::fail) }
+    fun createPlaylist(title: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.createPlaylist(title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
+    fun renamePlaylist(id: String, title: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.renamePlaylist(id, title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
+    fun deletePlaylist(id: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.deletePlaylist(id) }.onSuccess { loadLibrary() }.onFailure(::fail) }
+    fun addToPlaylist(track: Track, id: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.changePlaylistTrack(id, track, true) }.onSuccess { _state.update { it.copy(message = "已加入歌单") }; loadLibrary() }.onFailure(::fail) }
     fun removeFromPlaylist(track: Track, id: String) = viewModelScope.launch {
+        if (!requirePlaylistWrites()) return@launch
         runCatching { graph.api.changePlaylistTrack(id, track, false) }
             .onSuccess {
                 val tracks = _state.value.detail?.tracks.orEmpty().filterNot { item -> item.id == track.id }
@@ -586,10 +759,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         playQueueItem(target)
     }
     fun saveQueueAsPlaylist(title: String) = viewModelScope.launch {
+        if (!requirePlaylistWrites()) return@launch
         runCatching {
             val playlist = graph.api.createPlaylist(title)
             _queue.value.forEach { graph.api.changePlaylistTrack(playlist.directoryId, it, true) }
         }.onSuccess { _state.update { it.copy(message = "播放列表已保存为歌单") }; loadLibrary() }.onFailure(::fail)
+    }
+
+    private fun requirePlaylistWrites(): Boolean {
+        if (featureEnabled("playlistWrites")) return true
+        fail(IllegalStateException(featureMessage("playlistWrites").ifBlank { "收藏与歌单编辑暂时维护" }))
+        return false
     }
     fun loadQueueImportLiked() { queueImportJob?.cancel(); queueImportJob = null; _state.update { it.copy(queueImportTitle = "我喜欢", queueImportTracks = it.library?.liked.orEmpty(), queueImportLoading = false) } }
     fun loadQueueImportPlaylist(collection: MusicCollection) {

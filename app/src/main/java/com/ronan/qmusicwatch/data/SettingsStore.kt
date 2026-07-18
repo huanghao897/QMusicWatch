@@ -30,6 +30,9 @@ class SettingsStore(private val context: Context) {
     private val searchHistoryKey = stringPreferencesKey("search_history")
     private val profileCacheKey = stringPreferencesKey("profile_cache")
     private val accountSnapshotsKey = stringPreferencesKey("account_snapshots")
+    private val controlPlaneCacheKey = stringPreferencesKey("control_plane_cache")
+    private val seenAnnouncementsKey = stringPreferencesKey("seen_announcements")
+    private val pendingUpdateReleaseKey = stringPreferencesKey("pending_update_release")
     val quality = context.settingsDataStore.data.map { it[qualityKey] ?: "128" }
     val headphoneWarning = context.settingsDataStore.data.map { it[headphoneWarningKey] ?: true }
     val autoOpenPlayer = context.settingsDataStore.data.map { it[autoOpenPlayerKey] ?: true }
@@ -49,6 +52,11 @@ class SettingsStore(private val context: Context) {
     val searchHistory = context.settingsDataStore.data.map { it[searchHistoryKey].orEmpty().lineSequence().filter(String::isNotBlank).take(8).toList() }
     val profileCache = context.settingsDataStore.data.map { it[profileCacheKey].orEmpty() }
     val accountSnapshots = context.settingsDataStore.data.map { it[accountSnapshotsKey].orEmpty() }
+    val controlPlaneCache = context.settingsDataStore.data.map { it[controlPlaneCacheKey].orEmpty() }
+    val pendingUpdateRelease = context.settingsDataStore.data.map { it[pendingUpdateReleaseKey].orEmpty() }
+    val seenAnnouncements = context.settingsDataStore.data.map {
+        it[seenAnnouncementsKey].orEmpty().lineSequence().map(String::trim).filter(String::isNotBlank).take(100).toSet()
+    }
     suspend fun setQuality(value: String) = context.settingsDataStore.edit { it[qualityKey] = if (value == "320") "320" else "128" }
     suspend fun setHeadphoneWarning(value: Boolean) = context.settingsDataStore.edit { it[headphoneWarningKey] = value }
     suspend fun setAutoOpenPlayer(value: Boolean) = context.settingsDataStore.edit { it[autoOpenPlayerKey] = value }
@@ -72,4 +80,13 @@ class SettingsStore(private val context: Context) {
     suspend fun clearSearchHistory() = context.settingsDataStore.edit { it.remove(searchHistoryKey) }
     suspend fun setProfileCache(value: String) = context.settingsDataStore.edit { it[profileCacheKey] = value }
     suspend fun setAccountSnapshots(value: String) = context.settingsDataStore.edit { it[accountSnapshotsKey] = value }
+    suspend fun setControlPlaneCache(value: String) = context.settingsDataStore.edit { it[controlPlaneCacheKey] = value }
+    suspend fun setPendingUpdateRelease(value: String?) = context.settingsDataStore.edit { preferences ->
+        if (value.isNullOrBlank()) preferences.remove(pendingUpdateReleaseKey) else preferences[pendingUpdateReleaseKey] = value
+    }
+    suspend fun markAnnouncementSeen(id: String) = context.settingsDataStore.edit { prefs ->
+        val clean = id.replace('\n', ' ').trim().take(100)
+        if (clean.isNotBlank()) prefs[seenAnnouncementsKey] =
+            (listOf(clean) + prefs[seenAnnouncementsKey].orEmpty().lineSequence().filter { it.isNotBlank() && it != clean }).take(100).joinToString("\n")
+    }
 }

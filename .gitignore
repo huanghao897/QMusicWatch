@@ -6,5 +6,8 @@ release-signing.properties
 **/build/
 *.jks
 *.keystore
+*.key
+*.pem
+*.p12
 *.apk
 *.aab

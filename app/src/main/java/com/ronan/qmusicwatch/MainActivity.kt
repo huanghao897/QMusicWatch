@@ -103,11 +103,14 @@ import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.lyrics.activeLyricIndex
 import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
 import com.ronan.qmusicwatch.model.*
+import com.ronan.qmusicwatch.network.*
 import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
+import com.ronan.qmusicwatch.update.UpdateInstaller
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import java.io.File
 
 private val Green = Color(0xFF6DFF9E)
 private val Surface = Color(0xFF111714)
@@ -283,6 +286,7 @@ class MainActivity : ComponentActivity() {
     val lastSleepMinutes by vm.lastSleepMinutes.collectAsStateWithLifecycle()
     val dailyCount by vm.dailyCount.collectAsStateWithLifecycle()
     val searchHistory by vm.searchHistory.collectAsStateWithLifecycle()
+    val seenAnnouncements by vm.seenAnnouncements.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
     val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
     val queueReversed by vm.queueReversed.collectAsStateWithLifecycle()
@@ -316,12 +320,13 @@ class MainActivity : ComponentActivity() {
             composable("settings/display") { DisplaySettingsScreen(vm, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, lyricAlignment, pureBlack, lowPowerPlayer) { nav.popBackStack() } }
             composable("settings/playback") { PlaybackSettingsScreen(vm, quality, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() } }
             composable("settings/network") {
-                NetworkSettingsScreen(vm, dailyCount, state.diagnostic, state.profile, state.profileLoaded, state.profileError, onRelogin = {
+                NetworkSettingsScreen(vm, dailyCount, state, onAnnouncements = { nav.navigate("settings/announcements") }, onRelogin = {
                     vm.logout()
                     nav.navigate("login") { popUpTo("home") }
                 }) { nav.popBackStack() }
             }
-            composable("settings/about") { AboutScreen(vm, state.releaseInfo, state.updateChecking) { nav.popBackStack() } }
+            composable("settings/announcements") { AnnouncementsScreen(state.announcements, seenAnnouncements, vm) { nav.popBackStack() } }
+            composable("settings/about") { AboutScreen(vm, state.updateState) { nav.popBackStack() } }
         }
     }
     state.pendingSpeakerTrack?.let { track ->
@@ -330,6 +335,14 @@ class MainActivity : ComponentActivity() {
             dismissButton = { TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }) { Text("连接蓝牙") } })
     }
     if (showNotice) AlertDialog(onDismissRequest = {}, title = { Text("第三方非官方客户端") }, text = { Text("QMusic Watch 与腾讯或 QQ 音乐无隶属或认可关系。请尊重版权和账号权益，本项目不会绕过会员、地区、付费或 DRM 限制。") }, confirmButton = { Button({ noticePrefs.edit().putBoolean("accepted", true).apply(); showNotice = false }) { Text("我知道了") } })
+    else state.announcements.firstOrNull { it.pinned && it.id !in seenAnnouncements }?.let { announcement ->
+        AlertDialog(
+            onDismissRequest = { vm.markAnnouncementSeen(announcement.id) },
+            title = { Text(announcement.title.take(80), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            text = { Box(Modifier.heightIn(max = 165.dp).verticalScroll(rememberScrollState())) { Text(announcement.content.take(1200)) } },
+            confirmButton = { TextButton({ vm.markAnnouncementSeen(announcement.id) }) { Text("知道了") } },
+        )
+    }
 }
 
 @Composable private fun HomeScreen(nav: NavHostController, state: AppUiState, vm: AppViewModel, dailyCount: Int) {
@@ -387,7 +400,10 @@ class MainActivity : ComponentActivity() {
     LaunchedEffect(state.qrStatus) { if (state.qrStatus == "登录成功") onSuccess() }
     Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("扫码登录", fontSize = 25.sp, fontWeight = FontWeight.Bold)
-        if (provider == null) {
+        if (!vm.featureEnabled("qrLogin")) {
+            Icon(Icons.Default.BuildCircle, null, Modifier.size(42.dp), tint = Color.Gray)
+            Text(vm.featureMessage("qrLogin").ifBlank { "扫码登录暂时维护" }, color = Color.Gray)
+        } else if (provider == null) {
             Button({ provider = "qq" }, Modifier.fillMaxWidth()) { Text("使用 QQ 扫码") }
             OutlinedButton({ provider = "wechat" }, Modifier.fillMaxWidth()) { Text("使用微信扫码") }
             Text("不接收账号密码或手动 Cookie", color = Color.Gray)
@@ -797,39 +813,115 @@ private class QrLoginBridge(private val onCookie: (String) -> Unit) {
     if (customTimer) AlertDialog(onDismissRequest = { customTimer = false }, title = { Text("自定义播放时间") }, text = { OutlinedTextField(customMinutes, { customMinutes = it.filter(Char::isDigit).take(4) }, label = { Text("分钟（1-1440）") }, singleLine = true) }, confirmButton = { TextButton({ customMinutes.toIntOrNull()?.coerceIn(1, 1440)?.let { vm.startSleepTimer(it, finishCurrent) }; customTimer = false }) { Text("开始") } }, dismissButton = { TextButton({ customTimer = false }) { Text("取消") } })
 }
 
-@Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, diagnostic: String?, profile: UserProfile?, profileLoaded: Boolean, profileError: String?, onRelogin: () -> Unit, onBack: () -> Unit) {
+@Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, state: AppUiState, onAnnouncements: () -> Unit, onRelogin: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
+    var confirmUpload by remember { mutableStateOf(false) }
     val saveLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> uri?.let { runCatching { AppLog.copyTo(context, it) } } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item { SettingsHeader("内容与网络", onBack) }
         item { Column(Modifier.fillMaxWidth().padding(16.dp, 8.dp)) { Text("每日推荐显示数量"); Row { FilterChip(dailyCount == 5, { vm.setDailyCount(5) }, label = { Text("5 首") }); Spacer(Modifier.width(7.dp)); FilterChip(dailyCount == 10, { vm.setDailyCount(10) }, label = { Text("10 首") }) } } }
         if (vm.signedIn) {
             item { Text("账号", color = Green, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
-            item { ListItem(headlineContent = { Text(profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户") }, supportingContent = { Text("${accountLabel(vm.loginProvider, vm.accountId)}\n${vipSummary(profile, profileLoaded, profileError)}") }, leadingContent = { Icon(Icons.Default.AccountCircle, null, tint = Green) }) }
+            item { ListItem(headlineContent = { Text(state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户") }, supportingContent = { Text("${accountLabel(vm.loginProvider, vm.accountId)}\n${vipSummary(state.profile, state.profileLoaded, state.profileError)}") }, leadingContent = { Icon(Icons.Default.AccountCircle, null, tint = Green) }) }
             item { FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { OutlinedButton(vm::diagnose) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(5.dp)); Text("检查登录") }; OutlinedButton(onRelogin) { Text("重新登录") } } }
         }
-        diagnostic?.let { item { Text(it, color = if (it.startsWith("诊断失败")) MaterialTheme.colorScheme.error else Green, fontSize = 14.sp) } }
+        state.diagnostic?.let { item { Text(it, color = if (it.startsWith("诊断失败")) MaterialTheme.colorScheme.error else Green, fontSize = 14.sp) } }
+        item { Text("服务", color = Green, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
+        item { ListItem(
+            headlineContent = { Text(when { state.controlError != null -> "正在使用本地配置"; state.controlFetchedAt > 0 -> "服务配置已同步"; else -> "服务尚未同步" }) },
+            supportingContent = { Text(state.controlError?.take(100) ?: state.controlFetchedAt.takeIf { it > 0 }?.let { "上次同步 ${android.text.format.DateFormat.format("MM-dd HH:mm", it)}" } ?: "尚未同步") },
+            leadingContent = { Icon(if (state.controlError == null) Icons.Default.CloudDone else Icons.Default.CloudOff, null, tint = if (state.controlError == null) Green else Color.Gray) },
+            trailingContent = { IconButton({ vm.refreshControlPlane() }, enabled = !state.controlRefreshing) { if (state.controlRefreshing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Icon(Icons.Default.Refresh, "刷新") } },
+        ) }
+        item { SettingsModule("公告", "${state.announcements.size} 条可用公告", Icons.Default.Campaign, onAnnouncements) }
+        item { OutlinedButton({ confirmUpload = true }, Modifier.fillMaxWidth(), enabled = state.diagnosticUploadState !is DiagnosticUploadState.Uploading && vm.featureEnabled("diagnostics")) { Icon(Icons.Default.BugReport, null); Spacer(Modifier.width(6.dp)); Text(if (state.diagnosticUploadState is DiagnosticUploadState.Uploading) "正在提交" else "提交脱敏诊断") } }
+        when (val upload = state.diagnosticUploadState) {
+            is DiagnosticUploadState.Success -> item { Text("诊断已提交${upload.requestId.takeIf(String::isNotBlank)?.let { " · $it" }.orEmpty()}", color = Green, fontSize = 13.sp) }
+            is DiagnosticUploadState.Error -> item { Text(upload.message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
+            else -> Unit
+        }
         item { Text("日志最多 256KB，不记录 Cookie、令牌或播放 URL。", color = Color.Gray, fontSize = 14.sp) }
         item { FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) { OutlinedButton({ context.startActivity(Intent.createChooser(AppLog.shareIntent(context), "分享日志")) }) { Icon(Icons.Default.Share, null); Text("分享") }; OutlinedButton({ saveLog.launch("QMusicWatch-${BuildConfig.VERSION_NAME}.log") }) { Icon(Icons.Default.Save, null); Text("保存") }; TextButton(AppLog::clear) { Text("清空") } } }
         item { if (vm.signedIn) OutlinedButton(vm::logout, Modifier.fillMaxWidth()) { Text("退出登录") } }
     }
+    if (confirmUpload) AlertDialog(
+        onDismissRequest = { confirmUpload = false },
+        title = { Text("提交诊断？") },
+        text = { Text("仅上传版本、设备型号和经过二次脱敏的日志片段，不包含账号、Cookie、二维码、搜索词或播放地址。") },
+        confirmButton = { TextButton({ confirmUpload = false; vm.submitDiagnostics() }) { Text("提交") } },
+        dismissButton = { TextButton({ confirmUpload = false }) { Text("取消") } },
+    )
 }
 
-@Composable private fun AboutScreen(vm: AppViewModel, release: ReleaseInfo?, checking: Boolean, onBack: () -> Unit) {
+@Composable private fun AnnouncementsScreen(items: List<ControlAnnouncement>, seen: Set<String>, vm: AppViewModel, onBack: () -> Unit) {
+    LaunchedEffect(items.map(ControlAnnouncement::id)) { items.forEach { vm.markAnnouncementSeen(it.id) } }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 14.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        item { SettingsHeader("公告", onBack) }
+        if (items.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("暂无公告", color = Color.Gray) } }
+        items(items, key = ControlAnnouncement::id) { announcement ->
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Surface) {
+                Column(Modifier.padding(12.dp, 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) { Text(announcement.title.take(80), Modifier.weight(1f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (announcement.pinned) Icon(Icons.Default.PushPin, "置顶", Modifier.size(16.dp), tint = Green) }
+                    Text(announcement.content.take(2000), color = Color.LightGray, fontSize = 14.sp)
+                    if (announcement.id !in seen) Text("新公告", color = Green, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable private fun AboutScreen(vm: AppViewModel, update: UpdateUiState, onBack: () -> Unit) {
     val context = LocalContext.current
+    var permissionHint by remember { mutableStateOf(false) }
+    var externalError by rememberSaveable { mutableStateOf<String?>(null) }
+    val openExternal: (Intent, String) -> Unit = { intent, failureMessage ->
+        runCatching { context.startActivity(intent) }
+            .onSuccess { externalError = null }
+            .onFailure { error -> AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}"); externalError = failureMessage }
+    }
+    val install: (ControlUpdate, String) -> Unit = { release, path ->
+        if (!UpdateInstaller.canInstallPackages(context)) {
+            permissionHint = true
+            openExternal(UpdateInstaller.permissionIntent(context), "系统没有可用的未知来源安装设置入口")
+        } else vm.prepareUpdateInstall(release, path) { verified ->
+            openExternal(UpdateInstaller.installIntent(context, verified), "系统没有可用的 APK 安装器")
+        }
+    }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item { SettingsHeader("关于", onBack) }
     item { ListItem(headlineContent = { Text("QMusic Watch") }, supportingContent = { Text("版本 ${BuildConfig.VERSION_NAME}\n第三方非官方、开源、非商业客户端") }) }
     item { ListItem(headlineContent = { Text("开发者") }, supportingContent = { Text("Ronan") }, leadingContent = { Icon(Icons.Default.Code, null, tint = Green) }) }
-    item { OutlinedButton(vm::checkForUpdate, Modifier.fillMaxWidth(), enabled = !checking) { if (checking) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Default.SystemUpdate, null); Spacer(Modifier.width(7.dp)); Text(if (checking) "正在检查" else "检查 GitHub 更新") } }
-    release?.let { info ->
-        item { ListItem(headlineContent = { Text(if (info.newer) "发现 ${info.tag}" else "最新版本 ${info.tag}") }, supportingContent = { Text(buildString { append(info.title); if (info.notes.isNotBlank()) append("\n${info.notes.take(240)}"); append("\nAPK SHA-256：${info.sha256.ifBlank { "发布页未提供" }}") }) }) }
-        val openUrl = info.apkUrl.ifBlank { info.pageUrl }
-        if (openUrl.isNotBlank()) item { Button({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(openUrl))) }, Modifier.fillMaxWidth()) { Text(if (info.apkUrl.isNotBlank()) "打开 APK 下载" else "打开 Release 页面") } }
+    when (update) {
+        UpdateUiState.Idle -> item { OutlinedButton(vm::checkForUpdate, Modifier.fillMaxWidth()) { Icon(Icons.Default.SystemUpdate, null); Spacer(Modifier.width(7.dp)); Text("检查服务器更新") } }
+        UpdateUiState.Checking -> item { OutlinedButton({}, Modifier.fillMaxWidth(), enabled = false) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在检查") } }
+        UpdateUiState.NoUpdate -> { item { ListItem(headlineContent = { Text("当前已是最新版本") }, leadingContent = { Icon(Icons.Default.Verified, null, tint = Green) }) }; item { TextButton(vm::checkForUpdate, Modifier.fillMaxWidth()) { Text("重新检查") } } }
+        is UpdateUiState.Available -> {
+            item { ListItem(headlineContent = { Text("发现 ${update.release.versionName}${if (update.release.forceUpdate) " · 重要更新" else ""}") }, supportingContent = { Text("${update.release.title}\n${update.release.changelog.take(400)}\n${formatFileSize(update.release.apk.sizeBytes)}") }, leadingContent = { Icon(Icons.Default.NewReleases, null, tint = Green) }) }
+            item { Button({ vm.downloadUpdate(update.release) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(6.dp)); Text("下载并校验") } }
+        }
+        is UpdateUiState.Downloading -> { item { Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text("正在下载 ${formatFileSize(update.downloadedBytes)} / ${formatFileSize(update.totalBytes)}"); LinearProgressIndicator(progress = { if (update.totalBytes > 0) update.downloadedBytes.toFloat() / update.totalBytes else 0f }, modifier = Modifier.fillMaxWidth()) } } }
+        is UpdateUiState.Verifying -> item { Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("正在校验安装包") } }
+        is UpdateUiState.Ready -> {
+            item { ListItem(headlineContent = { Text("安装包校验通过") }, supportingContent = { Text("${update.release.versionName} · 签名、包名和哈希均一致") }, leadingContent = { Icon(Icons.Default.Verified, null, tint = Green) }) }
+            item { Button({ install(update.release, update.filePath) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.InstallMobile, null); Spacer(Modifier.width(6.dp)); Text("打开系统安装器") } }
+            if (permissionHint) item { Text("请允许 QMusic Watch 安装未知来源应用，返回后再次点安装。", color = Color(0xFFFFC857), fontSize = 13.sp) }
+        }
+        is UpdateUiState.Error -> {
+            item { Text(update.message, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
+            item { OutlinedButton({ update.release?.let(vm::downloadUpdate) ?: vm.checkForUpdate() }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("重试") } }
+        }
     }
+    externalError?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) } }
+    item { TextButton({ openExternal(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/huanghao897/QMusicWatch/releases")), "系统没有可用的浏览器") }, Modifier.fillMaxWidth()) { Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(6.dp)); Text("手动打开 GitHub 发布页") } }
     item { Text("本项目与腾讯或 QQ 音乐无隶属、赞助或认可关系。不绕过会员、地区、付费或 DRM 限制。", color = Color.Gray) }
     item { Text("开源与致谢", fontWeight = FontWeight.Bold); Text("QQMusicApi（GPL-3.0，未复制代码）\nQQmusic-API（Apache-2.0，协议实现参考）\nTides-WearOS（GPL-3.0，未复制代码）\nHorologist（Apache-2.0）\nHeyWear（MIT）", color = Color.Gray, fontSize = 14.sp) }
     }
+}
+
+private fun formatFileSize(bytes: Long): String = when {
+    bytes <= 0 -> "大小未知"
+    bytes >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1024f / 1024f)
+    else -> "${bytes / 1024} KB"
 }
 
 @Composable private fun TrackRow(track: Track, vm: AppViewModel, liked: Boolean = false, playlistId: String? = null, removeFromPlaylist: Boolean = false, queue: List<Track> = listOf(track), playlists: List<MusicCollection> = emptyList()) {

@@ -22,6 +22,7 @@ class WatchActivityRobolectricTest {
         val activity = controller.get()
         val permissions = activity.packageManager.getPackageInfo(activity.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty()
         assertTrue(Manifest.permission.POST_NOTIFICATIONS in permissions)
+        assertTrue(Manifest.permission.REQUEST_INSTALL_PACKAGES in permissions)
         controller.destroy()
     }
 

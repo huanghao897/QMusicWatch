@@ -7,13 +7,17 @@ import com.ronan.qmusicwatch.data.SettingsStore
 import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.download.DownloadController
 import com.ronan.qmusicwatch.network.ApiClient
+import com.ronan.qmusicwatch.network.ControlPlaneClient
 import com.ronan.qmusicwatch.playback.PlaybackConnection
+import com.ronan.qmusicwatch.update.UpdateManager
 
 class QMusicApplication : Application() {
     companion object { val processStartedAt: Long = android.os.SystemClock.elapsedRealtime() }
     lateinit var db: AppDatabase
     lateinit var vault: SessionVault
     lateinit var api: ApiClient
+    lateinit var controlPlane: ControlPlaneClient
+    lateinit var updates: UpdateManager
     lateinit var downloads: DownloadController
     lateinit var playback: PlaybackConnection
     lateinit var settings: SettingsStore
@@ -23,6 +27,8 @@ class QMusicApplication : Application() {
         db = AppDatabase.create(this)
         vault = SessionVault(this)
         api = ApiClient(this) { vault.load()?.upstreamCookie }
+        controlPlane = ControlPlaneClient()
+        updates = UpdateManager(this, controlPlane)
         downloads = DownloadController(this, db)
         settings = SettingsStore(this)
         playback = PlaybackConnection(this)

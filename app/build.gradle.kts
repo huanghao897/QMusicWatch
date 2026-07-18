@@ -61,6 +61,8 @@ android {
         versionName = "0.9.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartext"] = "false"
+        buildConfigField("String", "QMUSIC_SERVER_BASE_URL", "\"https://8.138.134.236:8443/\"")
+        buildConfigField("String", "QMUSIC_RELEASE_CERT_SHA256", "\"$expectedReleaseCertificateSha256\"")
     }
 
     signingConfigs {
@@ -134,6 +136,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.11.4")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.11.4")
