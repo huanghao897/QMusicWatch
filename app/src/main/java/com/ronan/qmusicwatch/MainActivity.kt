@@ -908,7 +908,7 @@ private fun qualityOptionRank(value: String): Int = when (value) {
     val options = (listOf("128", "320") + track.qualities).distinct().sortedBy(::qualityOptionRank)
     val rights = when {
         !profileLoaded -> "会员权益尚未确认，登录检查后可解锁对应音质"
-        profile?.isVip == true -> "${profile.vipName.ifBlank { "VIP 会员" }} · 可用音质以歌曲实际返回为准"
+        profile?.isVipActive() == true -> "${profile.vipName.ifBlank { "VIP 会员" }} · 可用音质以歌曲实际返回为准"
         else -> "普通账号 · VIP 音质会显示为不可用"
     }
     AlertDialog(
@@ -920,7 +920,7 @@ private fun qualityOptionRank(value: String): Int = when (value) {
                 options.forEach { option ->
                     val songSupports = option == "128" || option in track.qualities
                     val membershipRequired = option != "128" || track.requiresVip
-                    val membershipKnown = profileLoaded && profile?.isVip == true
+                    val membershipKnown = profileLoaded && profile?.isVipActive() == true
                     val enabled = songSupports && (!membershipRequired || membershipKnown)
                     val reason = when {
                         !songSupports -> "歌曲未提供"
@@ -1048,7 +1048,7 @@ private fun qualityOptionRank(value: String): Int = when (value) {
         Text(title, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         subtitle?.let { Text(it, color = Color.Gray, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     }
-    Switch(checked, onCheckedChange, modifier = Modifier.size(width = 44.dp, height = 28.dp))
+    Switch(checked, onCheckedChange, modifier = Modifier.width(52.dp).height(32.dp))
 }
 
 @Composable private fun SettingsChoiceBlock(title: String, content: @Composable ColumnScope.() -> Unit) = Column(
