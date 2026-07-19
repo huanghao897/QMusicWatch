@@ -6,6 +6,9 @@ import com.ronan.qmusicwatch.QMusicApplication
 import com.ronan.qmusicwatch.data.*
 import com.ronan.qmusicwatch.model.LyricsData
 import com.ronan.qmusicwatch.model.Track
+import com.ronan.qmusicwatch.model.QUALITY_LEGACY_UNKNOWN
+import com.ronan.qmusicwatch.model.QUALITY_STANDARD
+import com.ronan.qmusicwatch.model.normalizeQualityId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
@@ -29,6 +32,9 @@ private const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
 private class StorageReserveException : IllegalStateException("存储空间不足，需保留 256MB")
 internal fun hasDownloadSpace(availableBytes: Long, remainingDownloadBytes: Long): Boolean =
     availableBytes >= STORAGE_RESERVE_BYTES && (remainingDownloadBytes < 0 || availableBytes - remainingDownloadBytes >= STORAGE_RESERVE_BYTES)
+internal fun canResumePartialDownload(storedQuality: String?, nextQuality: String): Boolean =
+    storedQuality != null && storedQuality != QUALITY_LEGACY_UNKNOWN &&
+        normalizeQualityId(storedQuality) == normalizeQualityId(nextQuality)
 
 class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = downloadSlots.withPermit { withContext(Dispatchers.IO) {
@@ -39,17 +45,39 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val target = File(applicationContext.filesDir, offlineAudioRelativePath(owner, id))
         val dir = target.parentFile!!.apply { mkdirs() }
         val part = File(dir, target.name.removeSuffix(".audio") + ".part")
-        db.downloads().upsert(DownloadEntity(id, owner, inputData.getString("title").orEmpty(), inputData.getString("artists").orEmpty(), inputData.getString("artwork").orEmpty(), target.absolutePath, "downloading", part.length(), groupName = inputData.getString("group").orEmpty().ifBlank { "单曲缓存" }))
+        val requestedQuality = normalizeQualityId(inputData.getString("quality") ?: QUALITY_STANDARD)
+        val existing = db.downloads().find(id, owner)
+        if (part.exists() && existing == null) part.delete()
+        val initial = existing?.copy(
+            title = inputData.getString("title").orEmpty(),
+            artists = inputData.getString("artists").orEmpty(),
+            artworkUrl = inputData.getString("artwork").orEmpty(),
+            status = "downloading",
+            downloadedBytes = part.length(),
+            updatedAt = System.currentTimeMillis(),
+            groupName = inputData.getString("group").orEmpty().ifBlank { "单曲缓存" },
+        ) ?: DownloadEntity(id, owner, inputData.getString("title").orEmpty(), inputData.getString("artists").orEmpty(), inputData.getString("artwork").orEmpty(), target.absolutePath, "downloading", part.length(), groupName = inputData.getString("group").orEmpty().ifBlank { "单曲缓存" }, quality = requestedQuality)
+        db.downloads().upsert(initial)
         if (graph.vault.load()?.accountId != owner) { db.downloads().progress(id, owner, "locked", part.length(), -1); return@withContext Result.failure() }
         fun availableBytes() = if (android.os.Build.VERSION.SDK_INT >= 26) runCatching { applicationContext.getSystemService(android.os.storage.StorageManager::class.java).getAllocatableBytes(android.os.storage.StorageManager.UUID_DEFAULT) }.getOrDefault(dir.usableSpace) else dir.usableSpace
         if (!hasDownloadSpace(availableBytes(), -1)) { db.downloads().progress(id, owner, "failed_storage", part.length(), -1); return@withContext Result.failure(workDataOf("reason" to "存储空间不足，需保留 256MB")) }
         runCatching {
             val track = Track(
                 id = id, title = inputData.getString("title").orEmpty(), artists = inputData.getString("artists").orEmpty().split(" / ").filter(String::isNotBlank),
-                artworkUrl = inputData.getString("artwork").orEmpty(), qualities = inputData.getString("qualities").orEmpty().split(',').filter(String::isNotBlank).ifEmpty { listOf("128") },
+                artworkUrl = inputData.getString("artwork").orEmpty(), qualities = inputData.getString("qualities").orEmpty().split(',').filter(String::isNotBlank).ifEmpty { listOf(QUALITY_STANDARD) },
                 numericId = inputData.getLong("numericId", 0), mediaMid = inputData.getString("mediaMid").orEmpty(), songType = inputData.getInt("songType", 0), requiresVip = inputData.getBoolean("requiresVip", false),
             )
-            val stream = graph.api.stream(track, inputData.getString("quality") ?: "128")
+            val stream = graph.api.stream(track, requestedQuality)
+            val issuedQuality = normalizeQualityId(stream.quality)
+            val current = db.downloads().find(id, owner)
+            if (part.exists() && !canResumePartialDownload(current?.quality, issuedQuality)) part.delete()
+            current?.copy(
+                status = "downloading",
+                downloadedBytes = part.length(),
+                totalBytes = -1,
+                updatedAt = System.currentTimeMillis(),
+                quality = issuedQuality,
+            )?.let { db.downloads().upsert(it) }
             val request = Request.Builder().url(stream.url).header("Referer", "https://y.qq.com/").header("Origin", "https://y.qq.com/").apply { if (part.length() > 0) header("Range", "bytes=${part.length()}-") }.build()
             downloadHttp.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error("download ${response.code}")
@@ -105,12 +133,15 @@ class DownloadController(private val context: Context, private val db: AppDataba
         val target = File(context.filesDir, offlineAudioRelativePath(owner, track.id))
         val part = File(target.parentFile, target.name.removeSuffix(".audio") + ".part")
         val existing = db.downloads().find(track.id, owner)
+        val requestedQuality = normalizeQualityId(quality)
+        val canResume = canResumePartialDownload(existing?.quality, requestedQuality)
+        if (part.exists() && !canResume) part.delete()
         db.downloads().upsert(DownloadEntity(
             track.id, owner, track.title, track.artists.joinToString(" / "), track.artworkUrl, target.absolutePath,
-            if (wifiOnly) "queued_wifi" else "queued", part.length(), existing?.totalBytes ?: -1, groupName = groupName,
+            if (wifiOnly) "queued_wifi" else "queued", part.length(), if (canResume) existing?.totalBytes ?: -1 else -1, groupName = groupName, quality = requestedQuality,
         ))
         val data = workDataOf(
-            "id" to track.id, "owner" to owner, "quality" to quality, "title" to track.title, "artists" to track.artists.joinToString(" / "), "artwork" to track.artworkUrl, "group" to groupName,
+            "id" to track.id, "owner" to owner, "quality" to requestedQuality, "title" to track.title, "artists" to track.artists.joinToString(" / "), "artwork" to track.artworkUrl, "group" to groupName,
             "qualities" to track.qualities.joinToString(","), "numericId" to track.numericId, "mediaMid" to track.mediaMid, "songType" to track.songType, "requiresVip" to track.requiresVip,
         )
         val network = if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED

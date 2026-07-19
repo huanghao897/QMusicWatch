@@ -22,6 +22,44 @@ internal fun normalizeHttpsUrl(value: String): String = when {
     else -> value
 }
 
+private fun JsonObject.hasPositiveNumber(vararg names: String): Boolean = names.any { name ->
+    (this[name] as? JsonPrimitive)?.longOrNull?.let { it > 0 } == true
+}
+
+internal fun parseQqQualityIds(item: JsonObject, file: JsonObject = item["file"] as? JsonObject ?: JsonObject(emptyMap())): List<String> =
+    buildList {
+        if (item.hasPositiveNumber("size128", "size_128mp3") || file.hasPositiveNumber("size128", "size_128mp3")) add(QUALITY_STANDARD)
+        if (item.hasPositiveNumber("size320", "size_320mp3") || file.hasPositiveNumber("size320", "size_320mp3")) add(QUALITY_HQ)
+        if (item.hasPositiveNumber("sizeflac", "size_flac") || file.hasPositiveNumber("sizeflac", "size_flac")) add(QUALITY_SQ)
+        if (item.hasPositiveNumber("sizehires", "size_hires") || file.hasPositiveNumber("sizehires", "size_hires")) add(QUALITY_HI_RES)
+    }.ifEmpty { listOf(QUALITY_STANDARD) }
+
+internal fun qqStreamFileName(quality: String, mediaMid: String): String {
+    require(mediaMid.isNotBlank()) { "歌曲缺少媒体标识" }
+    val (prefix, extension) = when (normalizeQualityId(quality)) {
+        QUALITY_SQ -> "F000" to "flac"
+        QUALITY_HQ -> "M800" to "mp3"
+        QUALITY_HI_RES -> throw IllegalArgumentException("Hi-Res 资源格式尚未完成兼容验证")
+        else -> "M500" to "mp3"
+    }
+    return "$prefix$mediaMid.$extension"
+}
+
+internal data class QqStreamPath(val value: String, val sourceKey: String)
+
+internal fun inferQqStreamQuality(path: String, sourceKey: String): String {
+    val upper = path.uppercase()
+    return when {
+        "F000" in upper -> QUALITY_SQ
+        "M800" in upper -> QUALITY_HQ
+        "M500" in upper || "C400" in upper || sourceKey in setOf("opi128kurl", "opi96kurl") -> QUALITY_STANDARD
+        else -> QUALITY_STANDARD
+    }
+}
+
+internal fun higherQualityStream(current: StreamData?, candidate: StreamData): StreamData =
+    if (current == null || qualityRank(candidate.quality) > qualityRank(current.quality)) candidate else current
+
 private val systemLikedPlaylistTitles = setOf(
     "我喜欢", "我喜欢的音乐", "我喜欢的歌曲",
     "我喜歡", "我喜歡的音樂", "我喜歡的歌曲",
@@ -163,6 +201,16 @@ private fun rankForMembership(path: String, label: String, typeCode: Int?, super
     else -> 0
 }
 
+private fun avatarPreferenceScore(value: String): Int {
+    val url = value.lowercase()
+    return value.length + when {
+        "thirdwx.qlogo.cn" in url || "wx.qlogo.cn" in url -> 2_000
+        "qlogo.cn" in url -> 1_500
+        "default" in url || "placeholder" in url -> -2_000
+        else -> 0
+    }
+}
+
 internal fun parseUserProfile(root: JsonElement): UserProfile? {
     fun objects(value: JsonElement, path: String = "root"): Sequence<Pair<String, JsonObject>> = sequence {
         when (value) {
@@ -181,8 +229,14 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
     }
     val identity = all.firstOrNull { (_, item) -> item.value("nick", "nickname", "nickName", "userName") != null }?.second
     val name = identity?.value("nick", "nickname", "nickName", "userName").orEmpty()
-    val avatarKeys = arrayOf("logo", "logoUrl", "headurl", "headUrl", "headpic", "headPic", "head_pic", "headPicUrl", "avatarurl", "avatarUrl")
-    val avatar = normalizeHttpsUrl((identity?.value(*avatarKeys) ?: all.firstNotNullOfOrNull { (_, item) -> item.value(*avatarKeys) }).orEmpty())
+    val avatarKeys = arrayOf(
+        "logo", "logoUrl", "headurl", "headUrl", "headpic", "headPic", "head_pic", "headPicUrl",
+        "headimgurl", "headImgUrl", "avatar", "avatarurl", "avatarUrl", "portrait",
+    )
+    val avatar = buildList {
+        identity?.value(*avatarKeys)?.let(::add)
+        all.mapNotNullTo(this) { (_, item) -> item.value(*avatarKeys) }
+    }.asSequence().map(::normalizeHttpsUrl).filter(String::isNotBlank).maxByOrNull(::avatarPreferenceScore).orEmpty()
     val now = System.currentTimeMillis() / 1000
     val memberships = all.mapNotNull { (path, item) ->
         val rawStatuses = item.values(*membershipStatusKeys).mapNotNull(::membershipBoolean)
@@ -322,7 +376,7 @@ internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {
     val chosen = active ?: known
     val merged = UserProfile(
         displayName = normalized.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(),
-        avatarUrl = normalized.firstNotNullOfOrNull { it.avatarUrl.takeIf(String::isNotBlank) }.orEmpty(),
+        avatarUrl = normalized.map(UserProfile::avatarUrl).filter(String::isNotBlank).maxByOrNull(::avatarPreferenceScore).orEmpty(),
         isVip = isVip,
         vipExpireAt = expire,
         vipName = chosen?.vipName.orEmpty(),
@@ -373,7 +427,7 @@ internal fun parseSearchTrack(item: JsonObject): Track? {
     val album = item["album"] as? JsonObject ?: JsonObject(emptyMap())
     val albumMid = text("albummid").ifBlank { (album["mid"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
     val albumName = text("albumname").ifBlank { (album["title"] as? JsonPrimitive)?.contentOrNull.orEmpty() }.ifBlank { (album["name"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
-    return Track(mid, title, (item["singer"] as? JsonArray).orEmpty().mapNotNull { ((it as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull }, albumName, albumMid.takeIf(String::isNotBlank)?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" }.orEmpty(), true, buildList { if (number("size128") > 0 || fileNumber("size_128mp3") > 0) add("128"); if (number("size320") > 0 || fileNumber("size_320mp3") > 0) add("320") }.ifEmpty { listOf("128") }, numericId = number("songid").takeIf { it > 0 } ?: number("id"), mediaMid = fileText("media_mid"), songType = number("type").toInt(), requiresVip = text("isonly") == "1" || pay("payplay") != 0 || pay("pay_play") != 0)
+    return Track(mid, title, (item["singer"] as? JsonArray).orEmpty().mapNotNull { ((it as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull }, albumName, albumMid.takeIf(String::isNotBlank)?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" }.orEmpty(), true, parseQqQualityIds(item, file), numericId = number("songid").takeIf { it > 0 } ?: number("id"), mediaMid = fileText("media_mid"), songType = number("type").toInt(), requiresVip = text("isonly") == "1" || pay("payplay") != 0 || pay("pay_play") != 0)
 }
 
 internal fun nextSearchCursor(page: Int, rawItemCount: Int, pageSize: Int = 20): String? =
@@ -487,11 +541,15 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
 
     suspend fun stream(track: Track, quality: String): StreamData = withContext(Dispatchers.IO) {
         requireLogin()
-        AppLog.write("STREAM", "request track=${track.id} preferred=$quality vip=${track.requiresVip}")
+        val preferred = normalizeQualityId(quality)
+        AppLog.write("STREAM", "request track=${track.id} preferred=$preferred vip=${track.requiresVip}")
         val complete = if (track.mediaMid.isBlank()) trackDetail(track.id) else track
-        val qualities = if (quality == "320" && "320" in complete.qualities) listOf("320", "128") else listOf("128")
+        val qualities = qualityFallbackOrder(preferred)
+        var firstFailure: Throwable? = null
+        var receivedResponse = false
+        var bestFallback: StreamData? = null
         qualities.forEach { requested ->
-            val filename = "${if (requested == "320") "M800" else "M500"}${complete.mediaMid}.mp3"
+            val filename = qqStreamFileName(requested, complete.mediaMid)
             val param = obj(
                 "uin" to accountId(), "filename" to listOf(filename), "guid" to guid,
                 "songmid" to listOf(complete.id), "songtype" to listOf(complete.songType),
@@ -501,18 +559,33 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
                 Triple(playbackComm(android = false), "vkey.GetVkeyServer", "CgiGetVkey"),
                 Triple(playbackComm(android = true), "music.vkey.GetVkey", "UrlGetVkey"),
             ).forEach attempt@{ (comm, module, method) ->
-                val data = runCatching { post(comm, module, method, param, tolerateBusinessError = true) }.getOrNull() ?: return@attempt
-                val purl = streamPath(data)
-                if (purl.isNotBlank()) {
+                val data = try {
+                    post(comm, module, method, param, tolerateBusinessError = true)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    if (error.message.orEmpty().contains("登录凭据已失效")) throw error
+                    if (firstFailure == null) firstFailure = error
+                    AppLog.write("STREAM", "attempt=$module failed ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                    return@attempt
+                }
+                receivedResponse = true
+                val path = streamPath(data) ?: return@attempt
+                if (path.value.isNotBlank()) {
                     val base = walkObjects(data).firstNotNullOfOrNull { item ->
                         (item["sip"] as? JsonArray)?.firstNotNullOfOrNull { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
                     }.orEmpty().let(::normalizeHttpsUrl)
-                    val url = if (purl.startsWith("http")) purl else "${base.ifBlank { "https://isure.stream.qqmusic.qq.com/" }}${if (base.endsWith('/')) "" else "/"}$purl"
-                    AppLog.write("STREAM", "issued quality=$requested via=$module")
-                    return@withContext StreamData(url, requested, System.currentTimeMillis() + data.long("expiration", 3600) * 1000)
+                    val url = if (path.value.startsWith("http")) path.value else "${base.ifBlank { "https://isure.stream.qqmusic.qq.com/" }}${if (base.endsWith('/')) "" else "/"}${path.value}"
+                    val actual = inferQqStreamQuality(path.value, path.sourceKey)
+                    val stream = StreamData(url, actual, System.currentTimeMillis() + data.long("expiration", 3600) * 1000)
+                    AppLog.write("STREAM", "issued requested=$requested actual=$actual via=$module")
+                    bestFallback = higherQualityStream(bestFallback, stream)
+                    if (actual == requested) return@withContext bestFallback!!
                 }
             }
         }
+        bestFallback?.let { return@withContext it }
+        if (!receivedResponse) firstFailure?.let { throw it }
         AppLog.write("STREAM", "no-url track=${track.id} vip=${complete.requiresVip}")
         error(if (complete.requiresVip) "这首歌需要 VIP 或购买" else "QQ 音乐未提供播放地址，可能存在版权、地区或账号权益限制")
     }
@@ -593,7 +666,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         val library = library()
         val track = home().daily.firstOrNull { !it.requiresVip && it.playable }
             ?: error("没有找到可用于播放诊断的免费歌曲")
-        val stream = stream(track, "128")
+        val stream = stream(track, QUALITY_STANDARD)
         val request = Request.Builder().url(stream.url)
             .header("Range", "bytes=0-0").header("Referer", "https://y.qq.com/")
             .header("Origin", "https://y.qq.com").header("User-Agent", WEB_UA).build()
@@ -770,7 +843,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             album = album.string("title").ifBlank { album.string("name") },
             artworkUrl = album.string("mid").takeIf(String::isNotBlank)?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" }.orEmpty(),
             playable = value.int("isonly") == 0 && pay.int("pay_play") == 0,
-            qualities = buildList { if (file.long("size_128mp3") > 0) add("128"); if (file.long("size_320mp3") > 0) add("320") }.ifEmpty { listOf("128") },
+            qualities = parseQqQualityIds(value, file),
             numericId = numericId, mediaMid = file.string("media_mid"), songType = value.int("type"),
             requiresVip = value.int("isonly") != 0 || pay.int("pay_play") != 0
         )
@@ -804,10 +877,10 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         }
     }
 
-    private fun streamPath(data: JsonElement): String = walkObjects(data).firstNotNullOfOrNull { item ->
+    private fun streamPath(data: JsonElement): QqStreamPath? = walkObjects(data).firstNotNullOfOrNull { item ->
         listOf("purl", "wifiurl", "flowurl", "opi128kurl", "opi96kurl")
-            .firstNotNullOfOrNull { key -> item.string(key).takeIf(String::isNotBlank) }
-    }.orEmpty()
+            .firstNotNullOfOrNull { key -> item.string(key).takeIf(String::isNotBlank)?.let { QqStreamPath(it, key) } }
+    }
 
     private fun obj(vararg entries: Pair<String, Any?>): JsonObject = buildJsonObject { entries.forEach { (k, v) -> put(k, any(v)) } }
     private fun any(value: Any?): JsonElement = when (value) {

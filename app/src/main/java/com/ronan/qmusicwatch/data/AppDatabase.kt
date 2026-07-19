@@ -16,6 +16,7 @@ data class DownloadEntity(
     val artworkUrl: String, val filePath: String, val status: String, val downloadedBytes: Long = 0,
     val totalBytes: Long = -1, val updatedAt: Long = System.currentTimeMillis(),
     val groupName: String = "单曲缓存",
+    @ColumnInfo(defaultValue = "'standard'") val quality: String = "standard",
 )
 
 @Dao interface RecentDao {
@@ -33,7 +34,7 @@ data class DownloadEntity(
     @Query("DELETE FROM downloads WHERE trackId = :id AND ownerAccountId = :owner") suspend fun delete(id: String, owner: String)
 }
 
-@Database(entities = [RecentEntity::class, DownloadEntity::class], version = 3, exportSchema = false)
+@Database(entities = [RecentEntity::class, DownloadEntity::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun recent(): RecentDao
     abstract fun downloads(): DownloadDao
@@ -49,6 +50,19 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE TABLE IF NOT EXISTS recent (trackId TEXT NOT NULL, ownerAccountId TEXT NOT NULL, title TEXT NOT NULL, artists TEXT NOT NULL, album TEXT NOT NULL, artworkUrl TEXT NOT NULL, playedAt INTEGER NOT NULL, PRIMARY KEY(trackId, ownerAccountId))")
             }
         }
-        fun create(context: Context) = Room.databaseBuilder(context, AppDatabase::class.java, "qmusic-watch.db").addMigrations(migration1To2, migration2To3).build()
+        private val migration3To4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE downloads ADD COLUMN quality TEXT NOT NULL DEFAULT 'standard'")
+                db.execSQL("UPDATE downloads SET quality = 'legacy_unknown'")
+            }
+        }
+        private val migration4To5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("UPDATE downloads SET quality = 'legacy_unknown' WHERE status != 'complete'")
+            }
+        }
+        fun create(context: Context) = Room.databaseBuilder(context, AppDatabase::class.java, "qmusic-watch.db")
+            .addMigrations(migration1To2, migration2To3, migration3To4, migration4To5)
+            .build()
     }
 }

@@ -39,7 +39,7 @@ data class AppUiState(
     val searchTracks: List<Track> = emptyList(),
     val searchCollections: List<MusicCollection> = emptyList(), val searchType: String = "track",
     val searchQuery: String = "", val searchCursor: String? = null, val searchLoading: Boolean = false,
-    val qrStatus: String = "", val currentTrack: Track? = null,
+    val qrStatus: String = "", val currentTrack: Track? = null, val activeStreamQuality: String = QUALITY_STANDARD,
     val lyrics: List<LyricLine> = emptyList(), val pendingSpeakerTrack: Track? = null,
     val detail: CollectionDetail? = null, val detailDirectoryId: String? = null, val playEvent: Long = 0,
     val diagnostic: String? = null, val profile: UserProfile? = null, val profileLoaded: Boolean = false,
@@ -99,13 +99,15 @@ internal fun mergeSelectedQueue(queue: List<Track>, source: List<Track>, selecte
     (queue + source.filter { it.id in selectedIds }).distinctBy(Track::id)
 
 internal fun qualityFallbackMessage(preferred: String, resolved: String): String? =
-    "已选择 320k，但当前歌曲或账号仅提供 128k，已自动降级".takeIf { preferred == "320" && resolved != "320" }
+    "${qualityLabel(preferred)}不可用，已自动使用${qualityLabel(resolved)}".takeIf {
+        normalizeQualityId(preferred) != normalizeQualityId(resolved)
+    }
 
 internal fun qualityFallbackMessage(preferred: String, resolved: String, track: Track, profile: UserProfile?): String? {
     if (normalizeQualityId(preferred) == normalizeQualityId(resolved)) return null
     val decision = resolveQuality(preferred, track, profile)
-    val reason = decision.reason.ifBlank { "当前歌曲或账号仅提供 128k" }
-    return "已选择 ${normalizeQualityId(preferred)}k，但$reason，已自动使用 ${normalizeQualityId(resolved)}k"
+    val reason = decision.reason.ifBlank { "当前歌曲或账号未提供所选音质" }
+    return "${qualityLabel(preferred)}不可用：$reason，已自动使用${qualityLabel(resolved)}"
 }
 
 internal fun nextQueueIndex(size: Int, current: Int, delta: Int, mode: String, ended: Boolean, shuffled: Int = -1): Int = when {
@@ -122,7 +124,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(AppUiState())
     val state = _state.asStateFlow()
     val downloads = graph.downloads.downloads.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val quality = graph.settings.quality.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "128")
+    val quality = graph.settings.quality.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QUALITY_STANDARD)
     /** Account-level options for the compact watch quality picker. */
     val qualityEntitlements = state.map { profileQualityOptions(it.profile) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, profileQualityOptions(null))
@@ -153,10 +155,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var restoredPosition = 0L
     private var lastStreamUrl = ""
     private var lastStreamExpiresAt = 0L
-    private var lastStreamQuality = "128"
+    private var lastStreamQuality = QUALITY_STANDARD
     private var retryingTrackId: String? = null
     private var recoveryJob: Job? = null
     private var playJob: Job? = null
+    private var qualitySwitchJob: Job? = null
     private var searchJob: Job? = null
     private var detailJob: Job? = null
     private var queueImportJob: Job? = null
@@ -182,9 +185,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 restoredPosition = snapshot.positionMs
                 lastStreamUrl = snapshot.streamUrl
                 lastStreamExpiresAt = snapshot.streamExpiresAt
-                lastStreamQuality = snapshot.quality
+                lastStreamQuality = reportedQualityId(snapshot.quality)
                 snapshot.track?.let { track ->
-                    _state.update { it.copy(currentTrack = track) }
+                    _state.update { it.copy(currentTrack = track, activeStreamQuality = lastStreamQuality) }
                     _queueIndex.value = _queue.value.indexOfFirst { item -> item.id == track.id }
                 }
             }
@@ -249,6 +252,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 lastStreamUrl = stream.url
                 lastStreamExpiresAt = stream.expiresAt
                 lastStreamQuality = stream.quality
+                _state.update { it.copy(activeStreamQuality = stream.quality) }
                 persistSnapshot(event.positionMs)
             }.onSuccess {
                 val qualityNote = qualityFallbackMessage(quality.value, lastStreamQuality, track, _state.value.profile)
@@ -261,6 +265,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleMediaItemChanged(mediaId: String, uri: String) {
         if (mediaId.isBlank() || _state.value.currentTrack?.id == mediaId || playJob?.isActive == true) return
+        qualitySwitchJob?.cancel(); qualitySwitchJob = null
         recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
         viewModelScope.launch {
             val snapshot = runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()
@@ -274,8 +279,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _queueIndex.value = _queue.value.indexOfFirst { it.id == mediaId }
             lastStreamUrl = snapshot?.streamUrl?.takeIf { snapshot.track?.id == mediaId }.orEmpty().ifBlank { uri }
             lastStreamExpiresAt = snapshot?.streamExpiresAt?.takeIf { snapshot.track?.id == mediaId } ?: if (uri.startsWith("file:")) Long.MAX_VALUE else 0
-            lastStreamQuality = snapshot?.quality?.takeIf { snapshot.track?.id == mediaId } ?: preferredQuality(track)
-            _state.update { it.copy(currentTrack = track, lyrics = emptyList(), message = "已通过耳机或系统媒体控制切换歌曲") }
+            lastStreamQuality = reportedQualityId(snapshot?.quality?.takeIf { snapshot.track?.id == mediaId } ?: preferredQuality(track))
+            _state.update { it.copy(currentTrack = track, activeStreamQuality = lastStreamQuality, lyrics = emptyList(), message = "已通过耳机或系统媒体控制切换歌曲") }
             val localPath = android.net.Uri.parse(uri).takeIf { it.scheme == "file" }?.path
             val lines = runCatching { loadLyrics(track, localPath) }
                 .onFailure { AppLog.write("LYRICS", "media key ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
@@ -335,6 +340,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun logout() {
         viewModelScope.launch { runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "logout ${it.javaClass.simpleName}:${it.message.orEmpty()}") } }
         playJob?.cancel(); playJob = null
+        qualitySwitchJob?.cancel(); qualitySwitchJob = null
         recoveryJob?.cancel(); recoveryJob = null
         searchJob?.cancel(); searchJob = null; sessionGeneration++
         detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
@@ -599,6 +605,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun requestPlay(track: Track, allowSpeaker: Boolean = false, sourceQueue: List<Track>? = null) {
         recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
+        qualitySwitchJob?.cancel(); qualitySwitchJob = null
         playJob?.cancel()
         playJob = viewModelScope.launch {
         if (!track.playable && !track.requiresVip) return@launch fail(IllegalStateException("这首歌曲当前不可播放"))
@@ -619,7 +626,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             local?.let { item -> cachedArtworkFile(item.filePath).takeIf(File::exists)?.let { resolvedTrack = track.copy(artworkUrl = android.net.Uri.fromFile(it).toString()) } }
             issuedUrl = uri
             issuedExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE
-            issuedQuality = stream?.quality ?: preferredQuality(track)
+            issuedQuality = stream?.quality ?: local?.quality ?: preferredQuality(track)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), resolvedTrack.artworkUrl)
             if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
@@ -638,7 +645,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             lastStreamUrl = issuedUrl
             lastStreamExpiresAt = issuedExpiresAt
             lastStreamQuality = issuedQuality
-            _state.update { it.copy(currentTrack = resolvedTrack, lyrics = parsedLyrics, pendingSpeakerTrack = null, playEvent = System.nanoTime(), message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile)) }
+            _state.update {
+                it.copy(
+                    currentTrack = resolvedTrack,
+                    activeStreamQuality = reportedQualityId(issuedQuality),
+                    lyrics = parsedLyrics,
+                    pendingSpeakerTrack = null,
+                    playEvent = System.nanoTime(),
+                    message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile),
+                )
+            }
             persistSnapshot()
         }.onFailure { error -> if (error !is CancellationException) failPlayback(error) }
         }
@@ -663,16 +679,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onSuccess { lines -> _state.update { it.copy(lyrics = lines, message = if (lines.isEmpty()) "这首歌暂无歌词" else "歌词已重新加载") } }
             .onFailure(::fail)
     }
-    fun cache(track: Track, groupName: String = "单曲缓存") {
+    fun cache(track: Track, groupName: String = "单曲缓存", requestedQuality: String? = null) {
         val owner = accountId ?: return fail(IllegalStateException("请先登录"))
         viewModelScope.launch {
-            runCatching { graph.downloads.enqueue(track, owner, preferredQuality(track), wifiOnlyDownload.value, groupName) }
+            runCatching { graph.downloads.enqueue(track, owner, requestedQuality ?: preferredQuality(track), wifiOnlyDownload.value, groupName) }
                 .onSuccess { _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "已加入缓存，等待 Wi-Fi" else "已加入离线缓存") } }
                 .onFailure(::fail)
         }
     }
     fun cacheAll(tracks: List<Track>, groupName: String = "播放列表缓存") = tracks.forEach { cache(it, groupName) }
-    fun resumeDownload(item: com.ronan.qmusicwatch.data.DownloadEntity) = cache(Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl, qualities = listOf("128", "320")), item.groupName)
+    fun resumeDownload(item: com.ronan.qmusicwatch.data.DownloadEntity) = cache(
+        Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl, qualities = allAudioQualitySpecs().map(AudioQualitySpec::id)),
+        item.groupName,
+        item.quality,
+    )
     fun pauseDownload(id: String) = viewModelScope.launch {
         val owner = accountId ?: return@launch
         runCatching { graph.downloads.pause(id, owner) }.onFailure(::fail)
@@ -725,16 +745,56 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             .onFailure(::fail)
     }
-    fun setQuality(value: String) = viewModelScope.launch {
-        val requested = normalizeQualityId(value)
-        val profile = _state.value.profile
-        if (requested == QUALITY_HIGH && profile?.isVipActive() != true) {
-            _state.update {
-                it.copy(message = if (profile == null || profile.isVip == null) "请先检查登录以确认 320k 会员权益" else "320k 需要有效会员权益，已保留标准 128k")
+    fun setQuality(value: String) {
+        qualitySwitchJob?.cancel()
+        qualitySwitchJob = viewModelScope.launch {
+            val requested = normalizeQualityId(value)
+            val profile = _state.value.profile
+            val entitlement = profileQualityOptions(profile).first { it.id == requested }
+            if (!entitlement.available) {
+                _state.update {
+                    it.copy(message = entitlement.reason.ifBlank { "当前账号不能使用${qualityLabel(requested)}" })
+                }
+                return@launch
             }
-            return@launch
+            graph.settings.setQuality(requested)
+            val track = _state.value.currentTrack
+            if (track == null || lastStreamUrl.startsWith("file:") || lastStreamUrl.isBlank()) {
+                _state.update { it.copy(message = "默认音质已设为${qualityLabel(requested)}") }
+                return@launch
+            }
+            if (!featureEnabled("stream")) {
+                _state.update { it.copy(message = "默认音质已设为${qualityLabel(requested)}，下次在线播放时生效") }
+                return@launch
+            }
+            _state.update { it.copy(message = "正在切换到${qualityLabel(requested)}…") }
+            try {
+                val target = resolveQuality(requested, track, profile).resolved
+                val stream = graph.api.stream(track, target)
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                if (_state.value.currentTrack?.id != track.id || graph.playback.currentMediaId() != track.id) return@launch
+                val position = graph.playback.position()
+                val wasPlaying = graph.playback.isPlaying()
+                graph.playback.play(track.id, stream.url, track.title, track.artists.joinToString(" / "), track.artworkUrl)
+                graph.playback.seek(position)
+                if (!wasPlaying) graph.playback.pause()
+                lastStreamUrl = stream.url
+                lastStreamExpiresAt = stream.expiresAt
+                lastStreamQuality = stream.quality
+                persistSnapshot(position)
+                _state.update {
+                    it.copy(
+                        activeStreamQuality = normalizeQualityId(stream.quality),
+                        message = qualityFallbackMessage(requested, stream.quality, track, profile)
+                            ?: "已切换到${qualityLabel(stream.quality)}",
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                failPlayback(error)
+            }
         }
-        graph.settings.setQuality(requested)
     }
     fun setHeadphoneWarning(value: Boolean) = viewModelScope.launch { graph.settings.setHeadphoneWarning(value) }
     fun setAutoOpenPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setAutoOpenPlayer(value) }

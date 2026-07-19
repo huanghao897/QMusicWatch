@@ -3,6 +3,14 @@ package com.ronan.qmusicwatch
 import com.ronan.qmusicwatch.network.parseSearchTrack
 import com.ronan.qmusicwatch.network.nextSearchCursor
 import com.ronan.qmusicwatch.network.normalizeHttpsUrl
+import com.ronan.qmusicwatch.network.qqStreamFileName
+import com.ronan.qmusicwatch.network.inferQqStreamQuality
+import com.ronan.qmusicwatch.network.higherQualityStream
+import com.ronan.qmusicwatch.model.QUALITY_HI_RES
+import com.ronan.qmusicwatch.model.QUALITY_HQ
+import com.ronan.qmusicwatch.model.QUALITY_SQ
+import com.ronan.qmusicwatch.model.QUALITY_STANDARD
+import com.ronan.qmusicwatch.model.StreamData
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
@@ -23,18 +31,40 @@ class SearchParserTest {
         val track = parseSearchTrack(item)!!
         assertEquals("001", track.id)
         assertEquals(listOf("周杰伦"), track.artists)
-        assertEquals(listOf("128", "320"), track.qualities)
+        assertEquals(listOf(QUALITY_STANDARD, QUALITY_HQ), track.qualities)
         assertEquals(true, track.requiresVip)
     }
 
     @Test fun readsModernNestedFileQualityFields() {
-        val item = Json.parseToJsonElement("""{"mid":"song-mid","title":"Song","id":42,"type":0,"isonly":1,"singer":[{"name":"Singer"}],"album":{"title":"Album","mid":"album-mid"},"file":{"media_mid":"media-mid","size_128mp3":100,"size_320mp3":200},"pay":{"pay_play":1}}""").jsonObject
+        val item = Json.parseToJsonElement("""{"mid":"song-mid","title":"Song","id":42,"type":0,"isonly":1,"singer":[{"name":"Singer"}],"album":{"title":"Album","mid":"album-mid"},"file":{"media_mid":"media-mid","size_128mp3":100,"size_320mp3":200,"size_flac":300,"size_hires":400},"pay":{"pay_play":1}}""").jsonObject
         val track = parseSearchTrack(item)!!
-        assertEquals(listOf("128", "320"), track.qualities)
+        assertEquals(listOf(QUALITY_STANDARD, QUALITY_HQ, QUALITY_SQ, QUALITY_HI_RES), track.qualities)
         assertEquals("media-mid", track.mediaMid)
         assertEquals(42L, track.numericId)
         assertEquals("Album", track.album)
         assertEquals("https://y.gtimg.cn/music/photo_new/T002R300x300M000album-mid.jpg", track.artworkUrl)
         assertEquals(true, track.requiresVip)
+    }
+
+    @Test fun verifiedDirectFormatsUseStableQqFileNames() {
+        assertEquals("M500media-mid.mp3", qqStreamFileName(QUALITY_STANDARD, "media-mid"))
+        assertEquals("M800media-mid.mp3", qqStreamFileName(QUALITY_HQ, "media-mid"))
+        assertEquals("F000media-mid.flac", qqStreamFileName(QUALITY_SQ, "media-mid"))
+    }
+
+    @Test fun returnedFileNameWinsOverTheRequestedQualityLabel() {
+        assertEquals(QUALITY_STANDARD, inferQqStreamQuality("C400media-mid.m4a?vkey=x", "purl"))
+        assertEquals(QUALITY_HQ, inferQqStreamQuality("M800media-mid.mp3?vkey=x", "purl"))
+        assertEquals(QUALITY_SQ, inferQqStreamQuality("F000media-mid.flac?vkey=x", "purl"))
+        assertEquals(QUALITY_STANDARD, inferQqStreamQuality("https://cdn.example/audio", "opi128kurl"))
+        assertEquals(QUALITY_STANDARD, inferQqStreamQuality("https://cdn.example/opaque", "purl"))
+    }
+
+    @Test fun laterLowerTierResponseCannotReplaceAWorkingHigherTierFallback() {
+        val hq = StreamData("https://cdn.example/hq", QUALITY_HQ, 2_000)
+        val standard = StreamData("https://cdn.example/standard", QUALITY_STANDARD, 2_000)
+        assertEquals(hq, higherQualityStream(null, hq))
+        assertEquals(hq, higherQualityStream(hq, standard))
+        assertEquals(hq, higherQualityStream(standard, hq))
     }
 }

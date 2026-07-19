@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class ApiError(val code: String, val message: String)
 @Serializable data class Track(
     val id: String, val title: String, val artists: List<String> = emptyList(), val album: String = "",
-    val artworkUrl: String = "", val playable: Boolean = true, val qualities: List<String> = listOf("128"),
+    val artworkUrl: String = "", val playable: Boolean = true, val qualities: List<String> = listOf("standard"),
     val playedAt: Long? = null,
     val numericId: Long = 0, val mediaMid: String = "", val songType: Int = 0,
     val requiresVip: Boolean = false,
@@ -50,7 +50,7 @@ data class QualityResolution(
 @Serializable data class PlaybackSnapshot(
     val track: Track? = null, val queue: List<Track> = emptyList(), val positionMs: Long = 0,
     val queueReversed: Boolean = false,
-    val streamUrl: String = "", val streamExpiresAt: Long = 0, val quality: String = "128",
+    val streamUrl: String = "", val streamExpiresAt: Long = 0, val quality: String = "standard",
     val ownerAccountId: String = "",
 )
 fun PlaybackSnapshot.belongsToAccount(accountId: String?): Boolean = accountId != null && ownerAccountId == accountId
@@ -65,8 +65,44 @@ fun PlaybackSnapshot.belongsToAccount(accountId: String?): Boolean = accountId !
     val qualityEntitlements: List<QualityEntitlement> = emptyList(),
 )
 
-internal const val QUALITY_STANDARD = "128"
-internal const val QUALITY_HIGH = "320"
+internal const val QUALITY_STANDARD = "standard"
+internal const val QUALITY_HQ = "hq"
+internal const val QUALITY_SQ = "sq"
+internal const val QUALITY_HI_RES = "hires"
+internal const val QUALITY_LEGACY_UNKNOWN = "legacy_unknown"
+
+internal data class AudioQualitySpec(
+    val id: String,
+    val label: String,
+    val shortLabel: String,
+    val format: String,
+    val bitrateKbps: Int,
+    val requiresVip: Boolean,
+    val clientSupported: Boolean,
+    val rank: Int,
+)
+
+private val audioQualitySpecs = listOf(
+    AudioQualitySpec(QUALITY_STANDARD, "标准音质", "标准", "MP3 · 128 kbps", 128, false, true, 0),
+    AudioQualitySpec(QUALITY_HQ, "HQ · 高品质", "HQ", "MP3 · 320 kbps", 320, true, true, 1),
+    AudioQualitySpec(QUALITY_SQ, "SQ · 无损品质", "SQ", "FLAC · 无损", 0, true, true, 2),
+    AudioQualitySpec(QUALITY_HI_RES, "Hi-Res · 高解析无损", "Hi-Res", "24-bit 无损", 0, true, false, 3),
+)
+
+internal fun allAudioQualitySpecs(): List<AudioQualitySpec> = audioQualitySpecs
+internal fun audioQualitySpec(value: String?): AudioQualitySpec =
+    audioQualitySpecs.first { it.id == normalizeQualityId(value) }
+internal fun qualityLabel(value: String?): String =
+    if (value == QUALITY_LEGACY_UNKNOWN) "旧缓存（音质未知）" else audioQualitySpec(value).label
+internal fun qualityShortLabel(value: String?): String =
+    if (value == QUALITY_LEGACY_UNKNOWN) "旧缓存" else audioQualitySpec(value).shortLabel
+internal fun qualityRank(value: String?): Int = audioQualitySpec(value).rank
+internal fun reportedQualityId(value: String?): String =
+    if (value == QUALITY_LEGACY_UNKNOWN) QUALITY_LEGACY_UNKNOWN else normalizeQualityId(value)
+internal fun qualityFallbackOrder(value: String?): List<String> {
+    val requestedRank = qualityRank(value)
+    return audioQualitySpecs.asReversed().filter { it.clientSupported && it.rank <= requestedRank }.map(AudioQualitySpec::id)
+}
 
 /** Normalizes seconds, milliseconds and the occasional microsecond timestamp. */
 internal fun normalizeEpochSeconds(value: Long?): Long? = value?.let {
@@ -90,28 +126,32 @@ internal fun UserProfile.isVipActive(nowMillis: Long = System.currentTimeMillis(
 }
 
 internal fun normalizeQualityId(value: String?): String = when (value?.trim()?.lowercase()) {
-    "320", "320k", "hq", "high", "high_quality" -> QUALITY_HIGH
+    "320", "320k", "hq", "high", "high_quality" -> QUALITY_HQ
+    "flac", "lossless", "sq", "lossless_quality" -> QUALITY_SQ
+    "hires", "hi-res", "flac24bit", "24bit", "hr" -> QUALITY_HI_RES
     else -> QUALITY_STANDARD
 }
 
 private fun accountQualityOptions(profile: UserProfile?, nowMillis: Long): List<QualityEntitlement> {
-    val active = profile?.isVipActive(nowMillis) == true
+    val active = profile?.isVipActive(nowMillis) == true && !profile?.vipName.orEmpty().contains("听书")
     val unknown = profile == null || profile.isVip == null
-    val stored = profile?.qualityEntitlements.orEmpty().associateBy { normalizeQualityId(it.id) }
-    val highReason = when {
-        active -> ""
-        unknown -> "会员权益尚未确认"
-        else -> "需要有效会员权益"
-    }
-    return listOf(
-        QualityEntitlement(QUALITY_STANDARD, "标准 128k", 128, true),
+    return audioQualitySpecs.map { spec ->
+        val available = spec.clientSupported
         QualityEntitlement(
-            QUALITY_HIGH, "高品 320k", 320,
-            available = active || (profile?.isVip != false && stored[QUALITY_HIGH]?.available == true && profile?.vipExpireAt == null),
-            requiresVip = true,
-            reason = if (active || (profile?.isVip != false && stored[QUALITY_HIGH]?.available == true && profile?.vipExpireAt == null)) "" else highReason,
-        ),
-    )
+            id = spec.id,
+            label = spec.label,
+            bitrateKbps = spec.bitrateKbps,
+            available = available,
+            requiresVip = spec.requiresVip,
+            reason = when {
+                !spec.clientSupported -> "当前版本暂未完成兼容验证"
+                !spec.requiresVip -> ""
+                active -> "当前音乐会员权益已确认"
+                unknown -> "播放时由 QQ 音乐验证会员权益"
+                else -> "可能需要豪华绿钻或超级会员，播放时由 QQ 音乐验证"
+            },
+        )
+    }
 }
 
 /** Returns the account and track intersection used by the quality picker. */
@@ -121,19 +161,24 @@ internal fun qualityAvailability(
     nowMillis: Long = System.currentTimeMillis(),
 ): List<QualityEntitlement> {
     val account = accountQualityOptions(profile, nowMillis).associateBy { it.id }
-    val supported = track?.qualities.orEmpty().map(::normalizeQualityId).toSet().ifEmpty { setOf(QUALITY_STANDARD) }
+    val supported = if (track == null) {
+        audioQualitySpecs.mapTo(mutableSetOf(), AudioQualitySpec::id)
+    } else {
+        track.qualities.map(::normalizeQualityId).toSet().ifEmpty { setOf(QUALITY_STANDARD) }
+    }
     val vipRequired = track?.requiresVip == true
-    return listOf(QUALITY_STANDARD, QUALITY_HIGH).map { id ->
+    return audioQualitySpecs.map { spec ->
+        val id = spec.id
         val base = account.getValue(id)
-        val available = id in supported && (!vipRequired || profile?.isVipActive(nowMillis) == true) && base.available
+        val available = id in supported && base.available
         val reason = when {
-            available -> ""
             id !in supported -> "当前歌曲不提供 ${base.label}"
-            vipRequired && profile?.isVipActive(nowMillis) != true -> if (profile == null || profile.isVip == null) "会员权益尚未确认" else "这首歌需要会员权益"
+            !base.available -> base.reason.ifBlank { "当前版本不可用" }
+            vipRequired && profile?.isVipActive(nowMillis) != true -> "这首歌将在播放时由 QQ 音乐验证会员权益"
             base.reason.isNotBlank() -> base.reason
-            else -> "当前账号不可用"
+            else -> ""
         }
-        base.copy(available = available, reason = reason)
+        base.copy(available = available, requiresVip = base.requiresVip || vipRequired, reason = reason)
     }
 }
 
@@ -150,7 +195,10 @@ internal fun resolveQuality(
     val options = qualityAvailability(track, profile, nowMillis)
     val requestedOption = options.first { it.id == requested }
     if (requestedOption.available) return QualityResolution(requested, requested, true)
-    val fallback = options.firstOrNull(QualityEntitlement::available)
+    val requestedRank = qualityRank(requested)
+    val fallback = options.filter(QualityEntitlement::available)
+        .filter { qualityRank(it.id) <= requestedRank }
+        .maxByOrNull { qualityRank(it.id) }
         ?: options.firstOrNull { it.id == QUALITY_STANDARD }
         ?: options.first()
     return QualityResolution(requested, fallback.id, false, requestedOption.reason)

@@ -30,6 +30,13 @@ class SettingsStoreTest {
         assertEquals(-1, lyricIndexClosestToCenter(0, 0, items))
     }
 
+    @Test fun lyricScrollOffsetAccountsForPaddedViewportStart() {
+        assertEquals(-210, lyricCenterScrollOffset(viewportStart = 0, viewportEnd = 480, itemSize = 60))
+        assertEquals(-18, lyricCenterScrollOffset(viewportStart = -189, viewportEnd = 291, itemSize = 66))
+        assertEquals(0, lyricCenterScrollOffset(viewportStart = -207, viewportEnd = 273, itemSize = 66))
+        assertEquals(0, lyricCenterScrollOffset(viewportStart = 0, viewportEnd = 0, itemSize = 60))
+    }
+
     @Test fun lyricTimeUsesOfficialTwoDigitMinuteFormat() {
         assertEquals("00:03", lyricTime(3_000))
         assertEquals("12:05", lyricTime(725_000))

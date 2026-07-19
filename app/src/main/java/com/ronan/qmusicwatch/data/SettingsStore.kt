@@ -5,6 +5,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.ronan.qmusicwatch.model.QUALITY_STANDARD
+import com.ronan.qmusicwatch.model.normalizeQualityId
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore by preferencesDataStore("settings")
@@ -33,7 +35,7 @@ class SettingsStore(private val context: Context) {
     private val controlPlaneCacheKey = stringPreferencesKey("control_plane_cache")
     private val seenAnnouncementsKey = stringPreferencesKey("seen_announcements")
     private val pendingUpdateReleaseKey = stringPreferencesKey("pending_update_release")
-    val quality = context.settingsDataStore.data.map { it[qualityKey] ?: "128" }
+    val quality = context.settingsDataStore.data.map { normalizeQualityId(it[qualityKey]) }
     val headphoneWarning = context.settingsDataStore.data.map { it[headphoneWarningKey] ?: true }
     val autoOpenPlayer = context.settingsDataStore.data.map { it[autoOpenPlayerKey] ?: true }
     val playMode = context.settingsDataStore.data.map { it[playModeKey] ?: "sequential" }
@@ -57,7 +59,7 @@ class SettingsStore(private val context: Context) {
     val seenAnnouncements = context.settingsDataStore.data.map {
         it[seenAnnouncementsKey].orEmpty().lineSequence().map(String::trim).filter(String::isNotBlank).take(100).toSet()
     }
-    suspend fun setQuality(value: String) = context.settingsDataStore.edit { it[qualityKey] = if (value == "320") "320" else "128" }
+    suspend fun setQuality(value: String) = context.settingsDataStore.edit { it[qualityKey] = normalizeQualityId(value).ifBlank { QUALITY_STANDARD } }
     suspend fun setHeadphoneWarning(value: Boolean) = context.settingsDataStore.edit { it[headphoneWarningKey] = value }
     suspend fun setAutoOpenPlayer(value: Boolean) = context.settingsDataStore.edit { it[autoOpenPlayerKey] = value }
     suspend fun setPlayMode(value: String) = context.settingsDataStore.edit { it[playModeKey] = value }

@@ -23,6 +23,17 @@ class UserProfileParserTest {
         assertEquals(null, profile.isVip)
     }
 
+    @Test fun readsWechatAvatarFieldsAndPrefersAccountAvatarOverPlaceholder() {
+        val wechat = parseUserProfile(Json.parseToJsonElement("""{"profile":{"nickname":"Ronan","headimgurl":"http://thirdwx.qlogo.cn/mmopen/account/132"}}"""))!!
+        assertEquals("https://thirdwx.qlogo.cn/mmopen/account/132", wechat.avatarUrl)
+
+        val merged = mergeUserProfiles(listOf(
+            UserProfile(displayName = "Ronan", avatarUrl = "https://img.qq.com/default-avatar.png"),
+            wechat,
+        ))!!
+        assertEquals("https://thirdwx.qlogo.cn/mmopen/account/132", merged.avatarUrl)
+    }
+
     @Test fun parsesDedicatedVipResponse() {
         val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_info":{"vip_type":11,"vip_name":"超级会员","expire_date":"20260722"}}"""))!!
         assertEquals(true, profile.isVip)

@@ -31,6 +31,8 @@ class DatabaseMigrationRobolectricTest {
                     db.execSQL("CREATE TABLE recent (trackId TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artists TEXT NOT NULL, album TEXT NOT NULL, artworkUrl TEXT NOT NULL, playedAt INTEGER NOT NULL)")
                     db.execSQL("CREATE TABLE downloads (trackId TEXT NOT NULL, ownerAccountId TEXT NOT NULL, title TEXT NOT NULL, artists TEXT NOT NULL, artworkUrl TEXT NOT NULL, filePath TEXT NOT NULL, status TEXT NOT NULL, downloadedBytes INTEGER NOT NULL, totalBytes INTEGER NOT NULL, updatedAt INTEGER NOT NULL, groupName TEXT NOT NULL, PRIMARY KEY(trackId, ownerAccountId))")
                     db.execSQL("INSERT INTO recent VALUES ('old','Old','Artist','Album','',1)")
+                    db.execSQL("INSERT INTO downloads VALUES ('partial','owner','Partial','Artist','','/tmp/partial.audio','paused',42,-1,1,'单曲缓存')")
+                    db.execSQL("INSERT INTO downloads VALUES ('complete','owner','Complete','Artist','','/tmp/complete.audio','complete',84,84,1,'单曲缓存')")
                 }
                 override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
             }).build()
@@ -51,6 +53,14 @@ class DatabaseMigrationRobolectricTest {
             database.openHelper.writableDatabase.query("SELECT COUNT(*) FROM recent").use { cursor ->
                 assertTrue(cursor.moveToFirst())
                 assertEquals(0, cursor.getInt(0))
+            }
+            database.openHelper.writableDatabase.query("SELECT quality FROM downloads WHERE trackId = 'partial'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("legacy_unknown", cursor.getString(0))
+            }
+            database.openHelper.writableDatabase.query("SELECT quality FROM downloads WHERE trackId = 'complete'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("legacy_unknown", cursor.getString(0))
             }
         } finally {
             database.close()

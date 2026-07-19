@@ -9,8 +9,19 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import android.view.KeyEvent
 import com.ronan.qmusicwatch.playback.mediaButtonSkipDelta
+import com.ronan.qmusicwatch.download.canResumePartialDownload
+import com.ronan.qmusicwatch.model.QUALITY_LEGACY_UNKNOWN
+import com.ronan.qmusicwatch.model.qualityShortLabel
 
 class QueueTest {
+    @Test fun partialDownloadCannotMixDifferentQualityFiles() {
+        assertEquals(true, canResumePartialDownload("320", "hq"))
+        assertEquals(false, canResumePartialDownload("hq", "sq"))
+        assertEquals(false, canResumePartialDownload(null, "standard"))
+        assertEquals(false, canResumePartialDownload(QUALITY_LEGACY_UNKNOWN, "standard"))
+        assertEquals("旧缓存", qualityShortLabel(QUALITY_LEGACY_UNKNOWN))
+    }
+
     @Test fun headsetNextAndPreviousKeysMapToQueueDirections() {
         assertEquals(1, mediaButtonSkipDelta(KeyEvent.KEYCODE_MEDIA_NEXT))
         assertEquals(-1, mediaButtonSkipDelta(KeyEvent.KEYCODE_MEDIA_PREVIOUS))
@@ -90,10 +101,10 @@ class QueueTest {
         assertEquals("4.0 / 4.0 MB · 100%", downloadProgressSummary(9L * 1024 * 1024, 4L * 1024 * 1024))
     }
 
-    @Test fun qualityDowngradeIsExplainedOnlyWhen320WasRequested() {
-        assertEquals("已选择 320k，但当前歌曲或账号仅提供 128k，已自动降级", qualityFallbackMessage("320", "128"))
-        assertEquals(null, qualityFallbackMessage("128", "128"))
-        assertEquals(null, qualityFallbackMessage("320", "320"))
+    @Test fun qualityDowngradeUsesOfficialTierNames() {
+        assertEquals("SQ · 无损品质不可用，已自动使用HQ · 高品质", qualityFallbackMessage("sq", "hq"))
+        assertEquals(null, qualityFallbackMessage("standard", "128"))
+        assertEquals(null, qualityFallbackMessage("hq", "320"))
     }
 
     @Test fun playbackSnapshotKeepsQueueDirectionAndReadsOldSnapshots() {
