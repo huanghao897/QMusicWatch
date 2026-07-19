@@ -57,8 +57,8 @@ android {
         applicationId = "com.ronan.qmusicwatch"
         minSdk = 24
         targetSdk = 36
-        versionCode = 35
-        versionName = "0.9.5"
+        versionCode = 36
+        versionName = "0.9.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartext"] = "false"
         buildConfigField("String", "QMUSIC_SERVER_BASE_URL", "\"https://8.138.134.236/\"")

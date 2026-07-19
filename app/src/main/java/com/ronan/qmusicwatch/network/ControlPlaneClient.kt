@@ -39,8 +39,8 @@ class ControlPlaneClient(
     baseUrlValue: String = BuildConfig.QMUSIC_SERVER_BASE_URL,
     private val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(35, TimeUnit.SECONDS)
+        .callTimeout(40, TimeUnit.SECONDS)
         .followRedirects(false)
         .followSslRedirects(false)
         .build(),
@@ -90,6 +90,20 @@ class ControlPlaneClient(
         val bytes = json.encodeToString(payload).encodeToByteArray()
         require(bytes.size <= MAX_DIAGNOSTIC_REQUEST_BYTES) { "诊断信息超过 64 KB" }
         return post(endpoint("api/qmusic-watch/diagnostics"), bytes)
+    }
+
+    suspend fun createQrLogin(provider: String): ControlQrSession {
+        require(provider in setOf("qq", "wechat")) { "不支持的二维码登录方式" }
+        return validateQrSession(
+            post(endpoint("api/qmusic-watch/auth/$provider/qr"), "{}".encodeToByteArray()),
+            provider,
+        )
+    }
+
+    suspend fun pollQrLogin(id: String, provider: String): ControlQrStatus {
+        require(id.matches(Regex("[A-Za-z0-9_-]{24,96}"))) { "二维码会话标识无效" }
+        val bytes = json.encodeToString(ControlQrPollRequest(id)).encodeToByteArray()
+        return validateQrStatus(post(endpoint("api/qmusic-watch/auth/qr/poll"), bytes), provider)
     }
 
     fun download(request: Request): Response = http.newCall(request).execute()

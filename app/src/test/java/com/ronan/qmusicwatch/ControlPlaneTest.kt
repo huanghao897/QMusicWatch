@@ -78,4 +78,21 @@ class ControlPlaneTest {
         assertFalse(controlCacheIsFresh(cache, 301_000))
         assertTrue((cache.config.takeIf { controlCacheIsFresh(cache, 301_000) } ?: RemoteFeatureConfig()).featureEnabled("stream"))
     }
+
+    @Test fun qrLoginContractsRejectProviderAndCredentialMismatches() {
+        val session = ControlQrSession(
+            id = "q".repeat(32), provider = "qq", mimeType = "image/png",
+            imageBase64 = "A".repeat(128), expiresAt = 120_000, pollAfterMs = 2_000,
+        )
+        assertEquals(session, validateQrSession(session, "qq"))
+        assertThrows(IllegalArgumentException::class.java) { validateQrSession(session, "wechat") }
+        val complete = ControlQrStatus(
+            provider = "qq", status = "complete", expiresAt = 120_000,
+            cookie = "uin=o12345; qm_keyst=key",
+        )
+        assertEquals(complete, validateQrStatus(complete, "qq"))
+        assertThrows(IllegalArgumentException::class.java) {
+            validateQrStatus(complete.copy(status = "waiting"), "qq")
+        }
+    }
 }

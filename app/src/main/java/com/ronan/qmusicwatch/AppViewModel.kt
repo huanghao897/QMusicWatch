@@ -39,7 +39,8 @@ data class AppUiState(
     val searchTracks: List<Track> = emptyList(),
     val searchCollections: List<MusicCollection> = emptyList(), val searchType: String = "track",
     val searchQuery: String = "", val searchCursor: String? = null, val searchLoading: Boolean = false,
-    val qrStatus: String = "", val currentTrack: Track? = null, val activeStreamQuality: String = QUALITY_STANDARD,
+    val qrStatus: String = "", val qrImageBase64: String = "", val qrMimeType: String = "", val qrExpiresAt: Long = 0,
+    val currentTrack: Track? = null, val activeStreamQuality: String = QUALITY_STANDARD,
     val lyrics: List<LyricLine> = emptyList(), val pendingSpeakerTrack: Track? = null,
     val detail: CollectionDetail? = null, val detailDirectoryId: String? = null, val playEvent: Long = 0,
     val diagnostic: String? = null, val profile: UserProfile? = null, val profileLoaded: Boolean = false,
@@ -164,6 +165,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var detailJob: Job? = null
     private var queueImportJob: Job? = null
     private var updateJob: Job? = null
+    private var qrLoginJob: Job? = null
     private val json = Json { ignoreUnknownKeys = true }
     private val profileCacheReady = CompletableDeferred<Unit>()
     private val snapshotMutex = Mutex()
@@ -303,14 +305,72 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             cacheAccountSnapshot(home = home)
         }.onFailure { if (generation == sessionGeneration) _state.update { s -> s.copy(loading = false, offlineSnapshot = s.home != null) } }
     }
-    fun completeOfficialLogin(provider: String, cookie: String) = viewModelScope.launch {
-        if (!featureEnabled("qrLogin")) return@launch _state.update { it.copy(qrStatus = featureMessage("qrLogin").ifBlank { "扫码登录暂时维护" }) }
-        _state.update { it.copy(qrStatus = "已确认，正在完成登录…") }
+    fun startQrLogin(provider: String) {
+        qrLoginJob?.cancel()
+        if (provider !in setOf("qq", "wechat")) {
+            _state.update { it.copy(qrStatus = "不支持的登录方式", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            return
+        }
+        if (!featureEnabled("qrLogin")) {
+            _state.update { it.copy(qrStatus = featureMessage("qrLogin").ifBlank { "扫码登录暂时维护" }, qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            return
+        }
+        qrLoginJob = viewModelScope.launch {
+            _state.update { it.copy(qrStatus = "正在生成二维码…", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            try {
+                val session = graph.controlPlane.createQrLogin(provider)
+                _state.update { it.copy(
+                    qrStatus = "请使用手机扫描二维码",
+                    qrImageBase64 = session.imageBase64,
+                    qrMimeType = session.mimeType,
+                    qrExpiresAt = session.expiresAt,
+                ) }
+                while (isActive) {
+                    delay(session.pollAfterMs.coerceIn(1_000, 30_000))
+                    val result = graph.controlPlane.pollQrLogin(session.id, provider)
+                    AppLog.write("LOGIN", "server_qr provider=$provider status=${result.status}")
+                    when (result.status) {
+                        "waiting" -> _state.update { it.copy(qrStatus = "请使用手机扫描二维码") }
+                        "scanned" -> _state.update { it.copy(qrStatus = "已扫码，请在手机确认") }
+                        "complete" -> {
+                            _state.update { it.copy(qrStatus = "已确认，正在完成登录…") }
+                            completeServerLogin(provider, result.cookie)
+                            return@launch
+                        }
+                        "expired" -> {
+                            _state.update { it.copy(qrStatus = "二维码已过期，点刷新重试") }
+                            return@launch
+                        }
+                        "rejected" -> {
+                            _state.update { it.copy(qrStatus = "已取消登录，点刷新重试") }
+                            return@launch
+                        }
+                        else -> {
+                            _state.update { it.copy(qrStatus = "登录服务暂时不可用，点刷新重试") }
+                            return@launch
+                        }
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                AppLog.write("LOGIN", "server_qr ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                _state.update { it.copy(qrStatus = "二维码加载失败，点刷新重试", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            }
+        }
+    }
+
+    fun cancelQrLogin() {
+        qrLoginJob?.cancel()
+        qrLoginJob = null
+        _state.update { it.copy(qrStatus = "", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+    }
+
+    private suspend fun completeServerLogin(provider: String, cookie: String) {
         runCatching {
-            val finalCookie = graph.api.finishQrLogin(cookie)
-            val account = com.ronan.qmusicwatch.login.MusicCookie.accountId(finalCookie)
+            val account = com.ronan.qmusicwatch.login.MusicCookie.accountId(cookie)
                 ?: error("登录响应缺少账号标识")
-            SessionTokens(accountId = account, provider = com.ronan.qmusicwatch.login.MusicCookie.provider(finalCookie, provider), upstreamCookie = finalCookie)
+            SessionTokens(accountId = account, provider = com.ronan.qmusicwatch.login.MusicCookie.provider(cookie, provider), upstreamCookie = cookie)
         }.onSuccess { session ->
             runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "account switch ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
             playJob?.cancel(); playJob = null
@@ -329,7 +389,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 detail = null, detailDirectoryId = null, offlineSnapshot = false,
                 pendingSpeakerTrack = null,
                 queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false, searchLoading = false,
-                qrStatus = "登录成功", message = "登录成功",
+                qrStatus = "登录成功", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0, message = "登录成功",
             ) }
             loadHome(); loadProfile(force = true); loadLibrary(); loadRecent()
         }.onFailure { error ->
@@ -343,18 +403,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
         recoveryJob?.cancel(); recoveryJob = null
         searchJob?.cancel(); searchJob = null; sessionGeneration++
+        qrLoginJob?.cancel(); qrLoginJob = null
         detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
         graph.playback.stopAndClear(); graph.vault.clear(); currentSession = null
         pendingQueue = null
         _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
         restoredPosition = 0; lastStreamUrl = ""; lastStreamExpiresAt = 0; retryingTrackId = null
         viewModelScope.launch { graph.settings.setPlaybackSnapshot(""); graph.settings.setProfileCache("") }
-        android.webkit.CookieManager.getInstance().removeAllCookies { android.webkit.CookieManager.getInstance().flush() }
         _state.update { it.copy(
             home = null, library = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
             searchTracks = emptyList(), searchCollections = emptyList(), searchCursor = null, searchLoading = false,
             currentTrack = null, lyrics = emptyList(), pendingSpeakerTrack = null, detail = null, detailDirectoryId = null,
             queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false,
+            qrStatus = "", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0,
             offlineSnapshot = false, message = "已退出，离线文件已保留并锁定",
         ) }
         loadHome()

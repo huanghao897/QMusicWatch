@@ -448,37 +448,6 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
 
     private val guid = saved("guid") { (random.nextLong().ushr(1) % 10_000_000_000L).toString() }
 
-    suspend fun finishQrLogin(temporaryCookie: String): String = withContext(Dispatchers.IO) {
-        fun part(name: String) = temporaryCookie.split(';').map(String::trim)
-            .firstOrNull { it.startsWith("$name=") }?.substringAfter('=').orEmpty()
-        val temporaryKey = part("qqmusic_key")
-        val temporaryUin = part("qqmusic_uin")
-        val qrCodeId = part("qrcode_id")
-        if (temporaryKey.isBlank() || temporaryUin.isBlank() || qrCodeId.isBlank()) error("扫码结果不完整，请刷新二维码重试")
-
-        val data = post(
-            obj("ct" to 11, "cv" to 20_030_508),
-            "music.login.LoginServer", "Login",
-            obj(
-                "loginType" to 6, "needCookie" to 1, "tmeAppID" to "qqmusic",
-                "str_musicid" to temporaryUin, "qrCodeID" to qrCodeId, "token" to temporaryKey
-            ),
-            temporaryCookie
-        )
-        val key = data.string("musickey")
-        val musicId = data.string("musicid").ifBlank { data.long("musicid").takeIf { it > 0 }?.toString().orEmpty() }
-        if (key.isBlank() || musicId.isBlank()) error("QQ 音乐没有返回有效登录凭据，请重新扫码")
-        listOfNotNull(
-            "login_type=2", "tmeLoginMethod=3", "uin=o$musicId", "qqmusic_uin=$musicId",
-            data.string("encryptUin").takeIf(String::isNotBlank)?.let { "euin=$it" },
-            "tmeLoginType=${data.string("loginType").ifBlank { "1" }}",
-            "wxuin=o$musicId",
-            data.string("openid").takeIf(String::isNotBlank)?.let { "wxopenid=$it" },
-            "qm_keyst=$key", "p_lskey=$key", "qqmusic_key=$key",
-            data.string("refresh_key").takeIf(String::isNotBlank)?.let { "refresh_key=$it" }
-        ).joinToString("; ")
-    }
-
     suspend fun home(): HomeData = withContext(Dispatchers.IO) {
         val personalized = if (cookie().isNullOrBlank()) emptyList() else runCatching {
             api(

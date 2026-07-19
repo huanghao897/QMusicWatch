@@ -1,21 +1,13 @@
 package com.ronan.qmusicwatch
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
+import android.util.Base64
 import android.os.Bundle
-import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceError
-import android.webkit.WebResourceResponse
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -62,6 +54,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.clip
@@ -88,7 +82,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -102,7 +95,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.ronan.qmusicwatch.data.DownloadEntity
 import com.ronan.qmusicwatch.data.AppLog
-import com.ronan.qmusicwatch.login.MusicCookie
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.lyrics.activeLyricIndex
 import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
@@ -118,156 +110,6 @@ import java.io.File
 
 private val Green = Color(0xFF6DFF9E)
 private val Surface = Color(0xFF111714)
-private const val OFFICIAL_LOGIN_URL = "https://y.qq.com/m/client/qr_code_login/index.html?tmeAppID=qqmusic&frame=1&ct=11&cv=20030508"
-private val COMPACT_OFFICIAL_QR_SCRIPT = """
-    (function() {
-        function installLoginBridge() {
-            if (!window.__qmusicMessageBridge) {
-                window.__qmusicMessageBridge = true;
-                window.addEventListener('message', function(event) {
-                    try {
-                        var host = new URL(event.origin).hostname;
-                        if (!(host === 'qq.com' || host.endsWith('.qq.com'))) return;
-                    } catch (_) {
-                        return;
-                    }
-                    QMusicLogin.onMessage(typeof event.data === 'string' ? event.data : JSON.stringify(event.data));
-                });
-            }
-            if (window.Music && Music.client && Music.client.open && !Music.client.open.__qmusicWatchWrapped) {
-                var originalOpen = Music.client.open;
-                var wrappedOpen = function(scope, action, payload) {
-                    if (action === 'scanLoginResult') {
-                        QMusicLogin.onMessage(typeof payload === 'string' ? payload : JSON.stringify(payload || {}));
-                        return Promise.resolve({});
-                    }
-                    return originalOpen.apply(this, arguments);
-                };
-                wrappedOpen.__qmusicWatchWrapped = true;
-                Music.client.open = wrappedOpen;
-            }
-        }
-
-        installLoginBridge();
-
-        if (window.__qmusicWatchQrPresentation) return;
-        window.__qmusicWatchQrPresentation = true;
-        var notified = false;
-
-        function notifyReady() {
-            if (notified) return;
-            notified = true;
-            QMusicLogin.onQrReady();
-        }
-
-        function candidateScore(element, overlay) {
-            if (!element || (overlay && overlay.contains(element))) return -1;
-            var rect = element.getBoundingClientRect();
-            if (rect.width < 72 || rect.height < 72) return -1;
-            var ratio = rect.width / rect.height;
-            if (ratio < 0.82 || ratio > 1.18) return -1;
-            var style = window.getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return -1;
-            var metadata = [element.id, element.className, element.alt, element.getAttribute('aria-label'), element.getAttribute('src')]
-                .join(' ').toLowerCase();
-            var score = Math.min(rect.width, rect.height);
-            if (/qr|qrcode|qr-code|code-login/.test(metadata)) score += 1000;
-            if (element.tagName === 'CANVAS' || element.tagName === 'SVG') score += 180;
-            if (style.backgroundImage && style.backgroundImage !== 'none') score += 400;
-            if (Math.abs(ratio - 1) < 0.04) score += 220;
-            if (element.naturalWidth && Math.abs(element.naturalWidth - element.naturalHeight) < 4) score += 120;
-            return score;
-        }
-
-        function findQr(overlay) {
-            var nodes = document.querySelectorAll('img,canvas,svg,[class],[id],[style]');
-            var best = null;
-            var bestScore = -1;
-            for (var index = 0; index < nodes.length; index += 1) {
-                var score = candidateScore(nodes[index], overlay);
-                if (score > bestScore) {
-                    best = nodes[index];
-                    bestScore = score;
-                }
-            }
-            return bestScore >= 500 ? best : null;
-        }
-
-        function ensureOverlay() {
-            var overlay = document.getElementById('qmusic-watch-qr-overlay');
-            if (overlay) return overlay;
-            overlay = document.createElement('div');
-            overlay.id = 'qmusic-watch-qr-overlay';
-            overlay.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#111714;margin:0;padding:0;overflow:hidden;';
-            var frame = document.createElement('div');
-            frame.id = 'qmusic-watch-qr-frame';
-            frame.style.cssText = 'box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#fff;margin:0;overflow:hidden;';
-            overlay.appendChild(frame);
-            document.documentElement.appendChild(overlay);
-            return overlay;
-        }
-
-        function renderQr(source) {
-            var overlay = ensureOverlay();
-            var frame = document.getElementById('qmusic-watch-qr-frame');
-            var viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-            var viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-            var side = Math.max(1, Math.floor(Math.min(viewportWidth, viewportHeight)));
-            frame.style.width = side + 'px';
-            frame.style.height = side + 'px';
-            frame.style.padding = '0';
-
-            var preview = frame.firstElementChild;
-            if (source.tagName === 'IMG') {
-                if (!preview || preview.tagName !== 'IMG') {
-                    frame.textContent = '';
-                    preview = document.createElement('img');
-                    preview.alt = '登录二维码';
-                    frame.appendChild(preview);
-                }
-                var nextSource = source.currentSrc || source.src;
-                if (preview.src !== nextSource) preview.src = nextSource;
-            } else if (source.tagName === 'CANVAS') {
-                if (!preview || preview.tagName !== 'CANVAS') {
-                    frame.textContent = '';
-                    preview = document.createElement('canvas');
-                    frame.appendChild(preview);
-                }
-                preview.width = source.width;
-                preview.height = source.height;
-                var context = preview.getContext('2d');
-                if (context) context.drawImage(source, 0, 0);
-            } else {
-                frame.textContent = '';
-                preview = source.cloneNode(true);
-                if (preview.removeAttribute) preview.removeAttribute('id');
-                frame.appendChild(preview);
-            }
-            preview.style.setProperty('display', 'block', 'important');
-            preview.style.setProperty('width', '100%', 'important');
-            preview.style.setProperty('height', '100%', 'important');
-            preview.style.setProperty('margin', '0', 'important');
-            preview.style.setProperty('padding', '0', 'important');
-            preview.style.setProperty('object-fit', 'contain', 'important');
-            preview.style.setProperty('image-rendering', 'pixelated', 'important');
-            notifyReady();
-        }
-
-        function updateQr() {
-            installLoginBridge();
-            var overlay = document.getElementById('qmusic-watch-qr-overlay');
-            var source = findQr(overlay);
-            if (source) renderQr(source);
-        }
-
-        updateQr();
-        window.setInterval(updateQr, 400);
-        window.addEventListener('resize', updateQr);
-        window.setTimeout(function() {
-            if (!notified) QMusicLogin.onQrMissing();
-        }, 10000);
-    })();
-""".trimIndent()
 internal enum class LibrarySection(val routeValue: String) {
     Liked("liked"),
     Created("created"),
@@ -641,17 +483,22 @@ class MainActivity : ComponentActivity() {
         } else {
             val selectedProvider = provider!!
             val qrSide = minOf(maxWidth, (maxHeight - 76.dp).coerceAtLeast(1.dp), 356.dp)
+            LaunchedEffect(selectedProvider) { vm.startQrLogin(selectedProvider) }
+            DisposableEffect(selectedProvider) { onDispose(vm::cancelQrLogin) }
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ provider = null }, Modifier.size(36.dp)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回登录方式", Modifier.size(20.dp))
                     }
                     Text(if (selectedProvider == "wechat") "微信登录" else "QQ 登录", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    IconButton({ vm.startQrLogin(selectedProvider) }, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Refresh, "刷新二维码", Modifier.size(19.dp))
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
-                OfficialQrLogin(
-                    provider = selectedProvider,
-                    onCookie = { cookie -> vm.completeOfficialLogin(selectedProvider, cookie) },
+                ServerQrLogin(
+                    imageBase64 = state.qrImageBase64,
                     modifier = Modifier.size(qrSide),
                 )
                 Spacer(Modifier.height(6.dp))
@@ -667,88 +514,35 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@SuppressLint("JavascriptInterface") // QrLoginBridge.onMessage is annotated; lint loses the type through remember().
-@Composable private fun OfficialQrLogin(provider: String, onCookie: (String) -> Unit, modifier: Modifier = Modifier) {
-    var webView by remember { mutableStateOf<WebView?>(null) }
-    var submitted by remember(provider) { mutableStateOf(false) }
-    var loading by remember(provider) { mutableStateOf(true) }
-    var loadError by remember(provider) { mutableStateOf<String?>(null) }
-    val cookieManager = remember { CookieManager.getInstance().apply { setAcceptCookie(true) } }
-    LaunchedEffect(provider) {
-        delay(4_500)
-        if (loading && loadError == null) loading = false
-    }
-    val bridge = remember(provider) {
-        QrLoginBridge(
-            onCookie = { cookie -> if (!submitted) { submitted = true; onCookie(cookie) } },
-            onQrReady = { loadError = null; loading = false },
-            onQrMissing = { if (loading) { loading = false; loadError = "未找到登录二维码，请重新加载" } },
-        )
-    }
-    Box(modifier.background(Surface)) {
-    AndroidView(factory = { context ->
-        WebView(context).apply {
-            webView = this
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.userAgentString = settings.userAgentString + " /ANDROIDQQMUSIC/20030508 QQMusic/20.3.5.8 H5/1 NetType/WIFI QMusicWatch/${BuildConfig.VERSION_NAME}"
-            cookieManager.setAcceptThirdPartyCookies(this, true)
-            addJavascriptInterface(bridge, "QMusicLogin")
-            webViewClient = object : WebViewClient() {
-                override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
-                    loading = true
-                    loadError = null
-                }
-                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                    val host = request.url.host.orEmpty()
-                    return request.url.scheme != "https" || !(host == "qq.com" || host.endsWith(".qq.com"))
-                }
-                override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                    if (request.isForMainFrame) { loading = false; loadError = "二维码页面加载失败（${error.errorCode}）" }
-                }
-                override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
-                    if (request.isForMainFrame) { loading = false; loadError = "二维码页面响应 ${errorResponse.statusCode}" }
-                }
-                override fun onPageFinished(view: WebView, url: String) {
-                    if (loadError == null) view.evaluateJavascript(COMPACT_OFFICIAL_QR_SCRIPT, null)
-                }
+@Composable
+private fun ServerQrLogin(imageBase64: String, modifier: Modifier = Modifier) {
+    val image = remember(imageBase64) { decodeServerQrImage(imageBase64) }
+    Surface(modifier, shape = RoundedCornerShape(5.dp), color = Color.White) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = "登录二维码",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillBounds,
+                    filterQuality = FilterQuality.None,
+                )
+            } else {
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = Color(0xFF28312D))
             }
-            val target = this
-            cookieManager.removeAllCookies {
-                target.post {
-                    cookieManager.flush()
-                    if (webView === target) target.loadUrl(OFFICIAL_LOGIN_URL)
-                }
-            }
-        }
-    }, modifier = Modifier.fillMaxSize())
-    if (loading && loadError == null) Surface(Modifier.fillMaxSize(), color = Surface.copy(alpha = .96f)) { Box(contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp); Spacer(Modifier.height(10.dp)); Text("正在加载登录二维码", color = Color.Gray) } } }
-    loadError?.let { error -> Surface(Modifier.fillMaxSize(), color = Surface) { Box(contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(8.dp)); Button({ loading = true; loadError = null; webView?.loadUrl(OFFICIAL_LOGIN_URL) }) { Text("重新加载") } } } } }
-    }
-    DisposableEffect(Unit) { onDispose { webView?.stopLoading(); webView?.destroy(); webView = null } }
-}
-
-private class QrLoginBridge(
-    private val onCookie: (String) -> Unit,
-    private val onQrReady: () -> Unit,
-    private val onQrMissing: () -> Unit,
-) {
-    @JavascriptInterface fun onQrReady() {
-        Handler(Looper.getMainLooper()).post { onQrReady() }
-    }
-
-    @JavascriptInterface fun onQrMissing() {
-        Handler(Looper.getMainLooper()).post { onQrMissing() }
-    }
-
-    @JavascriptInterface fun onMessage(message: String) {
-        if (message.length > 16_384) return
-        MusicCookie.fromQrMessage(message)?.let { cookie ->
-            Handler(Looper.getMainLooper()).post { onCookie(cookie) }
         }
     }
 }
+
+private fun decodeServerQrImage(value: String) = runCatching {
+    require(value.length in 128..700_000)
+    val bytes = Base64.decode(value, Base64.DEFAULT)
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    require(bounds.outWidth in 32..2_048 && bounds.outHeight in 32..2_048)
+    require(bounds.outWidth.toLong() * bounds.outHeight <= 4_194_304L)
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() ?: error("二维码图片无法解码")
+}.getOrNull()
 
 @Composable private fun SearchScreen(nav: NavHostController, state: AppUiState, vm: AppViewModel, history: List<String>) {
     var query by remember { mutableStateOf("") }

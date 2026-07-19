@@ -14,6 +14,7 @@ These projects informed behavior, product research, or compatible protocol imple
 | [wangqr/QQMusicDES](https://github.com/wangqr/QQMusicDES) | MIT | The QQ DES-variant behavior and tables were adapted into Kotlin for QRC lyric decoding; copyright and license are retained in `third_party/wangqr-QQMusicDES-LICENSE.txt` |
 | [lyswhut/lx-music-desktop](https://github.com/lyswhut/lx-music-desktop) | Apache-2.0 | QQ Music quality-tier and filename behavior research only; no source code copied |
 | [power721/Harmony](https://github.com/power721/Harmony) | See upstream repository | Cross-checking QQ Music quality filename mappings only; no source code copied |
+| [MiChongs/karpov-gateway](https://github.com/MiChongs/karpov-gateway) | MIT | Research into current QQ/WeChat QR state and QQ Music OAuth exchange behavior; no source code copied |
 
 Runtime dependencies keep their original licenses. Gradle and npm lock files
 are the authoritative dependency lists for a particular release.
