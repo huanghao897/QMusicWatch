@@ -1064,7 +1064,9 @@ private class QrLoginBridge(
                                     inactiveTrackColor = Color(0xFF343B38),
                                 ),
                                 thumb = {
-                                    Box(Modifier.size(12.dp).background(Green, RoundedCornerShape(50)))
+                                    Box(Modifier.width(12.dp).height(16.dp), contentAlignment = Alignment.Center) {
+                                        Box(Modifier.size(12.dp).background(Green, RoundedCornerShape(50)))
+                                    }
                                 },
                                 track = {
                                     Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Color(0xFF343B38))) {
