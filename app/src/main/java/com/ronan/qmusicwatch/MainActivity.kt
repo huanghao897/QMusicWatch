@@ -183,12 +183,12 @@ internal fun showLyricTimePill(index: Int, focusedIndex: Int, manualSelection: B
         ).size.width.toFloat()
     }
     val fontSizeSp = fitSingleLineFontSp(requestedFontSp, measuredWidthPx, availableWidthPx)
-    // Progress is sampled by the player clock every 100 ms. Keep the tween shorter
-    // than that sample window so it never chases the previous frame or flashes when
-    // the active line changes.
+    // The player clock is sampled every 100 ms (500 ms in low-power mode).
+    // Let the tween span the sampling window so the highlight keeps moving
+    // between samples instead of stopping briefly after every update.
     val smoothProgress by animateFloatAsState(
         targetValue = renderProgress?.coerceIn(0f, 1f) ?: 0f,
-        animationSpec = tween(if (lowPower) 160 else 76, easing = LinearEasing),
+        animationSpec = tween(if (lowPower) 520 else 130, easing = LinearEasing),
         label = "lyricRender",
     )
     // Keep the measured text layout stable while the active line grows. A
