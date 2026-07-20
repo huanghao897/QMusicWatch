@@ -169,6 +169,7 @@ internal fun showLyricTimePill(index: Int, focusedIndex: Int, manualSelection: B
     renderProgress: Float? = null,
     lowPower: Boolean = false,
     centered: Boolean = false,
+    emphasisScale: Float = 1f,
 ) = BoxWithConstraints(modifier, contentAlignment = if (centered) Alignment.Center else Alignment.CenterStart) {
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
@@ -190,7 +191,19 @@ internal fun showLyricTimePill(index: Int, focusedIndex: Int, manualSelection: B
         animationSpec = tween(if (lowPower) 160 else 76, easing = LinearEasing),
         label = "lyricRender",
     )
-    Box(Modifier.wrapContentWidth()) {
+    // Keep the measured text layout stable while the active line grows. A
+    // render-layer transform avoids remeasuring every visible row during the
+    // center-scroll animation.
+    val smoothScale = emphasisScale.coerceIn(.92f, 1.12f)
+    val horizontalScale = if (measuredWidthPx > 0f && measuredWidthPx <= availableWidthPx) {
+        minOf(smoothScale, availableWidthPx / measuredWidthPx)
+    } else 1f
+    Box(
+        Modifier.wrapContentWidth().graphicsLayer {
+            scaleX = horizontalScale
+            scaleY = smoothScale
+        },
+    ) {
         Text(
             text, color = color, fontSize = fontSizeSp.sp, fontWeight = fontWeight,
             maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
@@ -642,7 +655,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     val lyricSp = when (lyricSize) { "small" -> 15f; "large" -> 21f; else -> 18f }
     val centerLyrics = lyricAlignment == "center"
     val listState = key(track.id) { rememberLazyListState() }
-    val lyricLineHeightPx = with(LocalDensity.current) { 44.dp.roundToPx() }
+    val lyricLineHeightPx = with(LocalDensity.current) { 40.dp.roundToPx() }
     val lyricListDragged by listState.interactionSource.collectIsDraggedAsState()
     var manualLyricSelection by remember(track.id) { mutableStateOf(false) }
     var manualLyricInteraction by remember(track.id) { mutableIntStateOf(0) }
@@ -661,7 +674,11 @@ private fun decodeServerQrImage(value: String) = runCatching {
             )
         }
     }
-    val focusedLyricIndex = centeredLyricIndex.takeIf { manualLyricSelection && it >= 0 } ?: active
+    // During automatic playback, avoid observing layoutInfo. That observation
+    // makes every scroll animation frame recompose the whole player.
+    val focusedLyricIndex = if (manualLyricSelection) {
+        centeredLyricIndex.takeIf { it >= 0 } ?: active
+    } else active
     val pager = rememberPagerState(initialPage = 0) { 2 }
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
@@ -742,10 +759,15 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                 }
                                 val motionDuration = if (lyricAnimation == "off") 0 else 180
                                 val lineAlpha by animateFloatAsState(targetAlpha, tween(motionDuration), label = "lyricFade")
-                                val lineFontSize by animateFloatAsState(
-                                    if (isFocused) lyricSp + 2f else (lyricSp - 1f).coerceAtLeast(12f),
-                                    tween(motionDuration), label = "lyricFontSize",
+                                // Keep row measurement fixed. The active-line
+                                // emphasis is applied in the draw layer below.
+                                val lineScale by animateFloatAsState(
+                                    if (isFocused && hasTimeline) 1.1f else 1f,
+                                    tween(motionDuration), label = "lyricFocusScale",
                                 )
+                                val lineFontSize = if (hasTimeline) {
+                                    (lyricSp - 1f).coerceAtLeast(12f)
+                                } else lyricSp
                                 val karaokeProgress = if (isPlaybackLine) lyricRenderProgress(line, position + lyricOffset, nextTime) else null
                                 val seek = {
                                     if (line.timeMs >= 0) {
@@ -760,7 +782,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                             alpha = lineAlpha
                                         }
                                         .then(if (line.timeMs >= 0) Modifier.clickable(onClick = seek) else Modifier)
-                                        .heightIn(min = if (renderTranslation && !line.translation.isNullOrBlank()) 48.dp else 40.dp)
+                                        .height(if (renderTranslation && !line.translation.isNullOrBlank()) 48.dp else 40.dp)
                                         .padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -778,6 +800,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                             renderProgress = karaokeProgress,
                                             lowPower = lowPowerPlayer,
                                             centered = centerLyrics,
+                                            emphasisScale = lineScale,
                                         )
                                         if (renderTranslation) line.translation?.takeIf { it.isNotBlank() }?.let { translation ->
                                             SingleLineLyricText(
@@ -787,6 +810,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                                 color = if (isFocused) Green.copy(alpha = .86f) else Color(0xFF9EB8A8),
                                                 fontWeight = if (isFocused && !renderOriginal) FontWeight.Bold else FontWeight.Normal,
                                                 centered = centerLyrics,
+                                                emphasisScale = lineScale,
                                             )
                                         }
                                     }
