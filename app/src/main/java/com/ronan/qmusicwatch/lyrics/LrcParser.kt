@@ -41,9 +41,12 @@ object LrcParser {
     private val qrcLine = Regex("\\[(\\d+),(\\d+)](.*)")
     private val qrcWord = Regex("(.*?)\\((\\d+),(\\d+)\\)")
     fun parse(original: String, translation: String? = null, wordSync: String? = null): List<LyricLine> {
-        val originalLines = parseQrc(wordSync.orEmpty()).ifEmpty {
+        val wordSyncContent = qrcContent(wordSync.orEmpty())
+        val originalLines = parseQrc(wordSyncContent).ifEmpty {
             parseOne(original).map { LyricLine(it.first, it.second) }.ifEmpty {
-                parsePlain(original).map { LyricLine(-1, it) }
+                parseOne(wordSyncContent).map { LyricLine(it.first, it.second) }.ifEmpty {
+                    parsePlain(original).ifEmpty { parsePlain(wordSyncContent) }.map { LyricLine(-1, it) }
+                }
             }
         }
         val translated = parseOne(translation.orEmpty())
@@ -60,23 +63,26 @@ object LrcParser {
             line.copy(translation = translatedText)
         }.sortedBy { it.timeMs }
     }
-    private fun parseQrc(value: String): List<LyricLine> {
-        val rawContent = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL)).find(value)?.groupValues?.getOrNull(1) ?: value
-        val content = rawContent.replace("&#13;&#10;", "\n").replace("&#10;", "\n").replace("&#13;", "\n")
+    private fun qrcContent(value: String): String {
+        val rawContent = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL))
+            .find(value)?.groupValues?.getOrNull(1) ?: value
+        return rawContent.replace("&#13;&#10;", "\n").replace("&#10;", "\n").replace("&#13;", "\n")
             .replace("&quot;", "\"").replace("&apos;", "'").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-        return content.lineSequence().mapNotNull { rawLine ->
-            val match = qrcLine.find(rawLine.trim()) ?: return@mapNotNull null
-            val start = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null
-            val tail = match.groupValues[3]
-            val words = qrcWord.findAll(tail).map { word ->
-                LyricWord(word.groupValues[1], word.groupValues[2].toLong(), word.groupValues[3].toLong())
-            }.filter { it.text.isNotEmpty() }.toMutableList()
-            if (words.isEmpty()) return@mapNotNull null
-            words[0] = words.first().copy(text = words.first().text.trimStart())
-            words[words.lastIndex] = words.last().copy(text = words.last().text.trimEnd())
-            LyricLine(start, words.joinToString("") { it.text }, words = words)
-        }.filter { it.text.isNotBlank() }.sortedBy { it.timeMs }.toList()
     }
+
+    private fun parseQrc(value: String): List<LyricLine> = value.lineSequence().mapNotNull { rawLine ->
+        val match = qrcLine.find(rawLine.trim()) ?: return@mapNotNull null
+        val start = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null
+        val tail = match.groupValues[3]
+        val words = qrcWord.findAll(tail).map { word ->
+            LyricWord(word.groupValues[1], word.groupValues[2].toLong(), word.groupValues[3].toLong())
+        }.filter { it.text.isNotEmpty() }.toMutableList()
+        if (words.isEmpty()) return@mapNotNull null
+        words[0] = words.first().copy(text = words.first().text.trimStart())
+        words[words.lastIndex] = words.last().copy(text = words.last().text.trimEnd())
+        LyricLine(start, words.joinToString("") { it.text }, words = words)
+    }.filter { it.text.isNotBlank() }.sortedBy { it.timeMs }.toList()
+
     private fun parseOne(value: String): List<Pair<Long, String>> = value.lineSequence().flatMap { line ->
         val matches = stamp.findAll(line).toList()
         val text = stamp.replace(line, "").trim()

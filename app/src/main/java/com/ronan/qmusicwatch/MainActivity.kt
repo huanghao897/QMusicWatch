@@ -340,6 +340,8 @@ class MainActivity : ComponentActivity() {
     val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
     val queueReversed by vm.queueReversed.collectAsStateWithLifecycle()
     val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
+    var dismissedAnnouncements by remember { mutableStateOf(emptySet<String>()) }
+    var dismissedUpdateId by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) { AppLog.write("PERF", "startup_ui_ready_ms=${android.os.SystemClock.elapsedRealtime() - QMusicApplication.processStartedAt}") }
     val snackbar = remember { SnackbarHostState() }
     DisposableEffect(backStack?.destination?.route) {
@@ -405,13 +407,39 @@ class MainActivity : ComponentActivity() {
             confirmButton = { TextButton(onClick = vm::continueOnSpeaker) { Text("继续外放") } },
             dismissButton = { TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }) { Text("连接蓝牙") } })
     }
+    val startupAnnouncement = nextStartupAnnouncement(state.announcements, seenAnnouncements, dismissedAnnouncements)
+    val startupUpdate = (state.updateState as? UpdateUiState.Available)
+        ?.takeIf { it.release.releaseId != dismissedUpdateId }
     if (showNotice) AlertDialog(onDismissRequest = {}, title = { Text("第三方非官方客户端") }, text = { Text("QMusic Watch 与腾讯或 QQ 音乐无隶属或认可关系。请尊重版权和账号权益，本项目不会绕过会员、地区、付费或 DRM 限制。") }, confirmButton = { Button({ noticePrefs.edit().putBoolean("accepted", true).apply(); showNotice = false }) { Text("我知道了") } })
-    else state.announcements.firstOrNull { it.pinned && it.id !in seenAnnouncements }?.let { announcement ->
+    else if (startupAnnouncement != null) startupAnnouncement.let { announcement ->
+        val dismiss: () -> Unit = {
+            dismissedAnnouncements = dismissedAnnouncements + announcement.id
+            vm.markAnnouncementSeen(announcement.id)
+        }
         AlertDialog(
-            onDismissRequest = { vm.markAnnouncementSeen(announcement.id) },
+            onDismissRequest = dismiss,
             title = { Text(announcement.title.take(80), maxLines = 2, overflow = TextOverflow.Ellipsis) },
             text = { Box(Modifier.heightIn(max = 165.dp).verticalScroll(rememberScrollState())) { Text(announcement.content.take(1200)) } },
-            confirmButton = { TextButton({ vm.markAnnouncementSeen(announcement.id) }) { Text("知道了") } },
+            confirmButton = { TextButton(dismiss) { Text("知道了") } },
+        )
+    }
+    else if (startupUpdate != null) startupUpdate.let { update ->
+        AlertDialog(
+            onDismissRequest = { dismissedUpdateId = update.release.releaseId },
+            title = { Text("发现新版本 ${update.release.versionName}", maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            text = {
+                Column(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    if (update.release.title.isNotBlank()) Text(update.release.title, fontWeight = FontWeight.Bold)
+                    if (update.release.changelog.isNotBlank()) Text(update.release.changelog.take(1200), color = Color.LightGray, fontSize = 14.sp)
+                    Text(formatFileSize(update.release.apk.sizeBytes), color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton({ dismissedUpdateId = update.release.releaseId; vm.downloadUpdate(update.release) }) {
+                    Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("下载更新")
+                }
+            },
+            dismissButton = { TextButton({ dismissedUpdateId = update.release.releaseId }) { Text("稍后") } },
         )
     }
 }
@@ -856,7 +884,9 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         )
                         Text(track.title, fontSize = if (compactPlayer) 18.sp else 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         Text(track.artists.joinToString(" / "), color = Color.Gray, fontSize = if (compactPlayer) 12.sp else 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                        val previewIndex = active.takeIf { it >= 0 } ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 } ?: -1
+                        val previewIndex = active.takeIf { it >= 0 }
+                            ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
+                            ?: lyrics.indexOfFirst { it.text.isNotBlank() }
                         val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() }
                         AnimatedContent(
                             targetState = preview.orEmpty(),
@@ -1481,8 +1511,9 @@ private fun formatFileSize(bytes: Long): String = when {
             delay(350)
         }
     }
-    val previewIndex = (activeLyricIndex(lyrics, position).takeIf { it >= 0 }
-        ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 } ?: -1)
+    val previewIndex = activeLyricIndex(lyrics, position).takeIf { it >= 0 }
+        ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
+        ?: lyrics.indexOfFirst { it.text.isNotBlank() }
     val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() } ?: "正在播放"
     Surface(color = Surface, tonalElevation = 3.dp) {
         Row(

@@ -2,10 +2,10 @@ package com.ronan.qmusicwatch.network
 
 import android.content.Context
 import android.os.Build
-import android.util.Base64
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.lyrics.QqQrcDecoder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -21,6 +21,8 @@ internal fun normalizeHttpsUrl(value: String): String = when {
     value.startsWith("http://", true) -> "https://${value.substringAfter("://")}"
     else -> value
 }
+
+private class QqBusinessException(val businessCode: Int, message: String) : IllegalStateException(message)
 
 private fun JsonObject.hasPositiveNumber(vararg names: String): Boolean = names.any { name ->
     (this[name] as? JsonPrimitive)?.longOrNull?.let { it > 0 } == true
@@ -562,20 +564,11 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     suspend fun library(): LibraryData = withContext(Dispatchers.IO) {
         requireLogin()
         val playlists = api("music.musicasset.PlaylistBaseRead", "GetPlaylistByUin", obj("uin" to accountId()))
-        val collectedPlaylists = mutableListOf<MusicCollection>()
-        val collectedDirectories = mutableSetOf<String>()
-        for (page in 0 until 20) {
-            val result = runCatching {
-                api(
-                    "music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo",
-                    obj("uin" to accountId(), "offset" to page * 100, "size" to 100),
-                ).let(::parseFavoritePlaylists)
-            }.onFailure { AppLog.write("LIBRARY", "favorite playlists ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
-            val batch = result.getOrNull() ?: break
-            val previousSize = collectedPlaylists.size
-            collectedPlaylists += batch.filter { collectedDirectories.add(it.directoryId) }
-            if (batch.size < 100 || collectedPlaylists.size == previousSize) break
-        }
+        val collectedPlaylists = runCatching { favoritePlaylists() }.onFailure { error ->
+            val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
+                ?: "${error.javaClass.simpleName}"
+            AppLog.write("LIBRARY", "favorite playlists unavailable $detail")
+        }.getOrDefault(emptyList())
         val likedTracks = mutableListOf<Track>()
         val likedIds = mutableSetOf<String>()
         for (page in 0 until 20) {
@@ -592,6 +585,49 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         normalizeLibraryData(
             LibraryData(likedTracks, mergeLibraryPlaylists(accountPlaylists, collectedPlaylists)),
         )
+    }
+
+    private suspend fun favoritePlaylists(): List<MusicCollection> {
+        val encryptedUin = cookieValue("euin").orEmpty()
+        if (encryptedUin.isBlank()) {
+            AppLog.write("LIBRARY", "favorite playlists encrypted_id=missing compatibility=unpaged")
+            return api(
+                "music.musicasset.PlaylistFavRead", "GetPlaylistFavInfo",
+                obj("uin" to accountId()),
+            ).let(::parseFavoritePlaylists)
+        }
+
+        val playlists = mutableListOf<MusicCollection>()
+        val directories = mutableSetOf<String>()
+        for (page in 0 until 20) {
+            val data = try {
+                api(
+                    "music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo",
+                    obj("uin" to encryptedUin, "offset" to page * 100, "size" to 100),
+                )
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                if (page == 0 && error is QqBusinessException && error.businessCode == 80050) {
+                    AppLog.write("LIBRARY", "favorite playlists compatibility=unpaged")
+                    return api(
+                        "music.musicasset.PlaylistFavRead", "GetPlaylistFavInfo",
+                        obj("uin" to accountId()),
+                    ).let(::parseFavoritePlaylists)
+                }
+                if (playlists.isNotEmpty()) {
+                    val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
+                        ?: error.javaClass.simpleName
+                    AppLog.write("LIBRARY", "favorite playlists partial $detail")
+                    return playlists
+                }
+                throw error
+            }
+            val batch = parseFavoritePlaylists(data)
+            val previousSize = playlists.size
+            playlists += batch.filter { directories.add(it.directoryId) }
+            if (batch.size < 100 || playlists.size == previousSize) break
+        }
+        return playlists
     }
 
     suspend fun profile(): UserProfile = withContext(Dispatchers.IO) {
@@ -773,7 +809,10 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             val code = req.int("code")
             AppLog.write("API", "$module/$method http=${response.code} code=$code ms=${System.currentTimeMillis() - started}")
             if (code in setOf(1000, 104400, 104401)) error("登录凭据已失效，请重新登录")
-            if (code != 0 && !tolerateBusinessError) error(req.string("msg").ifBlank { "QQ 音乐接口拒绝请求 ($code)" })
+            if (code != 0 && !tolerateBusinessError) throw QqBusinessException(
+                code,
+                req.string("msg").ifBlank { "QQ 音乐接口拒绝请求 ($code)" },
+            )
             return req["data"]?.jsonObject ?: JsonObject(emptyMap())
         }
     }
@@ -861,7 +900,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     private fun JsonObject.string(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
     private fun JsonObject.int(key: String) = (this[key] as? JsonPrimitive)?.intOrNull ?: 0
     private fun JsonObject.long(key: String, default: Long = 0) = (this[key] as? JsonPrimitive)?.longOrNull ?: default
-    private fun decodeText(value: String): String = if (value.isBlank()) "" else runCatching { Base64.decode(value, Base64.DEFAULT).decodeToString() }.getOrDefault(value)
+    private fun decodeText(value: String): String = decodeQqLyricText(value)
     private fun saved(key: String, factory: () -> String): String = prefs.getString(key, null) ?: factory().also { prefs.edit().putString(key, it).apply() }
     private fun hash33(value: String): Int = value.fold(5381) { hash, char -> hash + (hash shl 5) + char.code } and 0x7fffffff
     private fun cookieValue(vararg names: String): String? = cookie()?.split(';')?.map(String::trim)?.firstNotNullOfOrNull { part -> names.firstOrNull { part.startsWith("$it=") }?.let { part.substringAfter('=') } }

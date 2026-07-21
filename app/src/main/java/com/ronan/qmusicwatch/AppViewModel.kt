@@ -209,7 +209,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch { while (isActive) { delay(10_000); if (_state.value.currentTrack != null) persistSnapshot() } }
         viewModelScope.launch { restoreControlPlaneAndRefresh() }
-        viewModelScope.launch { restorePendingUpdate() }
+        viewModelScope.launch {
+            restorePendingUpdate()
+            checkForUpdateNow(showStatus = false)
+        }
         viewModelScope.launch {
             while (isActive) {
                 delay(60_000)
@@ -527,7 +530,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             announcements = visibleAnnouncements(value.announcements, BuildConfig.VERSION_CODE, now),
             controlFetchedAt = value.fetchedAt,
         ) } }
-        if (cached == null || !controlCacheIsFresh(cached, now)) refreshControlPlane(showStatus = false)
+        // Render cached values immediately, then check for newly published data
+        // once on every cold start even while the cache is still fresh.
+        refreshControlPlane(showStatus = false)
     }
 
     fun refreshControlPlane(showStatus: Boolean = true) = viewModelScope.launch {
@@ -602,18 +607,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun checkForUpdate() = viewModelScope.launch {
-        _state.update { it.copy(updateState = UpdateUiState.Checking) }
+    fun checkForUpdate() = viewModelScope.launch { checkForUpdateNow(showStatus = true) }
+
+    private suspend fun checkForUpdateNow(showStatus: Boolean) {
+        val previous = _state.value.updateState
+        if (showStatus || previous !is UpdateUiState.Ready) {
+            _state.update { it.copy(updateState = UpdateUiState.Checking) }
+        }
         try {
             val release = graph.controlPlane.latestRelease()
             runCatching { graph.settings.setPendingUpdateRelease(json.encodeToString(release).takeIf { release.hasUpdate }) }
-            _state.update { it.copy(
-                updateState = if (release.hasUpdate) UpdateUiState.Available(release) else UpdateUiState.NoUpdate,
-                message = if (release.hasUpdate) "发现新版本 ${release.versionName}" else "当前已是最新版本",
-            ) }
+            _state.update { current ->
+                val ready = (previous as? UpdateUiState.Ready)
+                    ?.takeIf { release.hasUpdate && it.release.releaseId == release.releaseId }
+                current.copy(
+                    updateState = ready ?: if (release.hasUpdate) UpdateUiState.Available(release) else UpdateUiState.NoUpdate,
+                    message = if (showStatus) {
+                        if (release.hasUpdate) "发现新版本 ${release.versionName}" else "当前已是最新版本"
+                    } else current.message,
+                )
+            }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "检查更新失败")) }
+            _state.update { current ->
+                current.copy(
+                    updateState = (previous as? UpdateUiState.Ready)
+                        ?: UpdateUiState.Error(error.message ?: "检查更新失败"),
+                )
+            }
         }
     }
 

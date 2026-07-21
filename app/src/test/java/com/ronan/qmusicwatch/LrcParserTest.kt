@@ -5,9 +5,22 @@ import com.ronan.qmusicwatch.lyrics.highlightedCharacters
 import com.ronan.qmusicwatch.lyrics.activeLyricIndex
 import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LrcParserTest {
+    @Test fun fallsBackToPlainDecryptedQrcWhenOriginalIsMissing() {
+        val lines = LrcParser.parse("", wordSync = "词：作者\n第一句\n第二句")
+        assertEquals(listOf("词：作者", "第一句", "第二句"), lines.map { it.text })
+        assertTrue(lines.all { it.timeMs == -1L })
+    }
+
+    @Test fun fallsBackToTimedLrcInsideDecryptedQrcField() {
+        val lines = LrcParser.parse("", wordSync = "[00:01.20]第一句\n[00:03.40]第二句")
+        assertEquals(listOf(1_200L, 3_400L), lines.map { it.timeMs })
+        assertEquals(listOf("第一句", "第二句"), lines.map { it.text })
+    }
+
     @Test fun fallsBackToUntimedPlainTextAndAlignsPlainTranslation() {
         val lines = LrcParser.parse("[ti:Demo]\nFirst line\nSecond line", "第一行\n第二行")
         assertEquals(listOf("First line", "Second line"), lines.map { it.text })

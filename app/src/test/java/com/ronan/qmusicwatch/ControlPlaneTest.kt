@@ -69,6 +69,22 @@ class ControlPlaneTest {
         assertFalse(RemoteFeatureConfig(features = mapOf("stream" to false)).featureEnabled("stream"))
     }
 
+    @Test fun startupAnnouncementsIncludeNonPinnedItemsAndPrioritizePinned() {
+        val items = listOf(
+            ControlAnnouncement("normal", createdAt = 30),
+            ControlAnnouncement("pinned", pinned = true, createdAt = 10),
+            ControlAnnouncement("seen", pinned = true, createdAt = 40),
+        )
+        assertEquals("pinned", nextStartupAnnouncement(items, setOf("seen"), emptySet())?.id)
+        assertEquals("normal", nextStartupAnnouncement(items, setOf("seen"), setOf("pinned"))?.id)
+    }
+
+    @Test fun recurringAnnouncementMayAppearAgainOnANewAppSession() {
+        val item = ControlAnnouncement("recurring", onceOnly = false)
+        assertEquals(item, nextStartupAnnouncement(listOf(item), setOf("recurring"), emptySet()))
+        assertEquals(null, nextStartupAnnouncement(listOf(item), setOf("recurring"), setOf("recurring")))
+    }
+
     @Test fun disabledRemoteFlagsExpireAndThenFailOpen() {
         val cache = CachedControlPlane(
             config = RemoteFeatureConfig(features = mapOf("stream" to false), ttlSeconds = 300),

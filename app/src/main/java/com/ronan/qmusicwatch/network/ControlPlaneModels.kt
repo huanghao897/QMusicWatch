@@ -173,6 +173,19 @@ internal fun visibleAnnouncements(
         (item.maxVersionCode <= 0 || item.maxVersionCode >= versionCode)
 }.distinctBy(ControlAnnouncement::id).take(40)
 
+internal fun nextStartupAnnouncement(
+    items: List<ControlAnnouncement>,
+    seen: Set<String>,
+    dismissedThisSession: Set<String>,
+): ControlAnnouncement? = items.asSequence()
+    .filter { it.id !in dismissedThisSession && (!it.onceOnly || it.id !in seen) }
+    .sortedWith(
+        compareByDescending<ControlAnnouncement> { it.pinned }
+            .thenByDescending { it.severity == "critical" }
+            .thenByDescending { maxOf(it.updatedAt, it.createdAt) },
+    )
+    .firstOrNull()
+
 internal fun RemoteFeatureConfig.featureEnabled(name: String): Boolean = features[name] != false
 
 internal fun controlCacheIsFresh(cache: CachedControlPlane, now: Long): Boolean {
