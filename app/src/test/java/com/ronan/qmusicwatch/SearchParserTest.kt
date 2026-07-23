@@ -1,6 +1,7 @@
 package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.network.parseSearchTrack
+import com.ronan.qmusicwatch.network.isUsableQqSongMid
 import com.ronan.qmusicwatch.network.nextSearchCursor
 import com.ronan.qmusicwatch.network.normalizeHttpsUrl
 import com.ronan.qmusicwatch.network.qqStreamFileName
@@ -44,6 +45,24 @@ class SearchParserTest {
         assertEquals("Album", track.album)
         assertEquals("https://y.gtimg.cn/music/photo_new/T002R300x300M000album-mid.jpg", track.artworkUrl)
         assertEquals(true, track.requiresVip)
+    }
+
+    @Test fun placeholderSongMidFallsBackToModernMid() {
+        val item = Json.parseToJsonElement("""{"songmid":"0","mid":"001ValidMid001","songname":"Song","singer":[{"name":"Singer"}]}""").jsonObject
+        assertEquals("001ValidMid001", parseSearchTrack(item)?.id)
+    }
+
+    @Test fun placeholderSongMidCanRecoverFromGroupedResult() {
+        val item = Json.parseToJsonElement("""{"songmid":"0","songname":"Container","grp":[{"songmid":"002GroupedMid1","songname":"Song","singer":[{"name":"Singer"}]}]}""").jsonObject
+        assertEquals("002GroupedMid1", parseSearchTrack(item)?.id)
+    }
+
+    @Test fun unresolvedPlaceholderSongMidIsRejected() {
+        val item = Json.parseToJsonElement("""{"songmid":"0","songname":"Broken","singer":[{"name":"Singer"}]}""").jsonObject
+        assertEquals(null, parseSearchTrack(item))
+        assertEquals(false, isUsableQqSongMid("0"))
+        assertEquals(false, isUsableQqSongMid("0000"))
+        assertEquals(false, isUsableQqSongMid("null"))
     }
 
     @Test fun verifiedDirectFormatsUseStableQqFileNames() {

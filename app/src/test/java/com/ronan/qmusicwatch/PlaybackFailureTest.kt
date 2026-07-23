@@ -25,6 +25,13 @@ class PlaybackFailureTest {
         assertEquals(PlaybackFailureType.API_CHANGED, failure.type)
     }
 
+    @Test fun invalidSearchTrackHasAnActionableMessage() {
+        val failure = classifyPlaybackFailure(IllegalStateException("歌曲信息已失效，请重新搜索后播放"))
+        assertEquals(PlaybackFailureType.API_CHANGED, failure.type)
+        assertEquals("歌曲信息已失效，请重新搜索后播放", failure.message)
+        assertEquals(false, failure.retryable)
+    }
+
     @Test fun genericMissingStreamIsNotMisreportedAsVipOnly() {
         val failure = classifyPlaybackFailure(IllegalStateException("QQ 音乐未提供播放地址，可能存在版权、地区或账号权益限制"))
         assertEquals(PlaybackFailureType.UNKNOWN, failure.type)

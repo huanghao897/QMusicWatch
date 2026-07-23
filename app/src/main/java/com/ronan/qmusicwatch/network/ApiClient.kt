@@ -22,6 +22,18 @@ internal fun normalizeHttpsUrl(value: String): String = when {
     else -> value
 }
 
+private val invalidQqSongMids = setOf("null", "undefined", "nil")
+
+internal fun isUsableQqSongMid(value: String): Boolean {
+    val normalized = value.trim()
+    return normalized.isNotEmpty() &&
+        normalized.any { it != '0' } &&
+        normalized.lowercase() !in invalidQqSongMids
+}
+
+private fun firstUsableQqSongMid(vararg values: String): String =
+    values.asSequence().map(String::trim).firstOrNull(::isUsableQqSongMid).orEmpty()
+
 private class QqBusinessException(val businessCode: Int, message: String) : IllegalStateException(message)
 
 private fun JsonObject.hasPositiveNumber(vararg names: String): Boolean = names.any { name ->
@@ -416,14 +428,15 @@ internal fun parseGitHubRelease(root: JsonObject, currentVersion: String): Relea
     )
 }
 
-internal fun parseSearchTrack(item: JsonObject): Track? {
+private fun parseSearchTrackItem(item: JsonObject): Track? {
     fun text(name: String) = (item[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
     fun number(name: String) = (item[name] as? JsonPrimitive)?.longOrNull ?: 0
     val file = item["file"] as? JsonObject ?: JsonObject(emptyMap())
     fun fileText(name: String) = (file[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
     fun fileNumber(name: String) = (file[name] as? JsonPrimitive)?.longOrNull ?: 0
-    val mid = text("songmid").ifBlank { text("mid") }; val title = text("songname").ifBlank { text("title") }
-    if (mid.isBlank() || title.isBlank()) return null
+    val mid = firstUsableQqSongMid(text("songmid"), text("mid"), text("song_mid"))
+    val title = text("songname").ifBlank { text("title") }
+    if (!isUsableQqSongMid(mid) || title.isBlank()) return null
     val pay = item["pay"] as? JsonObject ?: JsonObject(emptyMap())
     fun pay(name: String) = (pay[name] as? JsonPrimitive)?.intOrNull ?: 0
     val album = item["album"] as? JsonObject ?: JsonObject(emptyMap())
@@ -431,6 +444,11 @@ internal fun parseSearchTrack(item: JsonObject): Track? {
     val albumName = text("albumname").ifBlank { (album["title"] as? JsonPrimitive)?.contentOrNull.orEmpty() }.ifBlank { (album["name"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
     return Track(mid, title, (item["singer"] as? JsonArray).orEmpty().mapNotNull { ((it as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull }, albumName, albumMid.takeIf(String::isNotBlank)?.let { "https://y.gtimg.cn/music/photo_new/T002R300x300M000$it.jpg" }.orEmpty(), true, parseQqQualityIds(item, file), numericId = number("songid").takeIf { it > 0 } ?: number("id"), mediaMid = fileText("media_mid"), songType = number("type").toInt(), requiresVip = text("isonly") == "1" || pay("payplay") != 0 || pay("pay_play") != 0)
 }
+
+internal fun parseSearchTrack(item: JsonObject): Track? =
+    parseSearchTrackItem(item) ?: (item["grp"] as? JsonArray)
+        .orEmpty()
+        .firstNotNullOfOrNull { (it as? JsonObject)?.let(::parseSearchTrackItem) }
 
 internal fun nextSearchCursor(page: Int, rawItemCount: Int, pageSize: Int = 20): String? =
     (page + 1).toString().takeIf { rawItemCount >= pageSize }
@@ -469,8 +487,26 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     suspend fun searchTracks(query: String, cursor: String? = null): PagedTracks = withContext(Dispatchers.IO) {
         val page = cursor?.toIntOrNull()?.coerceAtLeast(1) ?: 1
         val items = webSearch(query, page, 0)["song"]?.jsonObject?.get("list") as? JsonArray ?: JsonArray(emptyList())
-        val tracks = items.mapNotNull { it as? JsonObject }.mapNotNull(::parseSearchTrack)
-        PagedTracks(tracks, nextSearchCursor(page, items.size))
+        val searchObjects = items.mapNotNull { it as? JsonObject }
+        val parsedTracks = searchObjects.mapNotNull(::parseSearchTrack)
+        val directTracks = parsedTracks.distinctBy(Track::id)
+        val rejected = searchObjects.size - parsedTracks.size
+        val structuredItems = if (rejected > 0) runCatching {
+            val data = api(
+                "music.search.SearchCgiService", "DoSearchForQQMusicDesktop",
+                obj("remoteplace" to "txt.yqq.center", "search_type" to 0, "query" to query, "page_num" to page, "num_per_page" to 20, "grp" to 1),
+            )
+            data["body"]?.jsonObject?.get("song")?.jsonObject?.get("list") as? JsonArray ?: JsonArray(emptyList())
+        }.onFailure { error ->
+            AppLog.write("SEARCH", "structured fallback ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+        }.getOrDefault(JsonArray(emptyList())) else JsonArray(emptyList())
+        val structuredTracks = structuredItems.mapNotNull { it as? JsonObject }.mapNotNull(::parseSearchTrack).distinctBy(Track::id)
+        val tracks = if (structuredTracks.size > directTracks.size) structuredTracks else directTracks
+        if (rejected > 0) AppLog.write(
+            "SEARCH",
+            "tracks page=$page ignored=$rejected fallback=${structuredTracks.size} returned=${tracks.size}",
+        )
+        PagedTracks(tracks, nextSearchCursor(page, maxOf(items.size, structuredItems.size)))
     }
 
     suspend fun searchCollections(type: String, query: String, cursor: String? = null): PagedCollections = withContext(Dispatchers.IO) {
@@ -511,6 +547,10 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     }
 
     suspend fun stream(track: Track, quality: String): StreamData = withContext(Dispatchers.IO) {
+        if (!isUsableQqSongMid(track.id)) {
+            AppLog.write("STREAM", "blocked invalid track id")
+            error("歌曲信息已失效，请重新搜索后播放")
+        }
         requireLogin()
         val preferred = normalizeQualityId(quality)
         AppLog.write("STREAM", "request track=${track.id} preferred=$preferred vip=${track.requiresVip}")
@@ -773,6 +813,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     }
 
     private suspend fun trackDetail(mid: String): Track {
+        require(isUsableQqSongMid(mid)) { "歌曲信息已失效，请重新搜索后播放" }
         val data = webApi("music.pf_song_detail_svr", "get_song_detail_yqq", obj("song_mid" to mid))
         return findTracks(data).firstOrNull() ?: error("无法读取歌曲详情")
     }
@@ -838,10 +879,10 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     }
 
     private fun findTracks(root: JsonElement): List<Track> = walkObjects(root).mapNotNull { value ->
-        val mid = value.string("mid")
+        val mid = firstUsableQqSongMid(value.string("mid"), value.string("songmid"), value.string("song_mid"))
         val singers = value["singer"] as? JsonArray
         val album = value["album"] as? JsonObject
-        if (mid.isBlank() || singers == null || album == null) return@mapNotNull null
+        if (!isUsableQqSongMid(mid) || singers == null || album == null) return@mapNotNull null
         val file = value["file"] as? JsonObject ?: JsonObject(emptyMap())
         val pay = value["pay"] as? JsonObject ?: JsonObject(emptyMap())
         val numericId = value.long("id")

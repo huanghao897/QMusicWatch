@@ -26,6 +26,8 @@ internal fun classifyPlaybackFailure(error: Throwable): PlaybackFailure {
     return when {
         status in setOf(401, 403, 404, 410) -> PlaybackFailure(PlaybackFailureType.ADDRESS_EXPIRED, "播放地址已失效", true)
         text.contains("登录凭据已失效") || text.contains("请重新登录") -> PlaybackFailure(PlaybackFailureType.SESSION_EXPIRED, "登录状态已失效，请重新登录")
+        text.contains("歌曲信息已失效") || text.contains("歌曲标识无效") ->
+            PlaybackFailure(PlaybackFailureType.API_CHANGED, "歌曲信息已失效，请重新搜索后播放")
         text.contains("未提供播放地址") -> PlaybackFailure(PlaybackFailureType.UNKNOWN, "QQ 音乐未提供播放地址，可能受版权、地区或账号权益限制")
         text.contains("vip") || text.contains("会员") || text.contains("购买") || text.contains("权益") ->
             PlaybackFailure(PlaybackFailureType.ENTITLEMENT, "当前账号没有这首歌的播放权益")
