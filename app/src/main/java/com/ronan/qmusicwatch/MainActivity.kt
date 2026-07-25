@@ -255,8 +255,8 @@ private fun vipSummary(profile: UserProfile?, loaded: Boolean, error: String?): 
 ) {
     val context = LocalContext.current
     val qq = accountId.orEmpty().filter(Char::isDigit)
-    val resolvedUrl = avatarUrl.orEmpty().ifBlank {
-        if (provider == "qq" && qq.isNotBlank()) "https://q1.qlogo.cn/g?b=qq&nk=$qq&s=140" else ""
+    val resolvedUrl = trustedQMusicMediaUrl(avatarUrl.orEmpty()).ifBlank {
+        if (provider == "qq" && qq.isNotBlank()) qmusicAvatarUrl(qq) else ""
     }
     val request = remember(resolvedUrl) {
         resolvedUrl.takeIf(String::isNotBlank)?.let { ImageRequest.Builder(context).data(it).crossfade(false).build() }
@@ -876,7 +876,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     ) {
                         var dragY by remember { mutableFloatStateOf(0f) }
                         AsyncImage(
-                            model = track.artworkUrl.ifBlank { null },
+                            model = safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null },
                             contentDescription = "歌曲封面",
                             modifier = Modifier.size(coverSize).background(Surface, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
                                 .pointerInput(track.id) { detectTapGestures(onDoubleTap = { if (vm.isPlaying()) vm.pausePlayback() else vm.resumePlayback() }) }
@@ -1380,7 +1380,7 @@ private fun formatFileSize(bytes: Long): String = when {
     var menu by remember { mutableStateOf(false) }
     var choosePlaylist by remember { mutableStateOf(false) }
     ListItem(modifier = Modifier.clickable { vm.requestPlay(track, sourceQueue = queue) }, headlineContent = { Row(verticalAlignment = Alignment.CenterVertically) { Text(track.title, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis); if (track.requiresVip) { Spacer(Modifier.width(5.dp)); Text("VIP", color = Color(0xFFFFC857), fontSize = 11.sp, fontWeight = FontWeight.Bold) } } }, supportingContent = { Text(track.artists.joinToString(" / "), maxLines = 1) },
-        leadingContent = { AsyncImage(track.artworkUrl.ifBlank { null }, null, Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)).background(Color.DarkGray)) },
+        leadingContent = { AsyncImage(safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null }, null, Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)).background(Color.DarkGray)) },
         trailingContent = { Row { IconButton({ vm.cache(track) }, Modifier.size(38.dp)) { Icon(Icons.Default.Download, null, Modifier.size(21.dp)) }; IconButton({ vm.like(track, !liked) }, Modifier.size(38.dp)) { Icon(if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, Modifier.size(21.dp), tint = if (liked) Green else LocalContentColor.current) }; Box { IconButton({ menu = true }, Modifier.size(38.dp)) { Icon(Icons.Default.MoreVert, "更多", Modifier.size(21.dp)) }; DropdownMenu(menu, { menu = false }) { DropdownMenuItem({ Text("下一首播放") }, { vm.enqueueNext(track); menu = false }); DropdownMenuItem({ Text("添加到播放列表") }, { vm.addToQueue(track); menu = false }); if (playlists.isNotEmpty()) DropdownMenuItem({ Text("加入我的歌单") }, { menu = false; choosePlaylist = true }); if (removeFromPlaylist && playlistId != null) DropdownMenuItem({ Text("从此歌单移除") }, { vm.removeFromPlaylist(track, playlistId); menu = false }) } } } })
     if (choosePlaylist) AlertDialog(onDismissRequest = { choosePlaylist = false }, title = { Text("加入哪个歌单？") }, text = { LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) { items(playlists.filter { it.owned != false && it.directoryId != "201" }, key = { it.directoryId }) { playlist -> Surface(Modifier.fillMaxWidth().clickable { vm.addToPlaylist(track, playlist.directoryId); choosePlaylist = false }, shape = RoundedCornerShape(14.dp), color = Surface) { Column(Modifier.padding(12.dp, 9.dp)) { Text(playlist.title, maxLines = 1); Text(if (playlist.trackCount >= 0) "${playlist.trackCount} 首" else "我的歌单", color = Color.Gray, fontSize = 12.sp) } } } } }, confirmButton = {}, dismissButton = { TextButton({ choosePlaylist = false }) { Text("取消") } })
 }
@@ -1521,7 +1521,7 @@ private fun formatFileSize(bytes: Long): String = when {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AsyncImage(
-                model = track.artworkUrl.ifBlank { null },
+                model = safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null },
                 contentDescription = "当前歌曲封面",
                 modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(Color.DarkGray),
             )

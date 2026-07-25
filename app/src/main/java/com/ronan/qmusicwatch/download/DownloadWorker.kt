@@ -9,6 +9,7 @@ import com.ronan.qmusicwatch.model.Track
 import com.ronan.qmusicwatch.model.QUALITY_LEGACY_UNKNOWN
 import com.ronan.qmusicwatch.model.QUALITY_STANDARD
 import com.ronan.qmusicwatch.model.normalizeQualityId
+import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
@@ -26,7 +27,16 @@ internal fun offlineAudioRelativePath(owner: String, trackId: String): String =
     "offline/${downloadHash(owner)}/${downloadHash("$owner:$trackId")}.audio"
 private fun downloadHash(value: String) = java.security.MessageDigest.getInstance("SHA-256").digest(value.encodeToByteArray()).joinToString("") { "%02x".format(it) }
 private val downloadSlots = Semaphore(2)
-private val downloadHttp = OkHttpClient()
+private val downloadHttp = OkHttpClient.Builder()
+    .followRedirects(false)
+    .followSslRedirects(false)
+    .addInterceptor { chain ->
+        require(trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank()) {
+            "download host rejected"
+        }
+        chain.proceed(chain.request())
+    }
+    .build()
 private val downloadJson = Json { ignoreUnknownKeys = true }
 private const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
 private class StorageReserveException : IllegalStateException("存储空间不足，需保留 256MB")
@@ -68,6 +78,8 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 numericId = inputData.getLong("numericId", 0), mediaMid = inputData.getString("mediaMid").orEmpty(), songType = inputData.getInt("songType", 0), requiresVip = inputData.getBoolean("requiresVip", false),
             )
             val stream = graph.api.stream(track, requestedQuality)
+            val streamUrl = trustedQMusicMediaUrl(stream.url)
+            if (streamUrl.isBlank()) error("download gateway url rejected")
             val issuedQuality = normalizeQualityId(stream.quality)
             val current = db.downloads().find(id, owner)
             if (part.exists() && !canResumePartialDownload(current?.quality, issuedQuality)) part.delete()
@@ -78,7 +90,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 updatedAt = System.currentTimeMillis(),
                 quality = issuedQuality,
             )?.let { db.downloads().upsert(it) }
-            val request = Request.Builder().url(stream.url).header("Referer", "https://y.qq.com/").header("Origin", "https://y.qq.com/").apply { if (part.length() > 0) header("Range", "bytes=${part.length()}-") }.build()
+            val request = Request.Builder().url(streamUrl).apply { if (part.length() > 0) header("Range", "bytes=${part.length()}-") }.build()
             downloadHttp.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error("download ${response.code}")
                 val append = response.code == 206 && part.length() > 0
@@ -107,7 +119,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 db.downloads().progress(id, owner, "complete", target.length(), target.length())
             }
             runCatching { graph.api.lyrics(id) }.getOrNull()?.let { cachedLyricsFile(target.absolutePath).writeText(downloadJson.encodeToString(it)) }
-            track.artworkUrl.takeIf { it.startsWith("https://") }?.let { artwork ->
+            trustedQMusicMediaUrl(track.artworkUrl).takeIf(String::isNotBlank)?.let { artwork ->
                 val cover = cachedArtworkFile(target.absolutePath)
                 val coverPart = File("${cover.absolutePath}.part")
                 runCatching {

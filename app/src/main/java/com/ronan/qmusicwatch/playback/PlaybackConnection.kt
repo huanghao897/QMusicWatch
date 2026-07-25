@@ -15,6 +15,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.ronan.qmusicwatch.data.AppLog
+import com.ronan.qmusicwatch.network.safeLocalOrGatewayUri
 
 class PlaybackConnection(context: Context) {
     private val audio = context.getSystemService(AudioManager::class.java)
@@ -116,8 +117,12 @@ class PlaybackConnection(context: Context) {
     fun release() { scope.cancel(); MediaController.releaseFuture(future) }
 }
 
-internal fun playbackMediaItem(id: String, uri: String, title: String, artist: String, artwork: String) =
-    MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(
+internal fun playbackMediaItem(id: String, uri: String, title: String, artist: String, artwork: String): MediaItem {
+    val playableUri = safeLocalOrGatewayUri(uri)
+    require(playableUri.isNotBlank()) { "播放地址不受信任" }
+    val safeArtwork = safeLocalOrGatewayUri(artwork)
+    return MediaItem.Builder().setMediaId(id).setUri(playableUri).setMediaMetadata(
         MediaMetadata.Builder().setTitle(title).setArtist(artist)
-            .apply { if (artwork.isNotBlank()) setArtworkUri(android.net.Uri.parse(artwork)) }.build()
+            .apply { if (safeArtwork.isNotBlank()) setArtworkUri(android.net.Uri.parse(safeArtwork)) }.build()
     ).build()
+}

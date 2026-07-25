@@ -23,9 +23,11 @@ class SearchParserTest {
         assertEquals(null, nextSearchCursor(page = 2, rawItemCount = 19))
     }
 
-    @Test fun protocolRelativeArtworkUrlsBecomeHttps() {
-        assertEquals("https://img.qq.com/a.jpg", normalizeHttpsUrl("//img.qq.com/a.jpg"))
-        assertEquals("https://img.qq.com/a.jpg", normalizeHttpsUrl("http://img.qq.com/a.jpg"))
+    @Test fun onlyGatewayArtworkUrlsAreAccepted() {
+        assertEquals("", normalizeHttpsUrl("//img.qq.com/a.jpg"))
+        assertEquals("", normalizeHttpsUrl("http://img.qq.com/a.jpg"))
+        val gateway = "https://203.160.55.168/api/qmusic-watch/gateway/media/${"a".repeat(32)}/cover.jpg"
+        assertEquals(gateway, normalizeHttpsUrl(gateway))
     }
     @Test fun parsesFullSearchSongShape() {
         val item = Json.parseToJsonElement("""{"songmid":"001","songname":"搁浅","songid":12,"albummid":"alb","albumname":"七里香","size128":10,"size320":20,"singer":[{"name":"周杰伦"}],"pay":{"payplay":1}}""").jsonObject
@@ -37,13 +39,13 @@ class SearchParserTest {
     }
 
     @Test fun readsModernNestedFileQualityFields() {
-        val item = Json.parseToJsonElement("""{"mid":"song-mid","title":"Song","id":42,"type":0,"isonly":1,"singer":[{"name":"Singer"}],"album":{"title":"Album","mid":"album-mid"},"file":{"media_mid":"media-mid","size_128mp3":100,"size_320mp3":200,"size_flac":300,"size_hires":400},"pay":{"pay_play":1}}""").jsonObject
+        val item = Json.parseToJsonElement("""{"mid":"song-mid","title":"Song","id":42,"type":0,"isonly":1,"singer":[{"name":"Singer"}],"album":{"title":"Album","mid":"albumMID123"},"file":{"media_mid":"media-mid","size_128mp3":100,"size_320mp3":200,"size_flac":300,"size_hires":400},"pay":{"pay_play":1}}""").jsonObject
         val track = parseSearchTrack(item)!!
         assertEquals(listOf(QUALITY_STANDARD, QUALITY_HQ, QUALITY_SQ, QUALITY_HI_RES), track.qualities)
         assertEquals("media-mid", track.mediaMid)
         assertEquals(42L, track.numericId)
         assertEquals("Album", track.album)
-        assertEquals("https://y.gtimg.cn/music/photo_new/T002R300x300M000album-mid.jpg", track.artworkUrl)
+        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/artwork/album/albumMID123.jpg", track.artworkUrl)
         assertEquals(true, track.requiresVip)
     }
 

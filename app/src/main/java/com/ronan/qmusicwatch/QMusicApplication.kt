@@ -1,6 +1,8 @@
 package com.ronan.qmusicwatch
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
 import com.ronan.qmusicwatch.data.AppDatabase
 import com.ronan.qmusicwatch.data.SessionVault
 import com.ronan.qmusicwatch.data.SettingsStore
@@ -8,10 +10,12 @@ import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.download.DownloadController
 import com.ronan.qmusicwatch.network.ApiClient
 import com.ronan.qmusicwatch.network.ControlPlaneClient
+import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import com.ronan.qmusicwatch.playback.PlaybackConnection
 import com.ronan.qmusicwatch.update.UpdateManager
+import okhttp3.OkHttpClient
 
-class QMusicApplication : Application() {
+class QMusicApplication : Application(), ImageLoaderFactory {
     companion object { val processStartedAt: Long = android.os.SystemClock.elapsedRealtime() }
     lateinit var db: AppDatabase
     lateinit var vault: SessionVault
@@ -33,4 +37,19 @@ class QMusicApplication : Application() {
         settings = SettingsStore(this)
         playback = PlaybackConnection(this)
     }
+
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        .okHttpClient {
+            OkHttpClient.Builder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .addInterceptor { chain ->
+                    require(trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank()) {
+                        "image host rejected"
+                    }
+                    chain.proceed(chain.request())
+                }
+                .build()
+        }
+        .build()
 }

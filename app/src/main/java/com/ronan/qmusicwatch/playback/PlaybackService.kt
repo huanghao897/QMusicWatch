@@ -30,6 +30,7 @@ import com.ronan.qmusicwatch.data.RecentEntity
 import com.ronan.qmusicwatch.download.cachedArtworkFile
 import com.ronan.qmusicwatch.model.PlaybackSnapshot
 import com.ronan.qmusicwatch.model.belongsToAccount
+import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -63,8 +64,18 @@ class PlaybackService : MediaSessionService() {
     }
     @UnstableApi override fun onCreate() {
         super.onCreate()
-        val http = OkHttpDataSource.Factory(OkHttpClient()).setUserAgent("QQMusic 14090008 Android")
-            .setDefaultRequestProperties(mapOf("Referer" to "https://y.qq.com/", "Origin" to "https://y.qq.com"))
+        val http = OkHttpDataSource.Factory(
+            OkHttpClient.Builder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .addInterceptor { chain ->
+                    require(trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank()) {
+                        "playback host rejected"
+                    }
+                    chain.proceed(chain.request())
+                }
+                .build()
+        ).setUserAgent("QMusicWatch")
         val dataSource = DefaultDataSource.Factory(this, http)
         val mediaSourceFactory = DefaultMediaSourceFactory(this).setDataSourceFactory(dataSource)
             .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(3))
@@ -117,9 +128,10 @@ class PlaybackService : MediaSessionService() {
                         val track = snapshot.track ?: error("没有可恢复的歌曲")
                         val local = snapshot.streamUrl.takeIf { it.startsWith("file:") }
                             ?.takeIf { File(android.net.Uri.parse(it).path.orEmpty()).exists() }
-                        val stream = if (local != null) null else if (snapshot.streamUrl.isNotBlank() && snapshot.streamExpiresAt > System.currentTimeMillis() + 30_000) null
+                        val cachedRemote = trustedQMusicMediaUrl(snapshot.streamUrl)
+                        val stream = if (local != null) null else if (cachedRemote.isNotBlank() && snapshot.streamExpiresAt > System.currentTimeMillis() + 30_000) null
                         else graph.api.stream(track, snapshot.quality)
-                        val uri = local ?: stream?.url ?: snapshot.streamUrl.takeIf(String::isNotBlank) ?: error("播放地址已失效")
+                        val uri = local ?: stream?.url ?: cachedRemote.takeIf(String::isNotBlank) ?: error("播放地址已失效")
                         if (stream != null) graph.settings.setPlaybackSnapshot(json.encodeToString(snapshot.copy(streamUrl = stream.url, streamExpiresAt = stream.expiresAt, quality = stream.quality)))
                         val item = playbackMediaItem(track.id, uri, track.title, track.artists.joinToString(" / "), track.artworkUrl)
                         MediaSession.MediaItemsWithStartPosition(listOf(item), 0, snapshot.positionMs.coerceAtLeast(0))

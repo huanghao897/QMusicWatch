@@ -6,7 +6,7 @@
         </trust-anchors>
     </base-config>
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="false">8.138.134.236</domain>
+        <domain includeSubdomains="false">203.160.55.168</domain>
         <trust-anchors>
             <certificates src="@raw/qmusic_server_ca" />
         </trust-anchors>

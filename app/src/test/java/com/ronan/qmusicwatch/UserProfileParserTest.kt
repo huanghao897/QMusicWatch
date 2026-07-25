@@ -10,35 +10,35 @@ import org.junit.Test
 
 class UserProfileParserTest {
     @Test fun parsesNicknameAndProtocolRelativeAvatar() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"creator":{"nick":"Ronan","logo":"//img.qq.com/a.png"},"background":{"picurl":"https://img.qq.com/wallpaper.jpg"},"greenVip":{"isVip":0},"superVip":{"isSVip":1,"vipEndTime":1893456000}}"""))!!
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"creator":{"nick":"Ronan","logo":"https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"greenVip":{"isVip":0},"superVip":{"isSVip":1,"vipEndTime":1893456000}}"""))!!
         assertEquals("Ronan", profile.displayName)
-        assertEquals("https://img.qq.com/a.png", profile.avatarUrl)
+        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png", profile.avatarUrl)
         assertEquals(true, profile.isVip)
         assertEquals(1893456000L, profile.vipExpireAt)
         assertEquals("超级会员（SVIP）", profile.vipName)
     }
 
     @Test fun ignoresSongVipFlagsWhenParsingAccount() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"info":{"nick":"Ronan","logo":"https://img.qq.com/a.png"},"song":{"title":"测试歌曲","isVip":0}}"""))!!
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"info":{"nick":"Ronan","logo":"https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"song":{"title":"测试歌曲","isVip":0}}"""))!!
         assertEquals(null, profile.isVip)
     }
 
     @Test fun readsWechatAvatarFieldsAndPrefersAccountAvatarOverPlaceholder() {
-        val wechat = parseUserProfile(Json.parseToJsonElement("""{"profile":{"nickname":"Ronan","headimgurl":"http://thirdwx.qlogo.cn/mmopen/account/132"}}"""))!!
-        assertEquals("https://thirdwx.qlogo.cn/mmopen/account/132", wechat.avatarUrl)
+        val wechat = parseUserProfile(Json.parseToJsonElement("""{"profile":{"nickname":"Ronan","headimgurl":"https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png"}}"""))!!
+        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", wechat.avatarUrl)
 
         val merged = mergeUserProfiles(listOf(
-            UserProfile(displayName = "Ronan", avatarUrl = "https://img.qq.com/default-avatar.png"),
+            UserProfile(displayName = "Ronan"),
             wechat,
         ))!!
-        assertEquals("https://thirdwx.qlogo.cn/mmopen/account/132", merged.avatarUrl)
+        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", merged.avatarUrl)
     }
 
     @Test fun parsesDedicatedVipResponse() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_info":{"vip_type":11,"vip_name":"超级会员","expire_date":"20260722"}}"""))!!
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"vip_info":{"vip_type":11,"vip_name":"超级会员","expire_date":"20990722"}}"""))!!
         assertEquals(true, profile.isVip)
         assertEquals("超级会员（SVIP）", profile.vipName)
-        assertEquals(1784649600L, profile.vipExpireAt)
+        assertEquals(profileEpoch("2099-07-22"), profile.vipExpireAt)
     }
 
     @Test fun parsesRealVipLoginBaseShape() {
