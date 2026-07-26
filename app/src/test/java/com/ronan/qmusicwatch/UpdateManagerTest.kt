@@ -2,6 +2,7 @@ package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.network.ControlApk
 import com.ronan.qmusicwatch.network.ControlUpdate
+import com.ronan.qmusicwatch.network.UpdateUiState
 import com.ronan.qmusicwatch.update.ApkArchiveMetadata
 import com.ronan.qmusicwatch.update.DownloadResponsePlan
 import com.ronan.qmusicwatch.update.expectedPartialMetadata
@@ -13,6 +14,7 @@ import com.ronan.qmusicwatch.update.updateArtifacts
 import com.ronan.qmusicwatch.update.validateApkMetadata
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -104,5 +106,15 @@ class UpdateManagerTest {
         assertThrows(IllegalArgumentException::class.java) {
             planDownloadResponse(416, requestedStart = 0, expectedSize = size, contentRange = null, retriedFromStart = false)
         }
+    }
+
+    @Test fun automaticInstallWaitsForTheMatchingVerifiedRelease() {
+        val ready = UpdateUiState.Ready(release, "verified.apk")
+
+        assertNull(automaticInstallCandidate(0, ready))
+        assertNull(automaticInstallCandidate(release.releaseId + 1, ready))
+        assertNull(automaticInstallCandidate(release.releaseId, UpdateUiState.Available(release)))
+        assertEquals(ready, automaticInstallCandidate(release.releaseId, ready))
+        assertEquals(release, updateStateRelease(UpdateUiState.Downloading(release, 50, 100)))
     }
 }

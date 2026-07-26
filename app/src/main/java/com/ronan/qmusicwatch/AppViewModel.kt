@@ -695,15 +695,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         updateJob?.cancel()
         updateJob = viewModelScope.launch {
             runCatching { graph.settings.setPendingUpdateRelease(json.encodeToString(release)) }
-            _state.update { it.copy(updateState = UpdateUiState.Downloading(release, 0, release.apk.sizeBytes)) }
+            _state.update {
+                it.copy(
+                    updateState = UpdateUiState.Downloading(release, 0, release.apk.sizeBytes),
+                    message = "正在下载更新…",
+                )
+            }
             runCatching {
                 graph.updates.downloadAndVerify(
                     release,
                     onProgress = { bytes, total -> _state.update { it.copy(updateState = UpdateUiState.Downloading(release, bytes, total)) } },
                     onVerifying = { _state.update { it.copy(updateState = UpdateUiState.Verifying(release)) } },
                 )
-            }.onSuccess { file -> _state.update { it.copy(updateState = UpdateUiState.Ready(release, file.absolutePath), message = "更新已校验，可以安装") } }
-                .onFailure { error -> if (error !is CancellationException) _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "更新下载失败", release)) } }
+            }.onSuccess { file -> _state.update { it.copy(updateState = UpdateUiState.Ready(release, file.absolutePath), message = "更新已校验，正在打开安装器") } }
+                .onFailure { error ->
+                    if (error !is CancellationException) {
+                        val message = error.message ?: "更新下载失败"
+                        _state.update { it.copy(updateState = UpdateUiState.Error(message, release), message = "更新失败：$message") }
+                    }
+                }
         }
     }
 

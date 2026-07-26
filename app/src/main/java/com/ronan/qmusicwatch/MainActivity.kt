@@ -282,6 +282,16 @@ internal fun downloadProgressSummary(downloadedBytes: Long, totalBytes: Long): S
     val percent = (safeDownloaded * 100 / totalBytes).toInt()
     return "%.1f / %.1f MB · %d%%".format(java.util.Locale.US, downloadedMb, totalMb, percent)
 }
+internal fun updateStateRelease(update: UpdateUiState): ControlUpdate? = when (update) {
+    is UpdateUiState.Available -> update.release
+    is UpdateUiState.Downloading -> update.release
+    is UpdateUiState.Verifying -> update.release
+    is UpdateUiState.Ready -> update.release
+    is UpdateUiState.Error -> update.release
+    else -> null
+}
+internal fun automaticInstallCandidate(pendingReleaseId: Long, update: UpdateUiState): UpdateUiState.Ready? =
+    (update as? UpdateUiState.Ready)?.takeIf { pendingReleaseId > 0 && it.release.releaseId == pendingReleaseId }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -342,13 +352,69 @@ class MainActivity : ComponentActivity() {
     val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
     var dismissedAnnouncements by remember { mutableStateOf(emptySet<String>()) }
     var dismissedUpdateId by remember { mutableLongStateOf(0L) }
+    var pendingAutomaticInstallId by rememberSaveable { mutableLongStateOf(0L) }
+    var permissionInstallId by rememberSaveable { mutableLongStateOf(0L) }
+    var installLaunchError by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { AppLog.write("PERF", "startup_ui_ready_ms=${android.os.SystemClock.elapsedRealtime() - QMusicApplication.processStartedAt}") }
     val snackbar = remember { SnackbarHostState() }
+    val openVerifiedInstaller: (UpdateUiState.Ready) -> Unit = { ready ->
+        vm.prepareUpdateInstall(ready.release, ready.filePath) { verified ->
+            runCatching { context.startActivity(UpdateInstaller.installIntent(context, verified)) }
+                .onSuccess { installLaunchError = null }
+                .onFailure { error ->
+                    AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                    installLaunchError = "系统没有可用的 APK 安装器"
+                }
+        }
+    }
+    val installPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val requestedId = permissionInstallId
+        permissionInstallId = 0L
+        val ready = (state.updateState as? UpdateUiState.Ready)
+            ?.takeIf { it.release.releaseId == requestedId }
+        if (ready != null && UpdateInstaller.canInstallPackages(context)) {
+            openVerifiedInstaller(ready)
+        } else if (requestedId > 0) {
+            installLaunchError = "需要允许 QMusic Watch 安装未知来源应用"
+        }
+    }
+    val requestUpdateInstall: (UpdateUiState.Ready) -> Unit = { ready ->
+        installLaunchError = null
+        if (UpdateInstaller.canInstallPackages(context)) {
+            openVerifiedInstaller(ready)
+        } else {
+            permissionInstallId = ready.release.releaseId
+            runCatching { installPermissionLauncher.launch(UpdateInstaller.permissionIntent(context)) }
+                .onFailure { error ->
+                    permissionInstallId = 0L
+                    AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                    installLaunchError = "系统没有可用的未知来源安装设置入口"
+                }
+        }
+    }
+    val startUpdate: (ControlUpdate) -> Unit = { release ->
+        dismissedUpdateId = release.releaseId
+        pendingAutomaticInstallId = release.releaseId
+        installLaunchError = null
+        vm.downloadUpdate(release)
+    }
     DisposableEffect(backStack?.destination?.route) {
         FramePerformanceMonitor.section = backStack?.destination?.route ?: "home"
         onDispose { }
     }
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); vm.consumeMessage() } }
+    LaunchedEffect(installLaunchError) {
+        installLaunchError?.let {
+            snackbar.showSnackbar(it)
+            installLaunchError = null
+        }
+    }
+    LaunchedEffect(state.updateState, pendingAutomaticInstallId) {
+        automaticInstallCandidate(pendingAutomaticInstallId, state.updateState)?.let { ready ->
+            pendingAutomaticInstallId = 0L
+            requestUpdateInstall(ready)
+        }
+    }
     LaunchedEffect(state.playEvent, autoOpenPlayer) {
         if (state.playEvent != 0L && autoOpenPlayer && state.currentTrack != null && backStack?.destination?.route != "player") nav.navigate("player") { launchSingleTop = true }
     }
@@ -399,7 +465,9 @@ class MainActivity : ComponentActivity() {
                 }) { nav.popBackStack() }
             }
             composable("settings/announcements") { AnnouncementsScreen(state.announcements, seenAnnouncements, vm) { nav.popBackStack() } }
-            composable("settings/about") { AboutScreen(vm, state.updateState) { nav.popBackStack() } }
+            composable("settings/about") {
+                AboutScreen(vm, state.updateState, startUpdate, requestUpdateInstall) { nav.popBackStack() }
+            }
         }
     }
     state.pendingSpeakerTrack?.let { track ->
@@ -408,8 +476,14 @@ class MainActivity : ComponentActivity() {
             dismissButton = { TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }) { Text("连接蓝牙") } })
     }
     val startupAnnouncement = nextStartupAnnouncement(state.announcements, seenAnnouncements, dismissedAnnouncements)
-    val startupUpdate = (state.updateState as? UpdateUiState.Available)
-        ?.takeIf { it.release.releaseId != dismissedUpdateId }
+    val automaticUpdate = state.updateState.takeIf {
+        pendingAutomaticInstallId > 0 && updateStateRelease(it)?.releaseId == pendingAutomaticInstallId
+    }
+    val startupUpdate = when (val update = state.updateState) {
+        is UpdateUiState.Available -> update.release
+        is UpdateUiState.Ready -> update.release
+        else -> null
+    }?.takeIf { it.releaseId != dismissedUpdateId }
     if (showNotice) AlertDialog(onDismissRequest = {}, title = { Text("第三方非官方客户端") }, text = { Text("QMusic Watch 与腾讯或 QQ 音乐无隶属或认可关系。请尊重版权和账号权益，本项目不会绕过会员、地区、付费或 DRM 限制。") }, confirmButton = { Button({ noticePrefs.edit().putBoolean("accepted", true).apply(); showNotice = false }) { Text("我知道了") } })
     else if (startupAnnouncement != null) startupAnnouncement.let { announcement ->
         val dismiss: () -> Unit = {
@@ -423,23 +497,78 @@ class MainActivity : ComponentActivity() {
             confirmButton = { TextButton(dismiss) { Text("知道了") } },
         )
     }
-    else if (startupUpdate != null) startupUpdate.let { update ->
+    else if (automaticUpdate is UpdateUiState.Downloading) AlertDialog(
+        onDismissRequest = {},
+        title = { Text("正在更新") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(downloadProgressSummary(automaticUpdate.downloadedBytes, automaticUpdate.totalBytes))
+                LinearProgressIndicator(
+                    progress = {
+                        if (automaticUpdate.totalBytes > 0) {
+                            automaticUpdate.downloadedBytes.toFloat()
+                                .div(automaticUpdate.totalBytes)
+                                .coerceIn(0f, 1f)
+                        } else 0f
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("下载完成后将自动打开系统安装器", color = Color.Gray, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {},
+    )
+    else if (automaticUpdate is UpdateUiState.Verifying) AlertDialog(
+        onDismissRequest = {},
+        title = { Text("正在校验更新") },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(9.dp))
+                Text("正在检查签名、包名和文件完整性")
+            }
+        },
+        confirmButton = {},
+    )
+    else if (automaticUpdate is UpdateUiState.Error) automaticUpdate.release?.let { release ->
         AlertDialog(
-            onDismissRequest = { dismissedUpdateId = update.release.releaseId },
-            title = { Text("发现新版本 ${update.release.versionName}", maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            onDismissRequest = { pendingAutomaticInstallId = 0L },
+            title = { Text("更新失败") },
+            text = { Text(automaticUpdate.message.take(300)) },
+            confirmButton = {
+                TextButton({ startUpdate(release) }) {
+                    Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("重试")
+                }
+            },
+            dismissButton = { TextButton({ pendingAutomaticInstallId = 0L }) { Text("稍后") } },
+        )
+    }
+    else if (startupUpdate != null) startupUpdate.let { update ->
+        val ready = (state.updateState as? UpdateUiState.Ready)
+            ?.takeIf { it.release.releaseId == update.releaseId }
+        AlertDialog(
+            onDismissRequest = { dismissedUpdateId = update.releaseId },
+            title = { Text("发现新版本 ${update.versionName}", maxLines = 2, overflow = TextOverflow.Ellipsis) },
             text = {
                 Column(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    if (update.release.title.isNotBlank()) Text(update.release.title, fontWeight = FontWeight.Bold)
-                    if (update.release.changelog.isNotBlank()) Text(update.release.changelog.take(1200), color = Color.LightGray, fontSize = 14.sp)
-                    Text(formatFileSize(update.release.apk.sizeBytes), color = Color.Gray, fontSize = 12.sp)
+                    if (update.title.isNotBlank()) Text(update.title, fontWeight = FontWeight.Bold)
+                    if (update.changelog.isNotBlank()) Text(update.changelog.take(1200), color = Color.LightGray, fontSize = 14.sp)
+                    Text(formatFileSize(update.apk.sizeBytes), color = Color.Gray, fontSize = 12.sp)
                 }
             },
             confirmButton = {
-                TextButton({ dismissedUpdateId = update.release.releaseId; vm.downloadUpdate(update.release) }) {
-                    Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("下载更新")
+                TextButton({
+                    dismissedUpdateId = update.releaseId
+                    if (ready != null) requestUpdateInstall(ready) else startUpdate(update)
+                }) {
+                    Icon(if (ready != null) Icons.Default.InstallMobile else Icons.Default.Download, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (ready != null) "安装更新" else "立即更新")
                 }
             },
-            dismissButton = { TextButton({ dismissedUpdateId = update.release.releaseId }) { Text("稍后") } },
+            dismissButton = { TextButton({ dismissedUpdateId = update.releaseId }) { Text("稍后") } },
         )
     }
 }
@@ -1322,22 +1451,19 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
 }
 
-@Composable private fun AboutScreen(vm: AppViewModel, update: UpdateUiState, onBack: () -> Unit) {
+@Composable private fun AboutScreen(
+    vm: AppViewModel,
+    update: UpdateUiState,
+    onDownloadUpdate: (ControlUpdate) -> Unit,
+    onInstallUpdate: (UpdateUiState.Ready) -> Unit,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
-    var permissionHint by remember { mutableStateOf(false) }
     var externalError by rememberSaveable { mutableStateOf<String?>(null) }
     val openExternal: (Intent, String) -> Unit = { intent, failureMessage ->
         runCatching { context.startActivity(intent) }
             .onSuccess { externalError = null }
             .onFailure { error -> AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}"); externalError = failureMessage }
-    }
-    val install: (ControlUpdate, String) -> Unit = { release, path ->
-        if (!UpdateInstaller.canInstallPackages(context)) {
-            permissionHint = true
-            openExternal(UpdateInstaller.permissionIntent(context), "系统没有可用的未知来源安装设置入口")
-        } else vm.prepareUpdateInstall(release, path) { verified ->
-            openExternal(UpdateInstaller.installIntent(context, verified), "系统没有可用的 APK 安装器")
-        }
     }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
     item { SettingsHeader("关于", onBack) }
@@ -1349,18 +1475,17 @@ private fun decodeServerQrImage(value: String) = runCatching {
         UpdateUiState.NoUpdate -> { item { ListItem(headlineContent = { Text("当前已是最新版本") }, leadingContent = { Icon(Icons.Default.Verified, null, tint = Green) }) }; item { TextButton(vm::checkForUpdate, Modifier.fillMaxWidth()) { Text("重新检查") } } }
         is UpdateUiState.Available -> {
             item { ListItem(headlineContent = { Text("发现 ${update.release.versionName}${if (update.release.forceUpdate) " · 重要更新" else ""}") }, supportingContent = { Text("${update.release.title}\n${update.release.changelog.take(400)}\n${formatFileSize(update.release.apk.sizeBytes)}") }, leadingContent = { Icon(Icons.Default.NewReleases, null, tint = Green) }) }
-            item { Button({ vm.downloadUpdate(update.release) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(6.dp)); Text("下载并校验") } }
+            item { Button({ onDownloadUpdate(update.release) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(6.dp)); Text("下载并安装") } }
         }
         is UpdateUiState.Downloading -> { item { Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text("正在下载 ${formatFileSize(update.downloadedBytes)} / ${formatFileSize(update.totalBytes)}"); LinearProgressIndicator(progress = { if (update.totalBytes > 0) update.downloadedBytes.toFloat() / update.totalBytes else 0f }, modifier = Modifier.fillMaxWidth()) } } }
         is UpdateUiState.Verifying -> item { Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("正在校验安装包") } }
         is UpdateUiState.Ready -> {
             item { ListItem(headlineContent = { Text("安装包校验通过") }, supportingContent = { Text("${update.release.versionName} · 签名、包名和哈希均一致") }, leadingContent = { Icon(Icons.Default.Verified, null, tint = Green) }) }
-            item { Button({ install(update.release, update.filePath) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.InstallMobile, null); Spacer(Modifier.width(6.dp)); Text("打开系统安装器") } }
-            if (permissionHint) item { Text("请允许 QMusic Watch 安装未知来源应用，返回后再次点安装。", color = Color(0xFFFFC857), fontSize = 13.sp) }
+            item { Button({ onInstallUpdate(update) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.InstallMobile, null); Spacer(Modifier.width(6.dp)); Text("打开系统安装器") } }
         }
         is UpdateUiState.Error -> {
             item { Text(update.message, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
-            item { OutlinedButton({ update.release?.let(vm::downloadUpdate) ?: vm.checkForUpdate() }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("重试") } }
+            item { OutlinedButton({ update.release?.let(onDownloadUpdate) ?: vm.checkForUpdate() }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("重试") } }
         }
     }
     externalError?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) } }
