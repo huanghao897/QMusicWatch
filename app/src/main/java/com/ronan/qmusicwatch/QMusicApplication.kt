@@ -10,6 +10,7 @@ import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.download.DownloadController
 import com.ronan.qmusicwatch.network.ApiClient
 import com.ronan.qmusicwatch.network.ControlPlaneClient
+import com.ronan.qmusicwatch.network.QMUSIC_SERVER_HOST
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import com.ronan.qmusicwatch.playback.PlaybackConnection
 import com.ronan.qmusicwatch.update.UpdateManager
@@ -30,7 +31,15 @@ class QMusicApplication : Application(), ImageLoaderFactory {
         AppLog.init(this)
         db = AppDatabase.create(this)
         vault = SessionVault(this)
-        api = ApiClient(this) { vault.load()?.upstreamCookie }
+        api = ApiClient(
+            this,
+            cookie = { vault.load()?.upstreamCookie },
+            updateCookie = { refreshed ->
+                vault.load()?.let { session ->
+                    vault.save(session.copy(upstreamCookie = refreshed, gatewayHost = QMUSIC_SERVER_HOST))
+                }
+            },
+        )
         controlPlane = ControlPlaneClient()
         updates = UpdateManager(this, controlPlane)
         downloads = DownloadController(this, db)

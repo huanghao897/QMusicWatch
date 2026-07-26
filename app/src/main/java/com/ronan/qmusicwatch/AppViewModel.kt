@@ -167,6 +167,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var updateJob: Job? = null
     private var qrLoginJob: Job? = null
     private val json = Json { ignoreUnknownKeys = true }
+    private val sessionReady = CompletableDeferred<Unit>()
     private val profileCacheReady = CompletableDeferred<Unit>()
     private val snapshotMutex = Mutex()
     private var currentSession = graph.vault.load()
@@ -178,6 +179,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         graph.playback.onError = ::handlePlaybackError
         graph.playback.onMediaItemChanged = ::handleMediaItemChanged
+        viewModelScope.launch {
+            try {
+                prepareGatewayCredential()
+            } finally {
+                sessionReady.complete(Unit)
+            }
+        }
         viewModelScope.launch {
             val generation = sessionGeneration
             val owner = accountId
@@ -195,6 +203,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            sessionReady.await()
             val generation = sessionGeneration
             var refresh = false
             try {
@@ -224,7 +233,43 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         loadHome()
-        if (signedIn) { loadLibrary(); loadRecent() }
+        viewModelScope.launch {
+            sessionReady.await()
+            if (signedIn) { loadLibrary(); loadRecent() }
+        }
+    }
+
+    private suspend fun prepareGatewayCredential() {
+        val session = currentSession ?: return
+        if (!sessionNeedsGatewayCredentialRefresh(session)) return
+        _state.update { it.copy(message = "正在迁移登录状态…") }
+        runCatching {
+            check(graph.api.refreshCredential(session.provider)) { "登录凭据无法刷新" }
+            val refreshed = graph.vault.load()?.copy(gatewayHost = QMUSIC_SERVER_HOST)
+                ?: error("登录凭据保存失败")
+            graph.vault.save(refreshed)
+            currentSession = refreshed
+        }.onSuccess {
+            AppLog.write("AUTH", "gateway credential migration complete provider=${session.provider}")
+            _state.update { it.copy(message = "登录状态已迁移") }
+        }.onFailure { error ->
+            AppLog.write("AUTH", "gateway credential migration failed ${error.javaClass.simpleName}")
+            if (!requiresNewQrLogin(error)) {
+                _state.update { it.copy(message = "登录状态迁移暂时失败，稍后将自动重试") }
+                return@onFailure
+            }
+            graph.vault.clear()
+            currentSession = null
+            sessionGeneration++
+            _state.update {
+                it.copy(
+                    profile = null,
+                    profileLoaded = true,
+                    profileError = "服务器迁移后需要重新扫码登录一次",
+                    message = "服务器已更换，请重新扫码登录一次",
+                )
+            }
+        }
     }
     fun consumeMessage() = _state.update { it.copy(message = null) }
     private fun fail(error: Throwable) {
@@ -298,6 +343,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         "${positionMs.coerceAtLeast(0) / 60_000}:${((positionMs.coerceAtLeast(0) / 1000) % 60).toString().padStart(2, '0')}"
 
     fun loadHome() = viewModelScope.launch {
+        sessionReady.await()
         val generation = sessionGeneration
         restoreAccountSnapshot()
         if (generation != sessionGeneration) return@launch
@@ -373,7 +419,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runCatching {
             val account = com.ronan.qmusicwatch.login.MusicCookie.accountId(cookie)
                 ?: error("登录响应缺少账号标识")
-            SessionTokens(accountId = account, provider = com.ronan.qmusicwatch.login.MusicCookie.provider(cookie, provider), upstreamCookie = cookie)
+            SessionTokens(
+                accountId = account,
+                provider = com.ronan.qmusicwatch.login.MusicCookie.provider(cookie, provider),
+                upstreamCookie = cookie,
+                gatewayHost = QMUSIC_SERVER_HOST,
+            )
         }.onSuccess { session ->
             runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "account switch ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
             playJob?.cancel(); playJob = null
@@ -424,6 +475,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         loadHome()
     }
     fun loadLibrary() = viewModelScope.launch {
+        sessionReady.await()
         if (!signedIn) return@launch fail(IllegalStateException("请先登录"))
         val generation = sessionGeneration
         restoreAccountSnapshot()
@@ -493,6 +545,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         profileJob.join()
     }
     fun loadRecent() = viewModelScope.launch {
+        sessionReady.await()
         val generation = sessionGeneration
         val owner = accountId ?: return@launch _state.update { it.copy(recent = emptyList(), recentLoaded = true) }
         val local = graph.db.recent().all(owner).map { Track(it.trackId, it.title, it.artists.split(" / "), it.album, it.artworkUrl, playedAt = it.playedAt) }
@@ -690,6 +743,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
         playJob?.cancel()
         playJob = viewModelScope.launch {
+        sessionReady.await()
         if (!track.playable && !track.requiresVip) return@launch fail(IllegalStateException("这首歌曲当前不可播放"))
         if (headphoneWarning.value && !allowSpeaker && !com.ronan.qmusicwatch.playback.hasPrivateAudioOutput(getApplication())) {
             pendingQueue = sourceQueue

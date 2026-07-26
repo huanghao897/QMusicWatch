@@ -1,10 +1,19 @@
 package com.ronan.qmusicwatch
 
+import com.ronan.qmusicwatch.network.QMusicGatewayException
 import com.ronan.qmusicwatch.network.qmusicAlbumArtworkUrl
 import com.ronan.qmusicwatch.network.qmusicAvatarUrl
+import com.ronan.qmusicwatch.network.requiresNewQrLogin
 import com.ronan.qmusicwatch.network.safeLocalOrGatewayUri
+import com.ronan.qmusicwatch.network.sessionNeedsGatewayCredentialRefresh
+import com.ronan.qmusicwatch.network.shouldRefreshCredential
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
+import com.ronan.qmusicwatch.network.validateRefreshedCookie
+import com.ronan.qmusicwatch.model.SessionTokens
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QMusicGatewayTest {
@@ -33,5 +42,43 @@ class QMusicGatewayTest {
     @Test fun localFilesRemainUsableButOtherRemoteHostsAreRejected() {
         assertEquals("file:///data/user/0/com.ronan.qmusicwatch/files/song", safeLocalOrGatewayUri("file:///data/user/0/com.ronan.qmusicwatch/files/song"))
         assertEquals("", safeLocalOrGatewayUri("https://example.com/song.mp3"))
+    }
+
+    @Test fun oldGatewaySessionsNeedOneCredentialMigration() {
+        val old = SessionTokens(
+            accountId = "12345",
+            provider = "qq",
+            upstreamCookie = "qqmusic_uin=12345; qm_keyst=old",
+        )
+        assertTrue(sessionNeedsGatewayCredentialRefresh(old))
+        assertFalse(sessionNeedsGatewayCredentialRefresh(old.copy(gatewayHost = "203.160.55.168")))
+        assertFalse(sessionNeedsGatewayCredentialRefresh(null))
+    }
+
+    @Test fun refreshedCookieMustKeepTheSameAccountAndPlaybackKey() {
+        val stale = "qqmusic_uin=12345; qm_keyst=old"
+        val refreshed = "qqmusic_uin=12345; qm_keyst=new; refresh_token=rotated"
+        assertEquals(refreshed, validateRefreshedCookie(stale, refreshed))
+        assertThrows(IllegalArgumentException::class.java) {
+            validateRefreshedCookie(stale, "qqmusic_uin=67890; qm_keyst=new")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            validateRefreshedCookie(stale, "qqmusic_uin=12345")
+        }
+    }
+
+    @Test fun onlyRealCredentialFailuresTriggerARefresh() {
+        assertTrue(shouldRefreshCredential("music.UserInfo.userInfoServer", "GetLoginUserInfo", 1000))
+        assertTrue(shouldRefreshCredential("vkey.GetVkeyServer", "CgiGetVkey", 104400))
+        assertFalse(shouldRefreshCredential("music.UserInfo.userInfoServer", "GetUserInfo", 1000))
+        assertFalse(shouldRefreshCredential("music.radioProxy.MbTrackRadioSvr", "get_radio_track", 1000))
+        assertFalse(shouldRefreshCredential("music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo", 80050))
+        assertFalse(shouldRefreshCredential("music.UserInfo.userInfoServer", "GetLoginUserInfo", 0))
+    }
+
+    @Test fun onlyAnExplicitGatewayReloginErrorClearsTheSession() {
+        assertTrue(requiresNewQrLogin(QMusicGatewayException(409, "RELOGIN_REQUIRED", "relogin")))
+        assertFalse(requiresNewQrLogin(QMusicGatewayException(503, "UPSTREAM_TIMEOUT", "retry")))
+        assertFalse(requiresNewQrLogin(java.io.IOException("offline")))
     }
 }

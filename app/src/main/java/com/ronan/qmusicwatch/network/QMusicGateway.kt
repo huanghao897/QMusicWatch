@@ -1,10 +1,33 @@
 package com.ronan.qmusicwatch.network
 
 import com.ronan.qmusicwatch.BuildConfig
+import com.ronan.qmusicwatch.login.MusicCookie
+import com.ronan.qmusicwatch.model.SessionTokens
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 internal const val QMUSIC_SERVER_HOST = "203.160.55.168"
+
+internal fun sessionNeedsGatewayCredentialRefresh(
+    session: SessionTokens?,
+    gatewayHost: String = QMUSIC_SERVER_HOST,
+): Boolean = session != null && session.gatewayHost != gatewayHost
+
+internal fun validateRefreshedCookie(staleCookie: String, refreshedCookie: String): String {
+    val staleAccount = MusicCookie.accountId(staleCookie)
+    val refreshedAccount = MusicCookie.accountId(refreshedCookie)
+    require(staleAccount != null && staleAccount == refreshedAccount) {
+        "刷新后的登录账号与当前账号不一致"
+    }
+    val playbackKey = refreshedCookie.split(';').asSequence()
+        .map { it.trim().split('=', limit = 2) }
+        .firstOrNull { it.size == 2 && it[0] in setOf("qm_keyst", "qqmusic_key", "p_lskey") }
+        ?.get(1).orEmpty()
+    require(playbackKey.isNotBlank() && playbackKey.length <= 8192 && playbackKey.none { it.code < 0x20 || it.code == 0x7f }) {
+        "刷新后的登录凭据不完整"
+    }
+    return refreshedCookie
+}
 
 private val configuredQMusicServerBaseUrl: HttpUrl by lazy {
     requireControlPlaneBaseUrl(BuildConfig.QMUSIC_SERVER_BASE_URL, BuildConfig.DEBUG)

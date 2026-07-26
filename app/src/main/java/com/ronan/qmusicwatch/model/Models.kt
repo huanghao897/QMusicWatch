@@ -43,6 +43,7 @@ data class QualityResolution(
 @Serializable data class SessionTokens(
     val accessToken: String = "", val refreshToken: String = "", val accountId: String,
     val provider: String = "qq", val upstreamCookie: String? = null,
+    val gatewayHost: String = "",
 )
 @Serializable data class CookieExchange(val provider: String, val cookie: String)
 @Serializable data class Ack(val accepted: Boolean)

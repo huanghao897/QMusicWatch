@@ -1,6 +1,7 @@
 package com.ronan.qmusicwatch.network
 
 import android.content.Context
+import com.ronan.qmusicwatch.login.MusicCookie
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.lyrics.QqQrcDecoder
@@ -14,6 +15,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 internal fun normalizeHttpsUrl(value: String): String = trustedQMusicMediaUrl(value)
@@ -31,6 +33,25 @@ private fun firstUsableQqSongMid(vararg values: String): String =
     values.asSequence().map(String::trim).firstOrNull(::isUsableQqSongMid).orEmpty()
 
 private class QqBusinessException(val businessCode: Int, message: String) : IllegalStateException(message)
+private class QqCredentialExpiredException(message: String) : IllegalStateException(message)
+internal class QMusicGatewayException(
+    val statusCode: Int,
+    val errorCode: String,
+    message: String,
+) : IllegalStateException(message)
+
+private const val LOGIN_USER_INFO_MODULE = "music.UserInfo.userInfoServer"
+private const val LOGIN_CREDENTIAL_PROBE_METHOD = "GetLoginUserInfo"
+
+internal fun shouldRefreshCredential(module: String, method: String, code: Int): Boolean =
+    code in setOf(104400, 104401) ||
+        (code == 1000 && module == LOGIN_USER_INFO_MODULE && method == LOGIN_CREDENTIAL_PROBE_METHOD)
+
+private fun isLoginCredentialProbe(module: String, method: String): Boolean =
+    module == LOGIN_USER_INFO_MODULE && method == LOGIN_CREDENTIAL_PROBE_METHOD
+
+internal fun requiresNewQrLogin(error: Throwable): Boolean =
+    error is QMusicGatewayException && error.errorCode == "RELOGIN_REQUIRED"
 
 private fun JsonObject.hasPositiveNumber(vararg names: String): Boolean = names.any { name ->
     (this[name] as? JsonPrimitive)?.longOrNull?.let { it > 0 } == true
@@ -456,7 +477,11 @@ internal fun playlistDirectoryNumber(value: String): Long =
  * QQ Music client backed by the fixed QMusic Watch gateway.
  * The watch never receives or connects to an upstream QQ Music host.
  */
-class ApiClient(context: Context, private val cookie: () -> String?) {
+class ApiClient(
+    context: Context,
+    private val cookie: () -> String?,
+    private val updateCookie: (String) -> Unit = {},
+) {
     private val json = Json { ignoreUnknownKeys = true }
     private val http = OkHttpClient.Builder()
         .callTimeout(18, TimeUnit.SECONDS)
@@ -465,8 +490,21 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         .build()
     private val prefs = context.getSharedPreferences("qq_direct_api", Context.MODE_PRIVATE)
     private val random = SecureRandom()
+    private val credentialRefreshLock = Any()
+    private val streamCache = ConcurrentHashMap<String, StreamData>()
+    @Volatile private var verifiedCredentialCookie = ""
+    @Volatile private var credentialVerifiedUntil = 0L
+    @Volatile private var recentlyRefreshedCookie = ""
+    @Volatile private var recentlyRefreshedAt = 0L
 
     private val guid = saved("guid") { (random.nextLong().ushr(1) % 10_000_000_000L).toString() }
+
+    suspend fun refreshCredential(provider: String): Boolean = withContext(Dispatchers.IO) {
+        require(provider in setOf("qq", "wechat")) { "不支持的登录方式" }
+        val staleCookie = cookie().orEmpty()
+        if (staleCookie.isBlank()) return@withContext false
+        refreshCredentialBlocking(staleCookie, provider)
+    }
 
     suspend fun home(): HomeData = withContext(Dispatchers.IO) {
         val personalized = if (cookie().isNullOrBlank()) emptyList() else runCatching {
@@ -546,20 +584,35 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         )
     }
 
-    suspend fun stream(track: Track, quality: String): StreamData = withContext(Dispatchers.IO) {
+    suspend fun stream(track: Track, quality: String): StreamData =
+        stream(track, quality, allowCredentialRecovery = true)
+
+    private suspend fun stream(
+        track: Track,
+        quality: String,
+        allowCredentialRecovery: Boolean,
+    ): StreamData = withContext(Dispatchers.IO) {
         if (!isUsableQqSongMid(track.id)) {
             AppLog.write("STREAM", "blocked invalid track id")
             error("歌曲信息已失效，请重新搜索后播放")
         }
         requireLogin()
         val preferred = normalizeQualityId(quality)
+        val cacheKey = "${accountId()}:${track.id}:$preferred"
+        streamCache[cacheKey]?.takeIf {
+            it.expiresAt > System.currentTimeMillis() + 30_000L &&
+                trustedQMusicMediaUrl(it.url).isNotBlank()
+        }?.let {
+            AppLog.write("STREAM", "cache-hit track=${track.id} quality=${it.quality}")
+            return@withContext it
+        }
         AppLog.write("STREAM", "request track=${track.id} preferred=$preferred vip=${track.requiresVip}")
         val complete = if (track.mediaMid.isBlank()) trackDetail(track.id) else track
         val qualities = qualityFallbackOrder(preferred)
         var firstFailure: Throwable? = null
         var receivedResponse = false
         var bestFallback: StreamData? = null
-        qualities.forEach { requested ->
+        qualities.forEachIndexed { qualityIndex, requested ->
             val filename = qqStreamFileName(requested, complete.mediaMid)
             val param = obj(
                 "uin" to accountId(), "filename" to listOf(filename), "guid" to guid,
@@ -575,7 +628,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Throwable) {
-                    if (error.message.orEmpty().contains("登录凭据已失效")) throw error
+                    if (error is QqCredentialExpiredException) throw error
                     if (firstFailure == null) firstFailure = error
                     AppLog.write("STREAM", "attempt=$module failed ${error.javaClass.simpleName}:${error.message.orEmpty()}")
                     return@attempt
@@ -589,11 +642,27 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
                     val stream = StreamData(url, actual, System.currentTimeMillis() + data.long("expiration", 3600) * 1000)
                     AppLog.write("STREAM", "issued requested=$requested actual=$actual via=$module")
                     bestFallback = higherQualityStream(bestFallback, stream)
-                    if (actual == requested) return@withContext bestFallback!!
+                    if (actual == requested) {
+                        streamCache[cacheKey] = bestFallback!!
+                        return@withContext bestFallback!!
+                    }
                 }
             }
+            if (
+                qualityIndex == 0 &&
+                bestFallback == null &&
+                complete.requiresVip &&
+                allowCredentialRecovery &&
+                probePlaybackCredential()
+            ) {
+                AppLog.write("STREAM", "credential refreshed; retry track=${track.id}")
+                return@withContext stream(track, quality, allowCredentialRecovery = false)
+            }
         }
-        bestFallback?.let { return@withContext it }
+        bestFallback?.let {
+            streamCache[cacheKey] = it
+            return@withContext it
+        }
         if (!receivedResponse) firstFailure?.let { throw it }
         AppLog.write("STREAM", "no-url track=${track.id} vip=${complete.requiresVip}")
         error(if (complete.requiresVip) "这首歌需要 VIP 或购买" else "QQ 音乐未提供播放地址，可能存在版权、地区或账号权益限制")
@@ -810,6 +879,7 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     private fun post(
         comm: JsonObject, module: String, method: String, param: JsonObject,
         requestCookie: String? = cookie(), tolerateBusinessError: Boolean = false,
+        allowCredentialRefresh: Boolean = true,
     ): JsonObject {
         val payload = buildJsonObject {
             requestCookie?.takeIf(String::isNotBlank)?.let { put("cookie", it) }
@@ -829,7 +899,29 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
         }
         val code = result.int("code")
         AppLog.write("API", "$module/$method code=$code ms=${System.currentTimeMillis() - started}")
-        if (code in setOf(1000, 104400, 104401)) error("登录凭据已失效，请重新登录")
+        if (shouldRefreshCredential(module, method, code)) {
+            val staleCookie = requestCookie.orEmpty()
+            val refreshed = allowCredentialRefresh && staleCookie.isNotBlank() && runCatching {
+                refreshCredentialBlocking(staleCookie, MusicCookie.provider(staleCookie, "qq"))
+            }.onFailure { error ->
+                AppLog.write("AUTH", "credential refresh failed ${error.javaClass.simpleName}")
+            }.getOrDefault(false)
+            if (refreshed) {
+                return post(
+                    comm = requestCommAfterCredentialRefresh(module),
+                    module = module,
+                    method = method,
+                    param = param,
+                    requestCookie = cookie(),
+                    tolerateBusinessError = tolerateBusinessError,
+                    allowCredentialRefresh = false,
+                )
+            }
+            throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
+        }
+        if (code == 0 && isLoginCredentialProbe(module, method)) {
+            markCredentialVerified(requestCookie.orEmpty())
+        }
         if (code != 0 && !tolerateBusinessError) throw QqBusinessException(
             code,
             result.string("message").ifBlank { "QQ 音乐接口拒绝请求 ($code)" },
@@ -856,8 +948,12 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
     }
 
     private fun gatewayRequest(route: String, payload: JsonObject): JsonObject {
+        return gatewayPost("api/qmusic-watch/gateway/$route", payload)
+    }
+
+    private fun gatewayPost(path: String, payload: JsonObject): JsonObject {
         val request = Request.Builder()
-            .url(qmusicServerEndpoint("api/qmusic-watch/gateway/$route"))
+            .url(qmusicServerEndpoint(path))
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .header("Accept", "application/json")
             .header("User-Agent", WEB_UA)
@@ -867,13 +963,75 @@ class ApiClient(context: Context, private val cookie: () -> String?) {
             val root = runCatching { json.parseToJsonElement(text).jsonObject }
                 .getOrElse { error("音乐服务器响应格式无效") }
             if (!response.isSuccessful || root["ok"]?.jsonPrimitive?.booleanOrNull != true) {
-                val message = (root["error"] as? JsonObject)?.string("message")
+                val gatewayError = root["error"] as? JsonObject
+                val message = gatewayError?.string("message")
                     .orEmpty().take(160).ifBlank { "音乐服务器响应 ${response.code}" }
-                error(message)
+                throw QMusicGatewayException(
+                    statusCode = response.code,
+                    errorCode = gatewayError?.string("code").orEmpty(),
+                    message = message,
+                )
             }
             return root["data"]?.jsonObject ?: error("音乐服务器响应缺少数据")
         }
     }
+
+    private fun requestCommAfterCredentialRefresh(module: String): JsonObject = when (module) {
+        "vkey.GetVkeyServer" -> playbackComm(android = false)
+        "music.vkey.GetVkey" -> playbackComm(android = true)
+        else -> webComm()
+    }
+
+    private fun probePlaybackCredential(): Boolean {
+        val staleCookie = cookie().orEmpty()
+        if (staleCookie.isBlank()) error("请先登录")
+        val now = System.currentTimeMillis()
+        if (staleCookie == verifiedCredentialCookie && now < credentialVerifiedUntil) {
+            AppLog.write("AUTH", "playback credential probe cache-hit")
+            return false
+        }
+        post(
+            comm = webComm(),
+            module = LOGIN_USER_INFO_MODULE,
+            method = LOGIN_CREDENTIAL_PROBE_METHOD,
+            param = obj(),
+            requestCookie = staleCookie,
+        )
+        val currentCookie = cookie().orEmpty()
+        markCredentialVerified(currentCookie)
+        return currentCookie.isNotBlank() && currentCookie != staleCookie
+    }
+
+    private fun markCredentialVerified(value: String) {
+        if (value.isBlank()) return
+        verifiedCredentialCookie = value
+        credentialVerifiedUntil = System.currentTimeMillis() + 5 * 60_000L
+    }
+
+    private fun refreshCredentialBlocking(staleCookie: String, provider: String): Boolean =
+        synchronized(credentialRefreshLock) {
+            val currentCookie = cookie().orEmpty()
+            if (currentCookie.isNotBlank() && currentCookie != staleCookie) return@synchronized true
+            val now = System.currentTimeMillis()
+            if (staleCookie == recentlyRefreshedCookie && now - recentlyRefreshedAt < 60_000L) {
+                AppLog.write("AUTH", "credential refresh suppressed after recent rotation")
+                return@synchronized false
+            }
+            val payload = buildJsonObject {
+                put("provider", provider)
+                put("cookie", staleCookie)
+            }
+            val data = gatewayPost("api/qmusic-watch/auth/refresh", payload)
+            val refreshed = validateRefreshedCookie(staleCookie, data.string("cookie"))
+            updateCookie(refreshed)
+            streamCache.clear()
+            verifiedCredentialCookie = ""
+            credentialVerifiedUntil = 0L
+            recentlyRefreshedCookie = refreshed
+            recentlyRefreshedAt = System.currentTimeMillis()
+            AppLog.write("AUTH", "credential refreshed provider=$provider")
+            true
+        }
 
     private fun readGatewayBody(input: java.io.InputStream): String {
         val output = ByteArrayOutputStream()
