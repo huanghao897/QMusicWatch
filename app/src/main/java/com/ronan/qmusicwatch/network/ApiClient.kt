@@ -7,6 +7,9 @@ import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.lyrics.QqQrcDecoder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -479,11 +482,6 @@ internal data class QqPlaylistTrackWrite(
     val param: JsonObject,
 )
 
-/**
- * QQ Music models “我喜欢” as the fixed playlist directory 201. Using the
- * playlist write contract also keeps normal playlist edits and likes on the
- * same, currently supported upstream path.
- */
 internal fun qqPlaylistTrackWrite(
     directoryId: Long,
     track: Track,
@@ -508,8 +506,26 @@ internal fun qqPlaylistTrackWrite(
     )
 }
 
-internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrackWrite =
-    qqPlaylistTrackWrite(directoryId = 201L, track = track, add = liked)
+/**
+ * The favorite API uses a song MID, unlike normal playlist writes which use
+ * the numeric song ID and song type. Keeping the contracts separate avoids the
+ * upstream 500003 returned by the retired CgiAddSongFav endpoint.
+ */
+internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrackWrite {
+    require(isUsableQqSongMid(track.id)) { "歌曲 MID 无效" }
+    return QqPlaylistTrackWrite(
+        module = "music.musicasset.SongFavWrite",
+        method = if (liked) "AddSongFans" else "DelSongFans",
+        param = buildJsonObject {
+            putJsonArray("v_songMid") { add(track.id) }
+        },
+    )
+}
+
+internal fun qqWriteBusinessCode(data: JsonObject): Int? =
+    sequenceOf("retCode", "retcode")
+        .mapNotNull { name -> data[name]?.jsonPrimitive?.intOrNull }
+        .firstOrNull()
 
 /**
  * QQ Music client backed by the fixed QMusic Watch gateway.
@@ -545,19 +561,31 @@ class ApiClient(
     }
 
     suspend fun home(): HomeData = withContext(Dispatchers.IO) {
-        val personalized = if (cookie().isNullOrBlank()) emptyList() else runCatching {
-            api(
-                "music.radioProxy.MbTrackRadioSvr", "get_radio_track",
-                obj("id" to 99, "num" to 20, "from" to 0, "scene" to 0, "song_ids" to emptyList<Long>()),
-            ).let(::findTracks)
-        }.onFailure { AppLog.write("HOME", "personalized ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrDefault(emptyList())
-        val daily = if (personalized.size >= 20) personalized else {
-            val fallback = runCatching { api("newsong.NewSongServer", "get_new_song_info", obj("type" to 5)).let(::findTracks) }
-                .onFailure { AppLog.write("HOME", "fallback ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
-                .getOrDefault(emptyList())
-            (personalized + fallback).distinctBy(Track::id)
+        coroutineScope {
+            val personalizedTask = async {
+                if (cookie().isNullOrBlank()) emptyList() else runCatching {
+                    api(
+                        "music.radioProxy.MbTrackRadioSvr", "get_radio_track",
+                        obj("id" to 99, "num" to 20, "from" to 0, "scene" to 0, "song_ids" to emptyList<Long>()),
+                    ).let(::findTracks)
+                }.onFailure {
+                    AppLog.write("HOME", "personalized ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+                }.getOrDefault(emptyList())
+            }
+            val fallbackTask = async {
+                runCatching {
+                    api("newsong.NewSongServer", "get_new_song_info", obj("type" to 5)).let(::findTracks)
+                }.onFailure {
+                    AppLog.write("HOME", "fallback ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+                }.getOrDefault(emptyList())
+            }
+            val personalized = personalizedTask.await()
+            val fallback = fallbackTask.await()
+            val daily = if (personalized.size >= 20) personalized else {
+                (personalized + fallback).distinctBy(Track::id)
+            }
+            HomeData(daily, emptyList())
         }
-        HomeData(daily, emptyList())
     }
 
     suspend fun searchTracks(query: String, cursor: String? = null): PagedTracks = withContext(Dispatchers.IO) {
@@ -605,21 +633,32 @@ class ApiClient(
     }
 
     suspend fun lyrics(id: String): LyricsData = withContext(Dispatchers.IO) {
-        val data = webApi(
-            "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
-            obj("songMid" to id, "crypt" to 0, "qrc" to 0, "qrc_t" to 0, "trans" to 1, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474)
-        )
-        val qrc = runCatching {
-            webApi(
-                "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
-                obj("songMid" to id, "crypt" to 1, "qrc" to 1, "qrc_t" to 0, "trans" to 0, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474),
-            ).string("lyric").takeIf { it.isNotBlank() }?.let(QqQrcDecoder::decode)
-        }.onFailure { AppLog.write("LYRICS", "qrc ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrNull()
-        LyricsData(
-            decodeText(data.string("lyric")),
-            decodeText(data.string("trans")).ifBlank { null },
-            qrc,
-        )
+        coroutineScope {
+            val textTask = async {
+                webApi(
+                    "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
+                    obj("songMid" to id, "crypt" to 0, "qrc" to 0, "qrc_t" to 0, "trans" to 1, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474),
+                )
+            }
+            val qrcTask = async {
+                runCatching {
+                    webApi(
+                        "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
+                        obj("songMid" to id, "crypt" to 1, "qrc" to 1, "qrc_t" to 0, "trans" to 0, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474),
+                        callTimeoutMs = 2_500,
+                    ).string("lyric").takeIf { it.isNotBlank() }?.let(QqQrcDecoder::decode)
+                }.onFailure {
+                    AppLog.write("LYRICS", "qrc ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+                }.getOrNull()
+            }
+            val data = textTask.await()
+            val qrc = qrcTask.await()
+            LyricsData(
+                decodeText(data.string("lyric")),
+                decodeText(data.string("trans")).ifBlank { null },
+                qrc,
+            )
+        }
     }
 
     suspend fun stream(track: Track, quality: String): StreamData =
@@ -708,12 +747,29 @@ class ApiClient(
 
     suspend fun library(): LibraryData = withContext(Dispatchers.IO) {
         requireLogin()
-        val playlists = api("music.musicasset.PlaylistBaseRead", "GetPlaylistByUin", obj("uin" to accountId()))
-        val collectedPlaylists = runCatching { favoritePlaylists() }.onFailure { error ->
-            val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
-                ?: "${error.javaClass.simpleName}"
-            AppLog.write("LIBRARY", "favorite playlists unavailable $detail")
-        }.getOrDefault(emptyList())
+        coroutineScope {
+            val playlistsTask = async {
+                api("music.musicasset.PlaylistBaseRead", "GetPlaylistByUin", obj("uin" to accountId()))
+            }
+            val collectedTask = async {
+                runCatching { favoritePlaylists() }.onFailure { error ->
+                    val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
+                        ?: "${error.javaClass.simpleName}"
+                    AppLog.write("LIBRARY", "favorite playlists unavailable $detail")
+                }.getOrDefault(emptyList())
+            }
+            val likedTask = async { likedTracks() }
+            val playlists = playlistsTask.await()
+            val collectedPlaylists = collectedTask.await()
+            val likedTracks = likedTask.await()
+            val accountPlaylists = parseAccountPlaylists(playlists)
+            normalizeLibraryData(
+                LibraryData(likedTracks, mergeLibraryPlaylists(accountPlaylists, collectedPlaylists)),
+            )
+        }
+    }
+
+    private suspend fun likedTracks(): List<Track> {
         val likedTracks = mutableListOf<Track>()
         val likedIds = mutableSetOf<String>()
         for (page in 0 until 20) {
@@ -726,10 +782,7 @@ class ApiClient(
             likedTracks += batch.filter { likedIds.add(it.id) }
             if (batch.size < 100 || likedTracks.size == previousSize) break
         }
-        val accountPlaylists = parseAccountPlaylists(playlists)
-        normalizeLibraryData(
-            LibraryData(likedTracks, mergeLibraryPlaylists(accountPlaylists, collectedPlaylists)),
-        )
+        return likedTracks
     }
 
     private suspend fun favoritePlaylists(): List<MusicCollection> {
@@ -778,15 +831,31 @@ class ApiClient(
     suspend fun profile(): UserProfile = withContext(Dispatchers.IO) {
         requireLogin()
         val id = accountId()
-        val roots = mutableListOf<JsonObject>()
-        listOf("GetLoginUserInfo", "GetUserInfo").forEach { method ->
-            runCatching { api("music.UserInfo.userInfoServer", method, obj("user_uin" to id, "login_uin" to id, "uin" to id)) }.getOrNull()?.let { data -> AppLog.write("PROFILE", "$method keys=${data.keys.joinToString(",").take(300)}"); roots += data }
+        val roots = coroutineScope {
+            val profileTasks = listOf("GetLoginUserInfo", "GetUserInfo").map { method ->
+                async {
+                    runCatching {
+                        api(
+                            "music.UserInfo.userInfoServer",
+                            method,
+                            obj("user_uin" to id, "login_uin" to id, "uin" to id),
+                        )
+                    }.getOrNull()?.also { data ->
+                        AppLog.write("PROFILE", "$method keys=${data.keys.joinToString(",").take(300)}")
+                    }
+                }
+            }
+            val vipTask = async {
+                runCatching {
+                    api("VipLogin.VipLoginInter", "vip_login_base", obj())
+                }.getOrNull()?.let { data ->
+                    AppLog.write("PROFILE", "vip_login_base keys=${data.keys.joinToString(",").take(300)}")
+                    buildJsonObject { put("vip_response", data) }
+                }
+            }
+            val legacyTask = async { runCatching { gatewayLegacy("profile") }.getOrNull() }
+            (profileTasks + listOf(vipTask, legacyTask)).awaitAll().filterNotNull()
         }
-        runCatching { api("VipLogin.VipLoginInter", "vip_login_base", obj()) }.getOrNull()?.let { data ->
-            AppLog.write("PROFILE", "vip_login_base keys=${data.keys.joinToString(",").take(300)}")
-            roots += buildJsonObject { put("vip_response", data) }
-        }
-        runCatching { gatewayLegacy("profile") }.getOrNull()?.let { roots += it }
         mergeUserProfiles(roots.mapNotNull(::parseUserProfile)) ?: error("QQ 音乐未返回账号资料")
     }
 
@@ -822,10 +891,8 @@ class ApiClient(
 
     suspend fun like(track: Track, liked: Boolean): Ack = withContext(Dispatchers.IO) {
         requireLogin()
-        val complete = if (track.numericId > 0) track else trackDetail(track.id)
-        if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改喜欢状态")
-        val write = qqFavoriteTrackWrite(complete, liked)
-        api(write.module, write.method, write.param)
+        val write = qqFavoriteTrackWrite(track, liked)
+        requireWriteAccepted(post(favoriteComm(), write.module, write.method, write.param))
         Ack(true)
     }
 
@@ -875,7 +942,7 @@ class ApiClient(
         val complete = if (track.numericId > 0) track else trackDetail(track.id)
         if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改歌单")
         val write = qqPlaylistTrackWrite(playlistDirectoryNumber(id), complete, add)
-        api(write.module, write.method, write.param)
+        requireWriteAccepted(post(webComm(), write.module, write.method, write.param))
         Ack(true)
     }
 
@@ -907,13 +974,26 @@ class ApiClient(
         return post(webComm(), module, method, param)
     }
 
-    private suspend fun webApi(module: String, method: String, param: JsonObject): JsonObject =
-        post(webComm(), module, method, param)
+    private suspend fun webApi(
+        module: String,
+        method: String,
+        param: JsonObject,
+        callTimeoutMs: Long? = null,
+    ): JsonObject = post(webComm(), module, method, param, callTimeoutMs = callTimeoutMs)
+
+    private fun requireWriteAccepted(data: JsonObject) {
+        val code = qqWriteBusinessCode(data) ?: return
+        if (code != 0) throw QqBusinessException(
+            code,
+            "QQ 音乐没有保存这次修改 ($code)",
+        )
+    }
 
     private fun post(
         comm: JsonObject, module: String, method: String, param: JsonObject,
         requestCookie: String? = cookie(), tolerateBusinessError: Boolean = false,
         allowCredentialRefresh: Boolean = true,
+        callTimeoutMs: Long? = null,
     ): JsonObject {
         val payload = buildJsonObject {
             requestCookie?.takeIf(String::isNotBlank)?.let { put("cookie", it) }
@@ -924,7 +1004,7 @@ class ApiClient(
         }
         val started = System.currentTimeMillis()
         val result = try {
-            gatewayRequest("musicu", payload)
+            gatewayRequest("musicu", payload, callTimeoutMs)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -949,6 +1029,7 @@ class ApiClient(
                     requestCookie = cookie(),
                     tolerateBusinessError = tolerateBusinessError,
                     allowCredentialRefresh = false,
+                    callTimeoutMs = callTimeoutMs,
                 )
             }
             throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
@@ -981,18 +1062,30 @@ class ApiClient(
         return gatewayRequest("legacy", payload)
     }
 
-    private fun gatewayRequest(route: String, payload: JsonObject): JsonObject {
-        return gatewayPost("api/qmusic-watch/gateway/$route", payload)
+    private fun gatewayRequest(
+        route: String,
+        payload: JsonObject,
+        callTimeoutMs: Long? = null,
+    ): JsonObject {
+        return gatewayPost("api/qmusic-watch/gateway/$route", payload, callTimeoutMs)
     }
 
-    private fun gatewayPost(path: String, payload: JsonObject): JsonObject {
+    private fun gatewayPost(
+        path: String,
+        payload: JsonObject,
+        callTimeoutMs: Long? = null,
+    ): JsonObject {
         val request = Request.Builder()
             .url(qmusicServerEndpoint(path))
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .header("Accept", "application/json")
             .header("User-Agent", WEB_UA)
             .build()
-        http.newCall(request).execute().use { response ->
+        val call = http.newCall(request)
+        callTimeoutMs?.takeIf { it > 0 }?.let {
+            call.timeout().timeout(it, TimeUnit.MILLISECONDS)
+        }
+        call.execute().use { response ->
             val text = response.body?.byteStream()?.use(::readGatewayBody).orEmpty()
             val root = runCatching { json.parseToJsonElement(text).jsonObject }
                 .getOrElse { error("音乐服务器响应格式无效") }
@@ -1079,6 +1172,13 @@ class ApiClient(
             output.write(buffer, 0, read)
         }
         return output.toString(Charsets.UTF_8.name())
+    }
+
+    private fun favoriteComm() = buildJsonObject {
+        put("uin", accountId().ifBlank { "0" })
+        put("format", "json")
+        put("ct", 20)
+        put("cv", 0)
     }
 
     private fun webComm() = buildJsonObject {

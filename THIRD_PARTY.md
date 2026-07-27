@@ -12,6 +12,7 @@ These projects informed behavior, product research, or compatible protocol imple
 | [BeyondtheApex/ChillPatcher](https://github.com/BeyondtheApex/ChillPatcher) | No license declared | VIP endpoint behavior research only; no source code copied |
 | [Hjdd14/Mconnect-Music_connect](https://github.com/Hjdd14/Mconnect-Music_connect) | MIT | VIP module/method compatibility research only; no source code copied |
 | [L-1124/QQMusicApi](https://github.com/L-1124/QQMusicApi) | GPL-3.0 | Current QQ Music playlist-write behavior and response-shape research only; no source code copied |
+| [SAWA-25/moro](https://github.com/SAWA-25/moro) | PolyForm Noncommercial 1.0.0 | Cross-checking current song-MID favorite behavior and the fixed legacy fallback endpoint only; no source code copied |
 | [wangqr/QQMusicDES](https://github.com/wangqr/QQMusicDES) | MIT | The QQ DES-variant behavior and tables were adapted into Kotlin for QRC lyric decoding; copyright and license are retained in `third_party/wangqr-QQMusicDES-LICENSE.txt` |
 | [lyswhut/lx-music-desktop](https://github.com/lyswhut/lx-music-desktop) | Apache-2.0 | QQ Music quality-tier and filename behavior research only; no source code copied |
 | [power721/Harmony](https://github.com/power721/Harmony) | See upstream repository | Cross-checking QQ Music quality filename mappings only; no source code copied |
