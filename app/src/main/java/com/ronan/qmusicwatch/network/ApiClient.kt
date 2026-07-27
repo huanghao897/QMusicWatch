@@ -473,6 +473,44 @@ internal fun nextSearchCursor(page: Int, rawItemCount: Int, pageSize: Int = 20):
 internal fun playlistDirectoryNumber(value: String): Long =
     value.toLongOrNull()?.takeIf { it > 0 } ?: throw IllegalArgumentException("歌单目录标识无效")
 
+internal data class QqPlaylistTrackWrite(
+    val module: String,
+    val method: String,
+    val param: JsonObject,
+)
+
+/**
+ * QQ Music models “我喜欢” as the fixed playlist directory 201. Using the
+ * playlist write contract also keeps normal playlist edits and likes on the
+ * same, currently supported upstream path.
+ */
+internal fun qqPlaylistTrackWrite(
+    directoryId: Long,
+    track: Track,
+    add: Boolean,
+): QqPlaylistTrackWrite {
+    require(directoryId > 0) { "歌单目录标识无效" }
+    require(track.numericId > 0) { "歌曲数字标识无效" }
+    return QqPlaylistTrackWrite(
+        module = "music.musicasset.PlaylistDetailWrite",
+        method = if (add) "AddSonglist" else "DelSonglist",
+        param = buildJsonObject {
+            put("dirId", directoryId)
+            put("tid", 0)
+            put("bFmtUtf8", true)
+            putJsonArray("v_songInfo") {
+                addJsonObject {
+                    put("songId", track.numericId)
+                    put("songType", track.songType)
+                }
+            }
+        },
+    )
+}
+
+internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrackWrite =
+    qqPlaylistTrackWrite(directoryId = 201L, track = track, add = liked)
+
 /**
  * QQ Music client backed by the fixed QMusic Watch gateway.
  * The watch never receives or connects to an upstream QQ Music host.
@@ -786,10 +824,8 @@ class ApiClient(
         requireLogin()
         val complete = if (track.numericId > 0) track else trackDetail(track.id)
         if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改喜欢状态")
-        api(
-            "music.musicasset.SongFavWrite", if (liked) "CgiAddSongFav" else "CgiDelSongFav",
-            obj("v_songId" to listOf(complete.numericId))
-        )
+        val write = qqFavoriteTrackWrite(complete, liked)
+        api(write.module, write.method, write.param)
         Ack(true)
     }
 
@@ -838,10 +874,8 @@ class ApiClient(
         requireLogin()
         val complete = if (track.numericId > 0) track else trackDetail(track.id)
         if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改歌单")
-        api(
-            "music.musicasset.PlaylistDetailWrite", if (add) "AddSonglist" else "DelSonglist",
-            obj("dirId" to playlistDirectoryNumber(id), "tid" to 0, "bFmtUtf8" to true, "v_songInfo" to listOf(mapOf("songId" to complete.numericId, "songType" to complete.songType)))
-        )
+        val write = qqPlaylistTrackWrite(playlistDirectoryNumber(id), complete, add)
+        api(write.module, write.method, write.param)
         Ack(true)
     }
 

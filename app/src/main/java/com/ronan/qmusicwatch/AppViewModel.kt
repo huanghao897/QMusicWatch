@@ -863,9 +863,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onSuccess { count -> _state.update { it.copy(message = "已删除“$groupName”中的 $count 首缓存") } }
             .onFailure(::fail)
     }
-    fun like(track: Track, liked: Boolean) = viewModelScope.launch {
-        if (!featureEnabled("playlistWrites")) return@launch fail(IllegalStateException(featureMessage("playlistWrites").ifBlank { "收藏与歌单编辑暂时维护" }))
-        runCatching { graph.api.like(track, liked) }.onSuccess { loadLibrary() }.onFailure(::fail)
+    fun like(track: Track, liked: Boolean, onComplete: (Boolean) -> Unit = {}) = viewModelScope.launch {
+        if (!featureEnabled("playlistWrites")) {
+            fail(IllegalStateException(featureMessage("playlistWrites").ifBlank { "收藏与歌单编辑暂时维护" }))
+            onComplete(false)
+            return@launch
+        }
+        runCatching { graph.api.like(track, liked) }
+            .onSuccess {
+                _state.update { state -> state.copy(message = if (liked) "已添加到我喜欢" else "已取消喜欢") }
+                onComplete(true)
+                loadLibrary()
+            }
+            .onFailure { error ->
+                onComplete(false)
+                fail(error)
+            }
     }
     fun loadDetail(type: String, collection: MusicCollection, editable: Boolean = false) {
         detailJob?.cancel()

@@ -817,6 +817,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     var manualLyricSelection by remember(track.id) { mutableStateOf(false) }
     var manualLyricInteraction by remember(track.id) { mutableIntStateOf(0) }
     var selectedLike by remember(track.id) { mutableStateOf<Boolean?>(null) }
+    var likePending by remember(track.id) { mutableStateOf(false) }
     var showPlaylistDialog by remember(track.id) { mutableStateOf(false) }
     var showQualityDialog by remember(track.id) { mutableStateOf(false) }
     var showModeDialog by remember(track.id) { mutableStateOf(false) }
@@ -1060,8 +1061,15 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         }
                         Row(Modifier.fillMaxWidth().height(if (compactPlayer) 40.dp else 48.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                             PlayerActionButton(Icons.Default.Favorite.takeIf { effectiveLiked } ?: Icons.Default.FavoriteBorder, if (effectiveLiked) "已喜欢" else "喜欢", tint = if (effectiveLiked) Color(0xFFFF718B) else Color.White, compact = compactPlayer) {
-                                selectedLike = !effectiveLiked
-                                vm.like(track, !effectiveLiked)
+                                if (!likePending) {
+                                    val target = !effectiveLiked
+                                    selectedLike = target
+                                    likePending = true
+                                    vm.like(track, target) { success ->
+                                        likePending = false
+                                        selectedLike = target.takeIf { success }
+                                    }
+                                }
                             }
                             PlayerActionButton(Icons.AutoMirrored.Filled.PlaylistAdd, "加歌单", compact = compactPlayer) { showPlaylistDialog = true }
                             PlayerActionButton(Icons.Default.Tune, qualityShortLabel(activeQuality), tint = Green, compact = compactPlayer) { showQualityDialog = true }
@@ -1504,9 +1512,22 @@ private fun formatFileSize(bytes: Long): String = when {
 @Composable private fun TrackRow(track: Track, vm: AppViewModel, liked: Boolean = false, playlistId: String? = null, removeFromPlaylist: Boolean = false, queue: List<Track> = listOf(track), playlists: List<MusicCollection> = emptyList()) {
     var menu by remember { mutableStateOf(false) }
     var choosePlaylist by remember { mutableStateOf(false) }
+    var selectedLike by remember(track.id) { mutableStateOf<Boolean?>(null) }
+    var likePending by remember(track.id) { mutableStateOf(false) }
+    val effectiveLiked = selectedLike ?: liked
     ListItem(modifier = Modifier.clickable { vm.requestPlay(track, sourceQueue = queue) }, headlineContent = { Row(verticalAlignment = Alignment.CenterVertically) { Text(track.title, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis); if (track.requiresVip) { Spacer(Modifier.width(5.dp)); Text("VIP", color = Color(0xFFFFC857), fontSize = 11.sp, fontWeight = FontWeight.Bold) } } }, supportingContent = { Text(track.artists.joinToString(" / "), maxLines = 1) },
         leadingContent = { AsyncImage(safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null }, null, Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)).background(Color.DarkGray)) },
-        trailingContent = { Row { IconButton({ vm.cache(track) }, Modifier.size(38.dp)) { Icon(Icons.Default.Download, null, Modifier.size(21.dp)) }; IconButton({ vm.like(track, !liked) }, Modifier.size(38.dp)) { Icon(if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, Modifier.size(21.dp), tint = if (liked) Green else LocalContentColor.current) }; Box { IconButton({ menu = true }, Modifier.size(38.dp)) { Icon(Icons.Default.MoreVert, "更多", Modifier.size(21.dp)) }; DropdownMenu(menu, { menu = false }) { DropdownMenuItem({ Text("下一首播放") }, { vm.enqueueNext(track); menu = false }); DropdownMenuItem({ Text("添加到播放列表") }, { vm.addToQueue(track); menu = false }); if (playlists.isNotEmpty()) DropdownMenuItem({ Text("加入我的歌单") }, { menu = false; choosePlaylist = true }); if (removeFromPlaylist && playlistId != null) DropdownMenuItem({ Text("从此歌单移除") }, { vm.removeFromPlaylist(track, playlistId); menu = false }) } } } })
+        trailingContent = { Row { IconButton({ vm.cache(track) }, Modifier.size(38.dp)) { Icon(Icons.Default.Download, null, Modifier.size(21.dp)) }; IconButton({
+            if (!likePending) {
+                val target = !effectiveLiked
+                selectedLike = target
+                likePending = true
+                vm.like(track, target) { success ->
+                    likePending = false
+                    selectedLike = target.takeIf { success }
+                }
+            }
+        }, Modifier.size(38.dp)) { Icon(if (effectiveLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, Modifier.size(21.dp), tint = if (effectiveLiked) Green else LocalContentColor.current) }; Box { IconButton({ menu = true }, Modifier.size(38.dp)) { Icon(Icons.Default.MoreVert, "更多", Modifier.size(21.dp)) }; DropdownMenu(menu, { menu = false }) { DropdownMenuItem({ Text("下一首播放") }, { vm.enqueueNext(track); menu = false }); DropdownMenuItem({ Text("添加到播放列表") }, { vm.addToQueue(track); menu = false }); if (playlists.isNotEmpty()) DropdownMenuItem({ Text("加入我的歌单") }, { menu = false; choosePlaylist = true }); if (removeFromPlaylist && playlistId != null) DropdownMenuItem({ Text("从此歌单移除") }, { vm.removeFromPlaylist(track, playlistId); menu = false }) } } } })
     if (choosePlaylist) AlertDialog(onDismissRequest = { choosePlaylist = false }, title = { Text("加入哪个歌单？") }, text = { LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) { items(playlists.filter { it.owned != false && it.directoryId != "201" }, key = { it.directoryId }) { playlist -> Surface(Modifier.fillMaxWidth().clickable { vm.addToPlaylist(track, playlist.directoryId); choosePlaylist = false }, shape = RoundedCornerShape(14.dp), color = Surface) { Column(Modifier.padding(12.dp, 9.dp)) { Text(playlist.title, maxLines = 1); Text(if (playlist.trackCount >= 0) "${playlist.trackCount} 首" else "我的歌单", color = Color.Gray, fontSize = 12.sp) } } } } }, confirmButton = {}, dismissButton = { TextButton({ choosePlaylist = false }) { Text("取消") } })
 }
 
