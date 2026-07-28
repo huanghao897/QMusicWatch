@@ -9,6 +9,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
@@ -38,6 +39,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 private const val COMMAND_PREVIOUS = "com.ronan.qmusicwatch.PREVIOUS"
 private const val COMMAND_NEXT = "com.ronan.qmusicwatch.NEXT"
@@ -66,6 +68,9 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         val http = OkHttpDataSource.Factory(
             OkHttpClient.Builder()
+                .connectTimeout(12, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
                 .followRedirects(false)
                 .followSslRedirects(false)
                 .addInterceptor { chain ->
@@ -79,7 +84,20 @@ class PlaybackService : MediaSessionService() {
         val dataSource = DefaultDataSource.Factory(this, http)
         val mediaSourceFactory = DefaultMediaSourceFactory(this).setDataSourceFactory(dataSource)
             .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(3))
-        player = ExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build().apply {
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                20_000,
+                90_000,
+                2_500,
+                5_000,
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+        player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
+            .build()
+            .apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
