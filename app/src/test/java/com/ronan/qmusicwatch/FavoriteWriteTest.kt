@@ -5,9 +5,7 @@ import com.ronan.qmusicwatch.network.qqFavoriteTrackWrite
 import com.ronan.qmusicwatch.network.qqPlaylistTrackWrite
 import com.ronan.qmusicwatch.network.qqWriteBusinessCode
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.long
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -21,25 +19,24 @@ class FavoriteWriteTest {
         songType = 0,
     )
 
-    @Test fun favoriteUsesLikedPlaylistDirectoryInsteadOfRejectedFavoriteContract() {
+    @Test fun favoriteSendsStableMidForServerSideIdentityResolution() {
         val write = qqFavoriteTrackWrite(track, liked = true)
 
-        assertEquals("music.musicasset.PlaylistDetailWrite", write.module)
-        assertEquals("AddSonglist", write.method)
-        assertEquals(201L, write.param.getValue("dirId").jsonPrimitive.long)
-        val song = write.param.getValue("v_songInfo").jsonArray.single().jsonObject
-        assertEquals(track.numericId, song.getValue("songId").jsonPrimitive.long)
-        assertEquals(track.songType, song.getValue("songType").jsonPrimitive.content.toInt())
+        assertEquals("music.musicasset.SongFavWrite", write.module)
+        assertEquals("AddSongFans", write.method)
+        assertEquals(
+            track.id,
+            write.param.getValue("v_songMid").jsonArray.single().jsonPrimitive.content,
+        )
     }
 
-    @Test fun removingFavoriteAndEditingPlaylistUseTheirOwnDirectories() {
+    @Test fun removingFavoriteAndEditingPlaylistKeepSeparateContracts() {
         val favorite = qqFavoriteTrackWrite(track, liked = false)
         val playlist = qqPlaylistTrackWrite(directoryId = 5566L, track = track, add = false)
 
-        assertEquals("DelSonglist", favorite.method)
-        assertEquals(201L, favorite.param.getValue("dirId").jsonPrimitive.long)
+        assertEquals("DelSongFans", favorite.method)
         assertEquals("DelSonglist", playlist.method)
-        assertEquals(5566L, playlist.param.getValue("dirId").jsonPrimitive.long)
+        assertEquals("5566", playlist.param.getValue("dirId").jsonPrimitive.content)
     }
 
     @Test fun nestedWriteFailureIsNotTreatedAsSuccess() {
