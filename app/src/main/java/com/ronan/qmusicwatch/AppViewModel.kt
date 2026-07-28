@@ -270,5 +270,836 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     message = "æœåŠ¡å™¨å·²æ›´æ¢ï¼Œè¯·é‡æ–°æ‰«ç ç™»å½•ä¸€æ¬¡",
                 )
             }
-     ×mõÒÚ$z{-®éÜj×vRÒ.[{.XŠ™šBF6÷VçBšinX[nK¹n‹JnXû~™HZé®{É>ZÙ‚"’ÒĞ¢æöäf–ÇW&Rƒ£¦f–Â¢Ğ¢gVâFVÆWFTF÷væÆöDw&÷W†w&÷WæÖS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢fÂ÷væW"Ò66÷VçD–Bó¢&WGW&äÆVæ6‚f–Â„–ÆÆVvÅ7FFTW†6WF–öâ‚.Šû~XXy›¾[ÙR"’¢'Vä6F6†–ær²w&‚æF÷væÆöG2æFVÆWFTw&÷W†÷væW"Âw&÷WæÖR’Ğ¢æöå7V66W72²6÷VçBÓâ÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.[{.XŠ™šN(	ÂFw&÷WæÖ^(	ŞKŠŞy¨BF6÷VçBšin{É>ZÙ‚"’ÒĞ¢æöäf–ÇW&Rƒ£¦f–Â¢Ğ¢gVâÆ–¶R‡G&6³¢G&6²ÂÆ–¶VC¢&ööÆVâÂöä6ö×ÆWFS¢„&ööÆVâ’ÓâVæ—BÒ·Ò’Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢–b‚fVGW&TVæ&ÆVB‚'Æ–Æ—7Ew&—FW2"’’°¢f–Â„–ÆÆVvÅ7FFTW†6WF–öâ†fVGW&TÖW76vR‚'Æ–Æ—7Ew&—FW2"’æ–d&Ææ²².iKn‰xşKˆîjØÎXÙ^{Én‹éi¨.i{n{»NhªB"Ò’¢öä6ö×ÆWFR†fÇ6R¢&WGW&äÆVæ6€¢Ğ¢'Vä6F6†–ær²w&‚æ’æÆ–¶R‡G&6²ÂÆ–¶VB’Ğ¢æöå7V66W72°¢÷7FFRçWFFR²7FFRÓâ7FFRæ6÷’†ÖW76vRÒ–b†Æ–¶VB’.[{.k{¾XªX‹h‰YiÎjÊ""VÇ6R.[{.XùnkhYiÎjÊ""’Ğ¢öä6ö×ÆWFR‡G'VR¢ÆöDÆ–'&'’‚¢Ğ¢æöäf–ÇW&R²W'&÷"Óà¢öä6ö×ÆWFR†fÇ6R¢f–Â†W'&÷"¢Ğ¢Ğ¢gVâÆöDFWF–Â‡G—S¢7G&–ærÂ6öÆÆV7F–öã¢×W6–46öÆÆV7F–öâÂVF—F&ÆS¢&ööÆVâÒfÇ6R’°¢FWF–Ä¦ö#òæ6æ6VÂ‚¢fÂvVæW&F–öâÒ6W76–öävVæW&F–öà¢÷7FFRçWFFR²—Bæ6÷’†FWF–ÂÒçVÆÂÂFWF–ÄF—&V7F÷'”–BÒçVÆÂÂFWF–ÄÆöF–ærÒG'VRÂFWF–ÄW'&÷"ÒçVÆÂ’Ğ¢FWF–Ä¦ö"Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢G'’°¢fÂfÇVRÒw&‚æ’æ6öÆÆV7F–öâ‡G—RÂ6öÆÆV7F–öâ¢–b†vVæW&F–öâÓÒ6W76–öävVæW&F–öâ’÷7FFRçWFFR°¢—Bæ6÷’€¢FWF–ÂÒfÇVRÀ¢FWF–ÄF—&V7F÷'”–BÒ6öÆÆV7F–öâæF—&V7F÷'”–BçF¶T–b²VF—F&ÆRÒÀ¢FWF–ÄÆöF–ærÒfÇ6RÀ¢FWF–ÄW'&÷"ÒçVÆÂÀ¢¢Ğ¢Ò6F6‚†6æ6VÆÆVC¢6æ6VÆÆF–öäW†6WF–öâ’°¢F‡&÷r6æ6VÆÆV@¢Ò6F6‚†W'&÷#¢F‡&÷v&ÆR’°¢–b†vVæW&F–öâÓÒ6W76–öävVæW&F–öâ’°¢÷7FFRçWFFR°¢—Bæ6÷’€¢FWF–ÄÆöF–ærÒfÇ6RÀ¢FWF–ÄW'&÷"ÒW'&÷"æÖW76vSòçF¶T–b…7G&–æs£¦—4æ÷D&Ææ²’ó¢.jØÎXÙ^Šû¾XùnZK‹JR"À¢¢Ğ¢f–Â†W'&÷"¢Ğ¢Ğ¢Ğ¢Ğ¢gVâ7&VFUÆ–Æ—7B‡F—FÆS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²–b‡&WV—&UÆ–Æ—7Ew&—FW2‚’’'Vä6F6†–ær²w&‚æ’æ7&VFUÆ–Æ—7B‡F—FÆR’Òæöå7V66W72²ÆöDÆ–'&'’‚’Òæöäf–ÇW&Rƒ£¦f–Â’Ğ¢gVâ&VæÖUÆ–Æ—7B†–C¢7G&–ærÂF—FÆS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²–b‡&WV—&UÆ–Æ—7Ew&—FW2‚’’'Vä6F6†–ær²w&‚æ’ç&VæÖUÆ–Æ—7B†–BÂF—FÆR’Òæöå7V66W72²ÆöDÆ–'&'’‚’Òæöäf–ÇW&Rƒ£¦f–Â’Ğ¢gVâFVÆWFUÆ–Æ—7B†–C¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²–b‡&WV—&UÆ–Æ—7Ew&—FW2‚’’'Vä6F6†–ær²w&‚æ’æFVÆWFUÆ–Æ—7B†–B’Òæöå7V66W72²ÆöDÆ–'&'’‚’Òæöäf–ÇW&Rƒ£¦f–Â’Ğ¢gVâFEFõÆ–Æ—7B‡G&6³¢G&6²Â–C¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²–b‡&WV—&UÆ–Æ—7Ew&—FW2‚’’'Vä6F6†–ær²w&‚æ’æ6†ævUÆ–Æ—7EG&6²†–BÂG&6²ÂG'VR’Òæöå7V66W72²÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.[{.XªXZ^jØÎXÙR"’Ó²ÆöDÆ–'&'’‚’Òæöäf–ÇW&Rƒ£¦f–Â’Ğ¢gVâ&VÖ÷fTg&öÕÆ–Æ—7B‡G&6³¢G&6²Â–C¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢–b‚&WV—&UÆ–Æ—7Ew&—FW2‚’’&WGW&äÆVæ6€¢'Vä6F6†–ær²w&‚æ’æ6†ævUÆ–Æ—7EG&6²†–BÂG&6²ÂfÇ6R’Ğ¢æöå7V66W72°¢fÂG&6·2Ò÷7FFRçfÇVRæFWF–ÃòçG&6·2æ÷$V×G’‚’æf–ÇFW$æ÷B²—FVÒÓâ—FVÒæ–BÓÒG&6²æ–BĞ¢÷7FFRçWFFR²7FFRÓâ7FFRæ6÷’†ÖW76vRÒ.[{.K¸îjØÎXÙ^z{¾™šB"ÂFWF–ÂÒ7FFRæFWF–Ãòæ6÷’‡G&6·2ÒG&6·2’’Ğ¢Ğ¢æöäf–ÇW&Rƒ£¦f–Â¢Ğ¢gVâ6WEVÆ—G’‡fÇVS¢7G&–ær’°¢VÆ—G•7v—F6„¦ö#òæ6æ6VÂ‚¢VÆ—G•7v—F6„¦ö"Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢fÂ&WVW7FVBÒæ÷&ÖÆ—¦UVÆ—G”–B‡fÇVR¢fÂ&öf–ÆRÒ÷7FFRçfÇVRç&öf–ÆP¢fÂVçF—FÆVÖVçBÒ&öf–ÆUVÆ—G”÷F–öç2‡&öf–ÆR’æf—'7B²—Bæ–BÓÒ&WVW7FVBĞ¢–b‚VçF—FÆVÖVçBæf–Æ&ÆR’°¢÷7FFRçWFFR°¢—Bæ6÷’†ÖW76vRÒVçF—FÆVÖVçBç&V6öâæ–d&Ææ²².[Ù>X˜Ş‹JnXû~KˆŞˆ;ŞKÛşyJ‚G·VÆ—G”Æ&VÂ‡&WVW7FVB—Ò"Ò¢Ğ¢&WGW&äÆVæ6€¢Ğ¢w&‚ç6WGF–æw2ç6WEVÆ—G’‡&WVW7FVB¢fÂG&6²Ò÷7FFRçfÇVRæ7W'&VçEG&6°¢–b‡G&6²ÓÒçVÆÂÇÂÆ7E7G&VÕW&Âç7F'G5v—F‚‚&f–ÆS¢"’ÇÂÆ7E7G&VÕW&Âæ—4&Ææ²‚’’°¢÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.›¹ŠêN™û>‹J[{.ŠëîK‹¢G·VÆ—G”Æ&VÂ‡&WVW7FVB—Ò"’Ğ¢&WGW&äÆVæ6€¢Ğ¢–b‚fVGW&TVæ&ÆVB‚'7G&VÒ"’’°¢÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.›¹ŠêN™û>‹J[{.ŠëîK‹¢G·VÆ—G”Æ&VÂ‡&WVW7FVB—ŞûÈÎKˆ¾jÊYÊ{«şi*ŞiKîi{nyIşiX‚"’Ğ¢&WGW&äÆVæ6€¢Ğ¢÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.jÚ>YÊXˆ~hÚ.X‹G·VÆ—G”Æ&VÂ‡&WVW7FVB—Ş(
-b"’Ğ¢G'’°¢fÂF&vWBÒ&W6öÇfUVÆ—G’‡&WVW7FVBÂG&6²Â&öf–ÆR’ç&W6öÇfV@¢fÂ7G&VÒÒw&‚æ’ç7G&VÒ‡G&6²ÂF&vWB¢¶÷FÆ–ç‚æ6÷&÷WF–æW2æ7W'&VçD6÷&÷WF–æT6öçFW‡B‚’æVç7W&T7F—fR‚¢–b…÷7FFRçfÇVRæ7W'&VçEG&6³òæ–BÒG&6²æ–BÇÂw&‚çÆ–&6²æ7W'&VçDÖVF––B‚’ÒG&6²æ–B’&WGW&äÆVæ6€¢fÂ÷6—F–öâÒw&‚çÆ–&6²ç÷6—F–öâ‚¢fÂÆ•v†Vå&VG’Òw&‚çÆ–&6²çÆ•v†Vå&VG’‚¢w&‚çÆ–&6²ç&WÆ6U7G&VÒ€¢–BÒG&6²æ–BÀ¢W&’Ò7G&VÒçW&ÂÀ¢F—FÆRÒG&6²çF—FÆRÀ¢'F—7BÒG&6²æ'F—7G2æ¦ö–åFõ7G&–ær‚"ò"’À¢'Gv÷&²ÒG&6²æ'Gv÷&µW&ÂÀ¢7F'E÷6—F–öä×2Ò÷6—F–öâÀ¢Æ•v†Vå&VG’ÒÆ•v†Vå&VG’À¢¢Æ7E7G&VÕW&ÂÒ7G&VÒçW&À¢Æ7E7G&VÔW‡—&W4BÒ7G&VÒæW‡—&W4@¢Æ7E7G&VÕVÆ—G’Ò7G&VÒçVÆ—G¢W'6—7E6æ6†÷B‡÷6—F–öâ¢÷7FFRçWFFR°¢—Bæ6÷’€¢7F—fU7G&VÕVÆ—G’Òæ÷&ÖÆ—¦UVÆ—G”–B‡7G&VÒçVÆ—G’’À¢ÖW76vRÒVÆ—G”fÆÆ&6´ÖW76vR‡&WVW7FVBÂ7G&VÒçVÆ—G’ÂG&6²Â&öf–ÆR¢ó¢.[{.Xˆ~hÚ.X‹G·VÆ—G”Æ&VÂ‡7G&VÒçVÆ—G’—Ò"À¢¢Ğ¢Ò6F6‚†6æ6VÆÆVC¢6æ6VÆÆF–öäW†6WF–öâ’°¢F‡&÷r6æ6VÆÆV@¢Ò6F6‚†W'&÷#¢F‡&÷v&ÆR’°¢f–ÅÆ–&6²†W'&÷"¢Ğ¢Ğ¢Ğ¢gVâ6WD†VG†öæUv&æ–ær‡fÇVS¢&ööÆVâ’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WD†VG†öæUv&æ–ær‡fÇVR’Ğ¢gVâ6WDWFô÷VåÆ–W"‡fÇVS¢&ööÆVâ’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDWFô÷VåÆ–W"‡fÇVR’Ğ¢gVâ6WEÆ”ÖöFR‡fÇVS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WEÆ”ÖöFR‡fÇVR’Ğ¢gVâ6WDÇ—&–56—¦R‡fÇVS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÇ—&–56—¦R‡fÇVR’Ğ¢gVâ6WDÇ—&–5G&ç6ÆF–öâ‡fÇVS¢&ööÆVâ’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÇ—&–5G&ç6ÆF–öâ‡fÇVR’Ğ¢gVâ6WDÇ—&–4÷&–v–æÂ‡fÇVS¢&ööÆVâ’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÇ—&–4÷&–v–æÂ‡fÇVR’Ğ¢gVâ6WDÇ—&–4öfg6WB‡fÇVS¢Æöær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÇ—&–4öfg6WB‡fÇVR’Ğ¢gVâ6WDÇ—&–4æ–ÖF–öâ‡fÇVS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÇ—&–4æ–ÖF–öâ‡fÇVR’Ğ¢gVâ6WDÇ—&–4Æ–væÖVçB‡fÇVS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÇ—&–4Æ–væÖVçB‡fÇVR’Ğ¢gVâ6WEW&T&Æ6²‡fÇVS¢&ööÆVâ’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WEW&T&Æ6²‡fÇVR’Ğ¢gVâ6WDÆ÷u÷vW%Æ–W"‡fÇVS¢&ööÆVâ’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÆ÷u÷vW%Æ–W"‡fÇVR’Ğ¢gVâ6WEv–f”öæÇ”F÷væÆöB‡fÇVS¢&ööÆVâ’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WEv–f”öæÇ”F÷væÆöB‡fÇVR’Ğ¢gVâ6WDF–Ç”6÷VçB‡fÇVS¢–çB’Òf–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDF–Ç”6÷VçB‡fÇVR’Ğ¢gVâFEFõVWVR‡G&6³¢G&6²’²–b…÷VWVRçfÇVRææöæR²—Bæ–BÓÒG&6²æ–BÒ’÷VWVRçfÇVRÒ÷VWVRçfÇVR²G&6³²W'6—7E6æ6†÷B‚“²÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.[{.XªXZ^i*ŞiKîX‰~Š‚"’ÒĞ¢gVâVçVWVTæW‡B‡G&6³¢G&6²’°¢fÂ—FV×2Ò–ç6W'DæW‡B…÷VWVRçfÇVRÂ÷7FFRçfÇVRæ7W'&VçEG&6³òæ–BÂG&6²¢÷VWVRçfÇVRÒ—FV×0¢÷VWVT–æFW‚çfÇVRÒ÷7FFRçfÇVRæ7W'&VçEG&6³òæÆWB²Æ––ærÓâ—FV×2æ–æFW„ödf—'7B²—Bæ–BÓÒÆ––æræ–BÒÒó¢Ó¢W'6—7E6æ6†÷B‚¢÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.[{.ŠëîK‹®Kˆ¾Kˆšib"’Ğ¢Ğ¢gVâ&VÖ÷fTg&öÕVWVR†–æFWƒ¢–çB’°¢fÂ—FV×2Ò÷VWVRçfÇVRçFô×WF&ÆTÆ—7B‚¢–b†–æFW‚–â—FV×2æ–æF–6W2’&WGW&à¢—FV×2ç&VÖ÷fTB†–æFW‚“²÷VWVRçfÇVRÒ—FV×0¢÷VWVT–æFW‚çfÇVRÒ÷7FFRçfÇVRæ7W'&VçEG&6³òæÆWB²Æ––ærÓâ—FV×2æ–æFW„ödf—'7B²—Bæ–BÓÒÆ––æræ–BÒÒó¢Ó¢W'6—7E6æ6†÷B‚¢Ğ¢gVâ6ÆV%VWVR‚’²÷VWVRçfÇVRÒV×G”Æ—7B‚“²÷VWVT–æFW‚çfÇVRÒÓ²W'6—7E6æ6†÷B‚’Ğ¢gVâ&VÖ÷fUVWVTGWÆ–6FW2‚’°¢fÂ&Vf÷&RÒ÷VWVRçfÇVRç6—¦P¢÷VWVRçfÇVRÒ÷VWVRçfÇVRæF—7F–æ7D'’…G&6³£¦–B¢÷VWVT–æFW‚çfÇVRÒ÷7FFRçfÇVRæ7W'&VçEG&6³òæÆWB²Æ––ærÓâ÷VWVRçfÇVRæ–æFW„ödf—'7B²—Bæ–BÓÒÆ––æræ–BÒÒó¢Ó¢W'6—7E6æ6†÷B‚“²÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.[{.z{¾™šBG¶&Vf÷&RÒ÷VWVRçfÇVRç6—¦WÒšin˜xŞZHŞjØÎi»""’Ğ¢Ğ¢gVâ&WfW'6UVWVR‚’°¢÷VWVRçfÇVRÒ÷VWVRçfÇVRç&WfW'6VB‚“²÷VWVU&WfW'6VBçfÇVRÒ÷VWVU&WfW'6VBçfÇVP¢÷VWVT–æFW‚çfÇVRÒ÷7FFRçfÇVRæ7W'&VçEG&6³òæÆWB²Æ––ærÓâ÷VWVRçfÇVRæ–æFW„ödf—'7B²—Bæ–BÓÒÆ––æræ–BÒÒó¢Ó¢W'6—7E6æ6†÷B‚¢Ğ¢gVâ&WÆ6UVWVT÷&FW"†—FV×3¢Æ—7CÅG&6³â’°¢–b†—FV×2æÖ…G&6³£¦–B’ç6÷'FVB‚’Ò÷VWVRçfÇVRæÖ…G&6³£¦–B’ç6÷'FVB‚’’&WGW&à¢–b†—FV×2æÖ…G&6³£¦–B’ÓÒ÷VWVRçfÇVRæÖ…G&6³£¦–B’’&WGW&à¢÷VWVRçfÇVRÒ—FV×0¢÷VWVT–æFW‚çfÇVRÒ÷7FFRçfÇVRæ7W'&VçEG&6³òæÆWB²Æ––ærÓâ—FV×2æ–æFW„ödf—'7B²—Bæ–BÓÒÆ––æræ–BÒÒó¢Ó¢W'6—7E6æ6†÷B‚¢Ğ¢gVâÆ•VWVT—FVÒ†–æFWƒ¢–çB’²÷VWVRçfÇVRævWD÷$çVÆÂ†–æFW‚“òæÆWB²&WVW7EÆ’†—BÂG'VR’ÒĞ¢gVâ6¶—æW‡B‚’ÒÆ”F¦6VçBƒÂfÇ6R¢gVâ6¶—&Wf–÷W2‚’ÒÆ”F¦6VçB‚ÓÂfÇ6R¢&—fFRgVâÆ”F¦6VçB†FVÇF¢–çBÂVæFVC¢&ööÆVâ’°¢–b…÷VWVRçfÇVRæ—4V×G’‚’’&WGW&à¢fÂÖöFRÒÆ”ÖöFRçfÇVP¢fÂ&æFöÒÒ–b†ÖöFRÓÒ'6‡VffÆR"bb÷VWVRçfÇVRç6—¦Râ’÷VWVRçfÇVRæ–æF–6W2æf–ÇFW"²—BÒ÷VWVT–æFW‚çfÇVRÒç&æFöÒ‚’VÇ6RÓ¢fÂF&vWBÒæW‡EVWVT–æFW‚…÷VWVRçfÇVRç6—¦RÂ÷VWVT–æFW‚çfÇVRÂFVÇFÂÖöFRÂVæFVBÂ&æFöÒ¢–b‡F&vWBÂ’&WGW&à¢Æ•VWVT—FVÒ‡F&vWB¢Ğ¢gVâ6fUVWVT5Æ–Æ—7B‡F—FÆS¢7G&–ær’Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢–b‚&WV—&UÆ–Æ—7Ew&—FW2‚’’&WGW&äÆVæ6€¢'Vä6F6†–ær°¢fÂÆ–Æ—7BÒw&‚æ’æ7&VFUÆ–Æ—7B‡F—FÆR¢÷VWVRçfÇVRæf÷$V6‚²w&‚æ’æ6†ævUÆ–Æ—7EG&6²‡Æ–Æ—7BæF—&V7F÷'”–BÂ—BÂG'VR’Ğ¢Òæöå7V66W72²÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.i*ŞiKîX‰~Š[{.KùŞZÙK‹®jØÎXÙR"’Ó²ÆöDÆ–'&'’‚’Òæöäf–ÇW&Rƒ£¦f–Â¢Ğ ¢&—fFRgVâ&WV—&UÆ–Æ—7Ew&—FW2‚“¢&ööÆVâ°¢–b†fVGW&TVæ&ÆVB‚'Æ–Æ—7Ew&—FW2"’’&WGW&âG'VP¢f–Â„–ÆÆVvÅ7FFTW†6WF–öâ†fVGW&TÖW76vR‚'Æ–Æ—7Ew&—FW2"’æ–d&Ææ²².iKn‰xşKˆîjØÎXÙ^{Én‹éi¨.i{n{»NhªB"Ò’¢&WGW&âfÇ6P¢Ğ¢gVâÆöEVWVT–×÷'DÆ–¶VB‚’²VWVT–×÷'D¦ö#òæ6æ6VÂ‚“²VWVT–×÷'D¦ö"ÒçVÆÃ²÷7FFRçWFFR²—Bæ6÷’‡VWVT–×÷'EF—FÆRÒ.h‰YiÎjÊ""ÂVWVT–×÷'EG&6·2Ò—BæÆ–'&'“òæÆ–¶VBæ÷$V×G’‚’ÂVWVT–×÷'DÆöF–ærÒfÇ6R’ÒĞ¢gVâÆöEVWVT–×÷'EÆ–Æ—7B†6öÆÆV7F–öã¢×W6–46öÆÆV7F–öâ’°¢VWVT–×÷'D¦ö#òæ6æ6VÂ‚¢fÂvVæW&F–öâÒ6W76–öävVæW&F–öà¢VWVT–×÷'D¦ö"Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢÷7FFRçWFFR²—Bæ6÷’‡VWVT–×÷'EF—FÆRÒ6öÆÆV7F–öâçF—FÆRÂVWVT–×÷'EG&6·2ÒV×G”Æ—7B‚’ÂVWVT–×÷'DÆöF–ærÒG'VR’Ğ¢G'’°¢fÂFWF–ÂÒw&‚æ’æ6öÆÆV7F–öâ‚'Æ–Æ—7B"Â6öÆÆV7F–öâ¢–b†vVæW&F–öâÓÒ6W76–öävVæW&F–öâ’÷7FFRçWFFR²—Bæ6÷’‡VWVT–×÷'EF—FÆRÒFWF–ÂçF—FÆRÂVWVT–×÷'EG&6·2ÒFWF–ÂçG&6·2ÂVWVT–×÷'DÆöF–ærÒfÇ6R’Ğ¢Ò6F6‚†6æ6VÆÆVC¢6æ6VÆÆF–öäW†6WF–öâ’²F‡&÷r6æ6VÆÆVBÒ6F6‚†W'&÷#¢F‡&÷v&ÆR’°¢–b†vVæW&F–öâÓÒ6W76–öävVæW&F–öâ’²÷7FFRçWFFR²—Bæ6÷’‡VWVT–×÷'EF—FÆRÒ""ÂVWVT–×÷'EG&6·2ÒV×G”Æ—7B‚’ÂVWVT–×÷'DÆöF–ærÒfÇ6R’Ó²f–Â†W'&÷"’Ğ¢Ğ¢Ğ¢Ğ¢gVâ6ÆV%VWVT–×÷'B‚’²VWVT–×÷'D¦ö#òæ6æ6VÂ‚“²VWVT–×÷'D¦ö"ÒçVÆÃ²÷7FFRçWFFR²—Bæ6÷’‡VWVT–×÷'EF—FÆRÒ""ÂVWVT–×÷'EG&6·2ÒV×G”Æ—7B‚’ÂVWVT–×÷'DÆöF–ærÒfÇ6R’ÒĞ¢gVâFE6VÆV7FVEVWVUG&6·2†–G3¢6WCÅ7G&–æsâ’°¢fÂ&Vf÷&RÒ÷VWVRçfÇVRç6—¦P¢÷VWVRçfÇVRÒÖW&vU6VÆV7FVEVWVR…÷VWVRçfÇVRÂ÷7FFRçfÇVRçVWVT–×÷'EG&6·2Â–G2¢÷VWVT–æFW‚çfÇVRÒ÷7FFRçfÇVRæ7W'&VçEG&6³òæÆWB²7W'&VçBÓâ÷VWVRçfÇVRæ–æFW„ödf—'7B²—Bæ–BÓÒ7W'&VçBæ–BÒÒó¢Ó¢fÂFFVBÒ÷VWVRçfÇVRç6—¦RÒ&Vf÷&P¢W'6—7E6æ6†÷B‚“²6ÆV%VWVT–×÷'B‚“²÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.[{.XªXZRFFFVBšinjØÎi»""’Ğ¢Ğ¢gVâ7F'E6ÆVWF–ÖW"†Ö–çWFW3¢–çBÂf–æ—6„7W'&VçC¢&ööÆVâÒfÇ6R’²w&‚çÆ–&6²ç7F'E6ÆVWF–ÖW"†Ö–çWFW2Âf–æ—6„7W'&VçB“²f–WtÖöFVÅ66÷RæÆVæ6‚²w&‚ç6WGF–æw2ç6WDÆ7E6ÆVWÖ–çWFW2†Ö–çWFW2’Ó²÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ–b†f–æ—6„7W'&VçB’"FÖ–çWFW2Xˆn™)şYîi*ŞZèÎ[Ù>X˜ŞjØÎi».X[>™zÒ"VÇ6R.[nYÊ‚FÖ–çWFW2Xˆn™)şYîXÎjÚ.i*ŞiKâ"’ÒĞ¢gVâ6æ6VÅ6ÆVWF–ÖW"‚’²w&‚çÆ–&6²æ6æ6VÅ6ÆVWF–ÖW"‚“²÷7FFRçWFFR²—Bæ6÷’†ÖW76vRÒ.[{.XùnkhZé®i{nX[>™zÒ"’ÒĞ¢gVâÆ–&6µ÷6—F–öâ‚’Òw&‚çÆ–&6²ç÷6—F–öâ‚¢gVâÆ–&6´GW&F–öâ‚’Òw&‚çÆ–&6²æGW&F–öâ‚¢gVâ—5Æ––ær‚’Òw&‚çÆ–&6²æ—5Æ––ær‚¢gVâW6UÆ–&6²‚’²w&‚çÆ–&6²çW6R‚“²W'6—7E6æ6†÷B‚’Ğ¢gVâ&W7VÖUÆ–&6²‚’²–b†w&‚çÆ–&6²æGW&F–öâ‚’ÓÒÂ’÷7FFRçfÇVRæ7W'&VçEG&6³òæÆWB²&WVW7EÆ’†—BÂG'VR’ÒVÇ6Rw&‚çÆ–&6²ç&W7VÖR‚’Ğ¢gVâ6VV²‡÷6—F–öã¢Æöær’Òw&‚çÆ–&6²ç6VV²‡÷6—F–öâ¢gVâF§W7EföÇVÖR†F—&V7F–öã¢–çB’Òw&‚çÆ–&6²æF§W7EföÇVÖR†F—&V7F–öâ¢gVâ6fUÆ–&6µ7FFR‚’ÒW'6—7E6æ6†÷B‚¢&—fFRgVâW'6—7E6æ6†÷B‡÷6—F–öã¢ÆöærÒw&‚çÆ–&6²ç÷6—F–öâ‚’’Òf–WtÖöFVÅ66÷RæÆVæ6‚°¢fÂ÷væW"Ò66÷VçD–Bó¢&WGW&äÆVæ6€¢w&‚ç6WGF–æw2ç6WEÆ–&6µ6æ6†÷B†§6öâæVæ6öFUFõ7G&–ær…Æ–&6µ6æ6†÷B€¢÷7FFRçfÇVRæ7W'&VçEG&6²Â÷VWVRçfÇVRÂ÷6—F–öâÂ÷VWVU&WfW'6VBçfÇVRÀ¢Æ7E7G&VÕW&ÂÂÆ7E7G&VÔW‡—&W4BÂÆ7E7G&VÕVÆ—G’Â÷væW"À¢’’¢Ğ¢&—fFRgVâ&VfW'&VEVÆ—G’‡G&6³¢G&6²“¢7G&–ærĞ¢&W6öÇfUVÆ—G’‡VÆ—G’çfÇVRÂG&6²Â÷7FFRçfÇVRç&öf–ÆR’ç&W6öÇfV@¢÷fW'&–FRgVâöä6ÆV&VB‚’²w&‚çÆ–&6²æöäW'&÷"ÒçVÆÃ²w&‚çÆ–&6²æöäÖVF–—FVÔ6†ævVBÒçVÆÃ²7WW"æöä6ÆV&VB‚’Ğ§Ğ 
+        }
+    }
+    fun consumeMessage() = _state.update { it.copy(message = null) }
+    private fun fail(error: Throwable) {
+        AppLog.write("ERROR", generateSequence(error) { it.cause }.joinToString(" <- ") { "${it.javaClass.simpleName}:${it.message.orEmpty()}" })
+        _state.update { it.copy(loading = false, searchLoading = false, message = error.message ?: "æ“ä½œå¤±è´¥") }
+    }
+
+    private fun failPlayback(error: Throwable) {
+        val failure = classifyPlaybackFailure(error)
+        AppLog.write("PLAYBACK", "type=${failure.type} ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+        _state.update { it.copy(loading = false, message = failure.message) }
+    }
+
+    private fun handlePlaybackError(event: PlaybackErrorEvent) {
+        val track = _state.value.currentTrack
+        val failure = classifyPlaybackFailure(event.error)
+        if (track == null || track.id != event.mediaId || event.isLocalFile || !failure.retryable || retryingTrackId == track.id) {
+            _state.update { it.copy(message = failure.message) }
+            return
+        }
+        retryingTrackId = track.id
+        recoveryJob?.cancel()
+        recoveryJob = viewModelScope.launch {
+            _state.update { it.copy(message = "æ’­æ”¾è¿æ¥ä¸­æ–­ï¼Œæ­£åœ¨è‡ªåŠ¨æ¢å¤â€¦") }
+            runCatching {
+                graph.api.invalidateStream(track.id)
+                val stream = graph.api.stream(track, preferredQuality(track))
+                if (_state.value.currentTrack?.id != track.id) throw CancellationException("æ­Œæ›²å·²åˆ‡æ¢")
+                graph.playback.replaceStream(
+                    id = track.id,
+                    uri = stream.url,
+                    title = track.title,
+                    artist = track.artists.joinToString(" / "),
+                    artwork = track.artworkUrl,
+                    startPositionMs = event.positionMs,
+                    playWhenReady = true,
+                )
+                lastStreamUrl = stream.url
+                lastStreamExpiresAt = stream.expiresAt
+                lastStreamQuality = stream.quality
+                _state.update { it.copy(activeStreamQuality = stream.quality) }
+                persistSnapshot(event.positionMs)
+            }.onSuccess {
+                val qualityNote = qualityFallbackMessage(quality.value, lastStreamQuality, track, _state.value.profile)
+                _state.update { it.copy(message = "å·²ä» ${lyricTimeForMessage(event.positionMs)} è‡ªåŠ¨æ¢å¤æ’­æ”¾" + qualityNote?.let { note -> " Â· $note" }.orEmpty()) }
+                delay(10_000)
+                if (_state.value.currentTrack?.id == track.id) retryingTrackId = null
+            }.onFailure { error -> retryingTrackId = null; if (error !is CancellationException) failPlayback(error) }
+        }
+    }
+
+    private fun handleMediaItemChanged(mediaId: String, uri: String) {
+        if (mediaId.isBlank() || _state.value.currentTrack?.id == mediaId || playJob?.isActive == true) return
+        qualitySwitchJob?.cancel(); qualitySwitchJob = null
+        recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
+        viewModelScope.launch {
+            val snapshot = runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()
+            val snapshotQueue = snapshot?.takeIf { it.belongsToAccount(accountId) }?.queue.orEmpty().distinctBy(Track::id)
+            val track = _queue.value.firstOrNull { it.id == mediaId }
+                ?: snapshot?.track?.takeIf { it.id == mediaId }
+                ?: snapshotQueue.firstOrNull { it.id == mediaId }
+                ?: return@launch
+            if (graph.playback.currentMediaId() != mediaId) return@launch
+            if (snapshotQueue.isNotEmpty()) _queue.value = snapshotQueue
+            _queueIndex.value = _queue.value.indexOfFirst { it.id == mediaId }
+            lastStreamUrl = snapshot?.streamUrl?.takeIf { snapshot.track?.id == mediaId }.orEmpty().ifBlank { uri }
+            lastStreamExpiresAt = snapshot?.streamExpiresAt?.takeIf { snapshot.track?.id == mediaId } ?: if (uri.startsWith("file:")) Long.MAX_VALUE else 0
+            lastStreamQuality = reportedQualityId(snapshot?.quality?.takeIf { snapshot.track?.id == mediaId } ?: preferredQuality(track))
+            _state.update { it.copy(currentTrack = track, activeStreamQuality = lastStreamQuality, lyrics = emptyList(), message = "å·²é€šè¿‡è€³æœºæˆ–ç³»ç»Ÿåª’ä½“æ§åˆ¶åˆ‡æ¢æ­Œæ›²") }
+            val localPath = android.net.Uri.parse(uri).takeIf { it.scheme == "file" }?.path
+            val lines = runCatching { loadLyrics(track, localPath) }
+                .onFailure { AppLog.write("LYRICS", "media key ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
+                .getOrDefault(emptyList())
+            if (graph.playback.currentMediaId() == mediaId) _state.update { it.copy(lyrics = lines) }
+        }
+    }
+
+    private fun lyricTimeForMessage(positionMs: Long): String =
+        "${positionMs.coerceAtLeast(0) / 60_000}:${((positionMs.coerceAtLeast(0) / 1000) % 60).toString().padStart(2, '0')}"
+
+    fun loadHome() = viewModelScope.launch {
+        sessionReady.await()
+        val generation = sessionGeneration
+        restoreAccountSnapshot()
+        if (generation != sessionGeneration) return@launch
+        _state.update { it.copy(loading = it.home == null) }
+        runCatching { graph.api.home() }.onSuccess { home ->
+            if (generation != sessionGeneration) return@onSuccess
+            _state.update { s -> s.copy(loading = false, home = home, offlineSnapshot = false) }
+            cacheAccountSnapshot(home = home)
+        }.onFailure { if (generation == sessionGeneration) _state.update { s -> s.copy(loading = false, offlineSnapshot = s.home != null) } }
+    }
+    fun startQrLogin(provider: String) {
+        qrLoginJob?.cancel()
+        if (provider !in setOf("qq", "wechat")) {
+            _state.update { it.copy(qrStatus = "ä¸æ”¯æŒçš„ç™»å½•æ–¹å¼", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            return
+        }
+        if (!featureEnabled("qrLogin")) {
+            _state.update { it.copy(qrStatus = featureMessage("qrLogin").ifBlank { "æ‰«ç ç™»å½•æš‚æ—¶ç»´æŠ¤" }, qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            return
+        }
+        qrLoginJob = viewModelScope.launch {
+            _state.update { it.copy(qrStatus = "æ­£åœ¨ç”ŸæˆäºŒç»´ç â€¦", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            try {
+                val session = graph.controlPlane.createQrLogin(provider)
+                _state.update { it.copy(
+                    qrStatus = "è¯·ä½¿ç”¨æ‰‹æœºæ‰«æäºŒç»´ç ",
+                    qrImageBase64 = session.imageBase64,
+                    qrMimeType = session.mimeType,
+                    qrExpiresAt = session.expiresAt,
+                ) }
+                while (isActive) {
+                    delay(session.pollAfterMs.coerceIn(1_000, 30_000))
+                    val result = graph.controlPlane.pollQrLogin(session.id, provider)
+                    AppLog.write("LOGIN", "server_qr provider=$provider status=${result.status}")
+                    when (result.status) {
+                        "waiting" -> _state.update { it.copy(qrStatus = "è¯·ä½¿ç”¨æ‰‹æœºæ‰«æäºŒç»´ç ") }
+                        "scanned" -> _state.update { it.copy(qrStatus = "å·²æ‰«ç ï¼Œè¯·åœ¨æ‰‹æœºç¡®è®¤") }
+                        "complete" -> {
+                            _state.update { it.copy(qrStatus = "å·²ç¡®è®¤ï¼Œæ­£åœ¨å®Œæˆç™»å½•â€¦") }
+                            completeServerLogin(provider, result.cookie)
+                            return@launch
+                        }
+                        "expired" -> {
+                            _state.update { it.copy(qrStatus = "äºŒç»´ç å·²è¿‡æœŸï¼Œç‚¹åˆ·æ–°é‡è¯•") }
+                            return@launch
+                        }
+                        "rejected" -> {
+                            _state.update { it.copy(qrStatus = "å·²å–æ¶ˆç™»å½•ï¼Œç‚¹åˆ·æ–°é‡è¯•") }
+                            return@launch
+                        }
+                        else -> {
+                            _state.update { it.copy(qrStatus = "ç™»å½•æœåŠ¡æš‚æ—¶ä¸å¯ç”¨ï¼Œç‚¹åˆ·æ–°é‡è¯•") }
+                            return@launch
+                        }
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                AppLog.write("LOGIN", "server_qr ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                _state.update { it.copy(qrStatus = "äºŒç»´ç åŠ è½½å¤±è´¥ï¼Œç‚¹åˆ·æ–°é‡è¯•", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+            }
+        }
+    }
+
+    fun cancelQrLogin() {
+        qrLoginJob?.cancel()
+        qrLoginJob = null
+        _state.update { it.copy(qrStatus = "", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0) }
+    }
+
+    private suspend fun completeServerLogin(provider: String, cookie: String) {
+        runCatching {
+            val account = com.ronan.qmusicwatch.login.MusicCookie.accountId(cookie)
+                ?: error("ç™»å½•å“åº”ç¼ºå°‘è´¦å·æ ‡è¯†")
+            SessionTokens(
+                accountId = account,
+                provider = com.ronan.qmusicwatch.login.MusicCookie.provider(cookie, provider),
+                upstreamCookie = cookie,
+                gatewayHost = QMUSIC_SERVER_HOST,
+            )
+        }.onSuccess { session ->
+            runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "account switch ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
+            playJob?.cancel(); playJob = null
+            recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
+            graph.playback.stopAndClear()
+            pendingQueue = null
+            _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
+            restoredPosition = 0; lastStreamUrl = ""; lastStreamExpiresAt = 0
+            graph.vault.save(session)
+            currentSession = session
+            sessionGeneration++
+            searchJob?.cancel(); searchJob = null
+            detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
+            _state.update { s -> s.copy(
+                home = null, library = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
+                detail = null, detailDirectoryId = null, offlineSnapshot = false,
+                pendingSpeakerTrack = null,
+                queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false, searchLoading = false,
+                qrStatus = "ç™»å½•æˆåŠŸ", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0, message = "ç™»å½•æˆåŠŸ",
+            ) }
+            loadHome(); loadProfile(force = true); loadLibrary(); loadRecent()
+        }.onFailure { error ->
+            _state.update { s -> s.copy(qrStatus = "ç™»å½•å¤±è´¥ï¼Œè¯·è¿”å›åˆ·æ–°äºŒç»´ç ") }
+            fail(error)
+        }
+    }
+    fun logout() {
+        viewModelScope.launch { runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "logout ${it.javaClass.simpleName}:${it.message.orEmpty()}") } }
+        playJob?.cancel(); playJob = null
+        qualitySwitchJob?.cancel(); qualitySwitchJob = null
+        recoveryJob?.cancel(); recoveryJob = null
+        searchJob?.cancel(); searchJob = null; sessionGeneration++
+        qrLoginJob?.cancel(); qrLoginJob = null
+        detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
+        graph.playback.stopAndClear(); graph.vault.clear(); currentSession = null
+        pendingQueue = null
+        _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
+        restoredPosition = 0; lastStreamUrl = ""; lastStreamExpiresAt = 0; retryingTrackId = null
+        viewModelScope.launch { graph.settings.setPlaybackSnapshot(""); graph.settings.setProfileCache("") }
+        _state.update { it.copy(
+            home = null, library = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
+            searchTracks = emptyList(), searchCollections = emptyList(), searchCursor = null, searchLoading = false,
+            currentTrack = null, lyrics = emptyList(), pendingSpeakerTrack = null, detail = null, detailDirectoryId = null,
+            queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false,
+            qrStatus = "", qrImageBase64 = "", qrMimeType = "", qrExpiresAt = 0,
+            offlineSnapshot = false, message = "å·²é€€å‡ºï¼Œç¦»çº¿æ–‡ä»¶å·²ä¿ç•™å¹¶é”å®š",
+        ) }
+        loadHome()
+    }
+    fun loadLibrary() = viewModelScope.launch {
+        sessionReady.await()
+        if (!signedIn) return@launch fail(IllegalStateException("è¯·å…ˆç™»å½•"))
+        val generation = sessionGeneration
+        restoreAccountSnapshot()
+        if (generation != sessionGeneration) return@launch
+        runCatching { graph.api.library() }.onSuccess { rawValue ->
+            if (generation != sessionGeneration) return@onSuccess
+            val value = normalizeLibraryData(rawValue)
+            _state.update { it.copy(library = value, offlineSnapshot = false) }
+            cacheAccountSnapshot(library = value)
+        }.onFailure { error ->
+            if (generation != sessionGeneration) return@onFailure
+            if (_state.value.library != null) _state.update { it.copy(offlineSnapshot = true, message = "ç½‘ç»œä¸å¯ç”¨ï¼Œæ­£åœ¨æ˜¾ç¤ºç¦»çº¿æ”¶è—ä¸æ­Œå•") }
+            else fail(error)
+        }
+    }
+
+    private suspend fun restoreAccountSnapshot() {
+        val owner = accountId ?: "guest"
+        val cached = runCatching { json.decodeFromString<CachedAccountSnapshots>(graph.settings.accountSnapshots.first()) }.getOrNull()
+            ?.items?.firstOrNull { it.accountId == owner } ?: return
+        _state.update { state -> state.copy(
+            home = state.home ?: cached.home,
+            library = state.library ?: cached.library?.let(::normalizeLibraryData),
+            offlineSnapshot = true,
+        ) }
+    }
+
+    private suspend fun cacheAccountSnapshot(home: HomeData? = null, library: LibraryData? = null) = snapshotMutex.withLock {
+        val owner = accountId ?: "guest"
+        val cache = runCatching { json.decodeFromString<CachedAccountSnapshots>(graph.settings.accountSnapshots.first()) }.getOrDefault(CachedAccountSnapshots())
+        val old = cache.items.firstOrNull { it.accountId == owner }
+        val normalizedLibrary = (library ?: old?.library)?.let(::normalizeLibraryData)
+        val updated = CachedAccountSnapshot(owner, home ?: old?.home, normalizedLibrary, System.currentTimeMillis())
+        graph.settings.setAccountSnapshots(json.encodeToString(upsertAccountSnapshot(cache, updated)))
+    }
+    fun loadProfile(force: Boolean = false) = viewModelScope.launch {
+        val generation = sessionGeneration
+        profileCacheReady.await()
+        if (!signedIn || (!force && _state.value.profileLoaded)) return@launch
+        if (!featureEnabled("profile")) return@launch _state.update { it.copy(profileLoaded = true, profileError = featureMessage("profile").ifBlank { "è´¦å·èµ„æ–™æœåŠ¡æš‚æ—¶ç»´æŠ¤" }) }
+        runCatching { graph.api.profile() }.onSuccess { rawProfile ->
+            if (generation != sessionGeneration) return@onSuccess
+            val profile = normalizeUserProfile(rawProfile)
+            _state.update { it.copy(profile = profile, profileLoaded = true, profileError = null) }
+            graph.settings.setProfileCache(json.encodeToString(CachedUserProfile(accountId.orEmpty(), profile, System.currentTimeMillis())))
+        }
+            .onFailure { error ->
+                if (generation != sessionGeneration) return@onFailure
+                AppLog.write("PROFILE", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                _state.update { it.copy(profileLoaded = true, profileError = "ä¼šå‘˜çŠ¶æ€è¯»å–å¤±è´¥ï¼Œå¯ç‚¹æ£€æŸ¥ç™»å½•é‡è¯•") }
+            }
+    }
+    /** Refreshes only the account profile, so the settings page can update VIP rights without a full playback diagnostic. */
+    fun refreshMembership() = viewModelScope.launch {
+        if (!signedIn) return@launch fail(IllegalStateException("è¯·å…ˆç™»å½•"))
+        _state.update { it.copy(profileError = null, message = "æ­£åœ¨è¯»å–ä¼šå‘˜æƒç›Šâ€¦") }
+        loadProfile(force = true).join()
+        val result = _state.value
+        _state.update { it.copy(message = if (result.profileError == null) "ä¼šå‘˜æƒç›Šå·²æ›´æ–°" else result.profileError) }
+    }
+    fun diagnose() = viewModelScope.launch {
+        _state.update { it.copy(message = "æ­£åœ¨æ£€æŸ¥ç™»å½•ã€æ­Œå•å’Œæ’­æ”¾åœ°å€â€¦") }
+        val profileJob = loadProfile(force = true)
+        runCatching { graph.api.diagnose() }
+            .onSuccess { result -> _state.update { it.copy(message = result, diagnostic = result) } }
+            .onFailure { error -> _state.update { it.copy(diagnostic = "è¯Šæ–­å¤±è´¥ï¼š${error.message ?: "æœªçŸ¥é”™è¯¯"}") }; fail(error) }
+        profileJob.join()
+    }
+    fun loadRecent() = viewModelScope.launch {
+        sessionReady.await()
+        val generation = sessionGeneration
+        val owner = accountId ?: return@launch _state.update { it.copy(recent = emptyList(), recentLoaded = true) }
+        val local = graph.db.recent().all(owner).map { Track(it.trackId, it.title, it.artists.split(" / "), it.album, it.artworkUrl, playedAt = it.playedAt) }
+        val cloud = if (signedIn) runCatching { graph.api.recent() }.getOrDefault(emptyList()) else emptyList()
+        if (generation != sessionGeneration) return@launch
+        _state.update { it.copy(recent = mergeRecent(local, cloud), recentLoaded = true) }
+    }
+    fun search(query: String, type: String, loadMore: Boolean = false) {
+        if (query.isBlank()) return
+        val append = loadMore && _state.value.searchQuery == query && _state.value.searchType == type
+        val cursor = _state.value.searchCursor.takeIf { append } ?: if (loadMore) return else null
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _state.update { state -> state.copy(searchLoading = true, searchType = type, searchQuery = query, searchCursor = if (append) state.searchCursor else null, searchTracks = if (!append && type == "track") emptyList() else state.searchTracks, searchCollections = if (!append && type != "track") emptyList() else state.searchCollections) }
+            if (!append) graph.settings.addSearchHistory(query)
+            try {
+                val (tracks, collections, next) = if (type == "track") graph.api.searchTracks(query, cursor).let { Triple(it.items, emptyList<MusicCollection>(), it.nextCursor) }
+                else graph.api.searchCollections(type, query, cursor).let { Triple(emptyList<Track>(), it.items, it.nextCursor) }
+                _state.update { state -> state.copy(searchTracks = (if (append) state.searchTracks + tracks else tracks).distinctBy(Track::id), searchCollections = (if (append) state.searchCollections + collections else collections).distinctBy(MusicCollection::id), searchCursor = next, searchLoading = false) }
+            } catch (cancelled: CancellationException) { throw cancelled } catch (error: Throwable) {
+                _state.update { it.copy(searchLoading = false) }
+                fail(error)
+            }
+        }
+    }
+    fun clearSearchHistory() = viewModelScope.launch { graph.settings.clearSearchHistory() }
+    fun featureEnabled(name: String): Boolean = _state.value.controlConfig.featureEnabled(name)
+    fun featureMessage(name: String): String = _state.value.controlConfig.messages[name].orEmpty()
+
+    private suspend fun restoreControlPlaneAndRefresh() {
+        val cached = runCatching { json.decodeFromString<CachedControlPlane>(graph.settings.controlPlaneCache.first()) }.getOrNull()
+        val now = System.currentTimeMillis()
+        cached?.let { value -> _state.update { it.copy(
+            controlConfig = value.config.takeIf { controlCacheIsFresh(value, now) } ?: RemoteFeatureConfig(),
+            announcements = visibleAnnouncements(value.announcements, BuildConfig.VERSION_CODE, now),
+            controlFetchedAt = value.fetchedAt,
+        ) } }
+        // Render cached values immediately, then check for newly published data
+        // once on every cold start even while the cache is still fresh.
+        refreshControlPlane(showStatus = false)
+    }
+
+    fun refreshControlPlane(showStatus: Boolean = true) = viewModelScope.launch {
+        if (_state.value.controlRefreshing) return@launch
+        _state.update { it.copy(controlRefreshing = true, controlError = null) }
+        val (configResult, announcementsResult) = coroutineScope {
+            val config = async { runCatching { graph.controlPlane.config() } }
+            val announcements = async { runCatching { graph.controlPlane.announcements() } }
+            config.await() to announcements.await()
+        }
+        val previous = _state.value
+        if (configResult.isSuccess || announcementsResult.isSuccess) {
+            val now = System.currentTimeMillis()
+            val previousCache = CachedControlPlane(previous.controlConfig, previous.announcements, previous.controlFetchedAt)
+            val partialError = configResult.exceptionOrNull() ?: announcementsResult.exceptionOrNull()
+            val cache = CachedControlPlane(
+                config = configResult.getOrNull()
+                    ?: previous.controlConfig.takeIf { controlCacheIsFresh(previousCache, now) }
+                    ?: RemoteFeatureConfig(),
+                announcements = visibleAnnouncements(
+                    announcementsResult.getOrDefault(previous.announcements),
+                    BuildConfig.VERSION_CODE,
+                    now,
+                ),
+                fetchedAt = now.takeIf { configResult.isSuccess } ?: previous.controlFetchedAt,
+            )
+            graph.settings.setControlPlaneCache(json.encodeToString(cache))
+            _state.update { it.copy(
+                controlConfig = cache.config, announcements = cache.announcements, controlFetchedAt = cache.fetchedAt,
+                controlRefreshing = false, controlError = partialError?.message?.take(160),
+                message = (if (partialError == null) "æœåŠ¡é…ç½®å·²åŒæ­¥" else "éƒ¨åˆ†æœåŠ¡æš‚ä¸å¯ç”¨ï¼ŒéŸ³ä¹åŠŸèƒ½ç»§ç»­ç›´è¿")
+                    .takeIf { showStatus },
+            ) }
+        } else {
+            val message = configResult.exceptionOrNull()?.message ?: announcementsResult.exceptionOrNull()?.message ?: "æ§åˆ¶é¢ä¸å¯ç”¨"
+            _state.update { current ->
+                val cached = CachedControlPlane(current.controlConfig, current.announcements, current.controlFetchedAt)
+                current.copy(
+                    controlConfig = current.controlConfig.takeIf { controlCacheIsFresh(cached, System.currentTimeMillis()) } ?: RemoteFeatureConfig(),
+                    announcements = visibleAnnouncements(current.announcements, BuildConfig.VERSION_CODE, System.currentTimeMillis()),
+                    controlRefreshing = false, controlError = message.take(160),
+                    message = "æœåŠ¡æš‚ä¸å¯ç”¨ï¼ŒéŸ³ä¹åŠŸèƒ½ç»§ç»­ç›´è¿".takeIf { showStatus },
+                )
+            }
+        }
+    }
+
+    fun markAnnouncementSeen(id: String) = viewModelScope.launch { graph.settings.markAnnouncementSeen(id) }
+
+    private suspend fun restorePendingUpdate() {
+        val serialized = graph.settings.pendingUpdateRelease.first()
+        if (serialized.isBlank()) return
+        val release = runCatching { json.decodeFromString<ControlUpdate>(serialized) }.getOrNull()
+        if (release == null || !release.hasUpdate || release.versionCode <= BuildConfig.VERSION_CODE) {
+            graph.settings.setPendingUpdateRelease(null)
+            return
+        }
+        val recovered = runCatching { graph.updates.recover(release) }.getOrElse {
+            graph.settings.setPendingUpdateRelease(null)
+            return
+        }
+        _state.update { current ->
+            if (current.updateState != UpdateUiState.Idle) current else current.copy(
+                updateState = recovered.ready?.let { UpdateUiState.Ready(release, it.absolutePath) }
+                    ?: UpdateUiState.Available(release),
+                message = when {
+                    recovered.ready != null -> "å·²æ¢å¤æ ¡éªŒé€šè¿‡çš„æ›´æ–°å®‰è£…åŒ…"
+                    recovered.partialBytes > 0 -> "ä¸Šæ¬¡ä¸‹è½½å·²ä¿ç•™ï¼Œå¯ç»§ç»­ä¸‹è½½"
+                    else -> current.message
+                },
+            )
+        }
+    }
+
+    fun checkForUpdate() = viewModelScope.launch { checkForUpdateNow(showStatus = true) }
+
+    private suspend fun checkForUpdateNow(showStatus: Boolean) {
+        val previous = _state.value.updateState
+        if (showStatus || previous !is UpdateUiState.Ready) {
+            _state.update { it.copy(updateState = UpdateUiState.Checking) }
+        }
+        try {
+            val release = graph.controlPlane.latestRelease()
+            runCatching { graph.settings.setPendingUpdateRelease(json.encodeToString(release).takeIf { release.hasUpdate }) }
+            _state.update { current ->
+                val ready = (previous as? UpdateUiState.Ready)
+                    ?.takeIf { release.hasUpdate && it.release.releaseId == release.releaseId }
+                current.copy(
+                    updateState = ready ?: if (release.hasUpdate) UpdateUiState.Available(release) else UpdateUiState.NoUpdate,
+                    message = if (showStatus) {
+                        if (release.hasUpdate) "å‘ç°æ–°ç‰ˆæœ¬ ${release.versionName}" else "å½“å‰å·²æ˜¯æœ€æ–°ç‰ˆæœ¬"
+                    } else current.message,
+                )
+            }
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            _state.update { current ->
+                current.copy(
+                    updateState = (previous as? UpdateUiState.Ready)
+                        ?: UpdateUiState.Error(error.message ?: "æ£€æŸ¥æ›´æ–°å¤±è´¥"),
+                )
+            }
+        }
+    }
+
+    fun downloadUpdate(release: ControlUpdate) {
+        updateJob?.cancel()
+        updateJob = viewModelScope.launch {
+            runCatching { graph.settings.setPendingUpdateRelease(json.encodeToString(release)) }
+            _state.update {
+                it.copy(
+                    updateState = UpdateUiState.Downloading(release, 0, release.apk.sizeBytes),
+                    message = "æ­£åœ¨ä¸‹è½½æ›´æ–°â€¦",
+                )
+            }
+            runCatching {
+                graph.updates.downloadAndVerify(
+                    release,
+                    onProgress = { bytes, total -> _state.update { it.copy(updateState = UpdateUiState.Downloading(release, bytes, total)) } },
+                    onVerifying = { _state.update { it.copy(updateState = UpdateUiState.Verifying(release)) } },
+                )
+            }.onSuccess { file -> _state.update { it.copy(updateState = UpdateUiState.Ready(release, file.absolutePath), message = "æ›´æ–°å·²æ ¡éªŒï¼Œæ­£åœ¨æ‰“å¼€å®‰è£…å™¨") } }
+                .onFailure { error ->
+                    if (error !is CancellationException) {
+                        val message = error.message ?: "æ›´æ–°ä¸‹è½½å¤±è´¥"
+                        _state.update { it.copy(updateState = UpdateUiState.Error(message, release), message = "æ›´æ–°å¤±è´¥ï¼š$message") }
+                    }
+                }
+        }
+    }
+
+    fun submitDiagnostics() = viewModelScope.launch {
+        if (!featureEnabled("diagnostics")) return@launch _state.update { it.copy(message = featureMessage("diagnostics").ifBlank { "è¯Šæ–­æäº¤æš‚ä¸å¯ç”¨" }) }
+        _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Uploading) }
+        val payload = DiagnosticUpload(
+            version = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE,
+            sdk = android.os.Build.VERSION.SDK_INT,
+            manufacturer = android.os.Build.MANUFACTURER.orEmpty().replace('\n', ' ').take(40),
+            model = android.os.Build.MODEL.orEmpty().replace('\n', ' ').take(60),
+            report = buildString {
+                append("QMusic Watch diagnostics\n")
+                append("version=${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n")
+                append("sdk=${android.os.Build.VERSION.SDK_INT}\n")
+                append("signedIn=${signedIn}\n")
+                append("networkControl=${redactDiagnosticMessage(_state.value.controlError ?: "ok")}\n\n")
+                append(AppLog.diagnosticExcerpt())
+            }.take(58_000),
+        )
+        runCatching { graph.controlPlane.uploadDiagnostics(payload) }
+            .onSuccess { receipt -> _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Success(receipt.requestId), message = "è¯Šæ–­å·²æäº¤") } }
+            .onFailure { error -> _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Error(error.message ?: "è¯Šæ–­æäº¤å¤±è´¥")) } }
+    }
+
+    fun resetDiagnosticUpload() = _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Idle) }
+
+    fun prepareUpdateInstall(release: ControlUpdate, filePath: String, onReady: (File) -> Unit) = viewModelScope.launch {
+        val file = File(filePath)
+        _state.update { it.copy(updateState = UpdateUiState.Verifying(release)) }
+        runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { graph.updates.verifyDownloadedApk(file, release) }; file }
+            .onSuccess { verified -> _state.update { it.copy(updateState = UpdateUiState.Ready(release, verified.absolutePath)) }; onReady(verified) }
+            .onFailure { error -> _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "å®‰è£…åŒ…æ ¡éªŒå¤±è´¥", release)) } }
+    }
+    fun requestPlay(track: Track, allowSpeaker: Boolean = false, sourceQueue: List<Track>? = null) {
+        recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
+        qualitySwitchJob?.cancel(); qualitySwitchJob = null
+        playJob?.cancel()
+        playJob = viewModelScope.launch {
+        sessionReady.await()
+        if (!track.playable && !track.requiresVip) return@launch fail(IllegalStateException("è¿™é¦–æ­Œæ›²å½“å‰ä¸å¯æ’­æ”¾"))
+        if (headphoneWarning.value && !allowSpeaker && !com.ronan.qmusicwatch.playback.hasPrivateAudioOutput(getApplication())) {
+            pendingQueue = sourceQueue
+            _state.update { it.copy(pendingSpeakerTrack = track) }; return@launch
+        }
+        val owner = accountId ?: return@launch fail(IllegalStateException("è¯·å…ˆç™»å½•åæ’­æ”¾"))
+        var issuedUrl = ""
+        var issuedExpiresAt = 0L
+        var issuedQuality = preferredQuality(track)
+        var resolvedTrack = track
+        runCatching {
+            val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
+            if (local == null && !featureEnabled("stream")) error(featureMessage("stream").ifBlank { "åœ¨çº¿æ’­æ”¾æš‚æ—¶ç»´æŠ¤ï¼Œä»å¯æ’­æ”¾å·²ç¼“å­˜æ­Œæ›²" })
+            val stream = if (local == null) graph.api.stream(track, preferredQuality(track)) else null
+            val uri = local?.let { android.net.Uri.fromFile(File(it.filePath)).toString() } ?: stream!!.url
+            local?.let { item -> cachedArtworkFile(item.filePath).takeIf(File::exists)?.let { resolvedTrack = track.copy(artworkUrl = android.net.Uri.fromFile(it).toString()) } }
+            issuedUrl = uri
+            issuedExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE
+            issuedQuality = stream?.quality ?: local?.quality ?: preferredQuality(track)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), resolvedTrack.artworkUrl)
+            if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
+            graph.db.recent().upsert(RecentEntity(track.id, owner, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
+            runCatching { loadLyrics(track, local?.filePath) }.onFailure { AppLog.write("LYRICS", "track=${track.id} ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrDefault(emptyList())
+        }.onSuccess { parsedLyrics ->
+            sourceQueue?.takeIf(List<Track>::isNotEmpty)?.let { source ->
+                _queue.value = source.distinctBy(Track::id)
+                _queueReversed.value = false
+            }
+            if (_queue.value.none { it.id == track.id }) _queue.value = _queue.value + track
+            _queueIndex.value = _queue.value.indexOfFirst { it.id == track.id }
+            pendingQueue = null
+            restoredPosition = 0
+            retryingTrackId = null
+            lastStreamUrl = issuedUrl
+            lastStreamExpiresAt = issuedExpiresAt
+            lastStreamQuality = issuedQuality
+            _state.update {
+                it.copy(
+                    currentTrack = resolvedTrack,
+                    activeStreamQuality = reportedQualityId(issuedQuality),
+                    lyrics = parsedLyrics,
+                    pendingSpeakerTrack = null,
+                    playEvent = System.nanoTime(),
+                    message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile),
+                )
+            }
+            persistSnapshot()
+        }.onFailure { error -> if (error !is CancellationException) failPlayback(error) }
+        }
+    }
+    fun continueOnSpeaker() { _state.value.pendingSpeakerTrack?.let { requestPlay(it, true, pendingQueue) } }
+    fun dismissSpeakerPrompt() = _state.update { it.copy(pendingSpeakerTrack = null) }
+    private suspend fun loadLyrics(track: Track, localAudioPath: String?): List<LyricLine> {
+        var data = localAudioPath?.let { cachedLyricsFile(it).takeIf(File::exists)?.let { file -> runCatching { json.decodeFromString<LyricsData>(file.readText()) }.getOrNull() } }
+        if (data == null) {
+            if (!featureEnabled("lyrics")) return emptyList()
+            data = graph.api.lyrics(track.id)
+            localAudioPath?.let { cachedLyricsFile(it).writeText(json.encodeToString(data)) }
+        }
+        return LrcParser.parse(data.original, data.translation, data.wordSync)
+    }
+    fun reloadLyrics() = viewModelScope.launch {
+        val track = _state.value.currentTrack ?: return@launch
+        val owner = accountId ?: return@launch fail(IllegalStateException("è¯·å…ˆç™»å½•"))
+        val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
+        _state.update { it.copy(message = "æ­£åœ¨é‡æ–°åŠ è½½æ­Œè¯â€¦") }
+        runCatching { loadLyrics(track, local?.filePath) }
+            .onSuccess { lines -> _state.update { it.copy(lyrics = lines, message = if (lines.isEmpty()) "è¿™é¦–æ­Œæš‚æ— æ­Œè¯" else "æ­Œè¯å·²é‡æ–°åŠ è½½") } }
+            .onFailure(::fail)
+    }
+    fun cache(track: Track, groupName: String = "å•æ›²ç¼“å­˜", requestedQuality: String? = null) {
+        val owner = accountId ?: return fail(IllegalStateException("è¯·å…ˆç™»å½•"))
+        viewModelScope.launch {
+            runCatching { graph.downloads.enqueue(track, owner, requestedQuality ?: preferredQuality(track), wifiOnlyDownload.value, groupName) }
+                .onSuccess { _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "å·²åŠ å…¥ç¼“å­˜ï¼Œç­‰å¾… Wi-Fi" else "å·²åŠ å…¥ç¦»çº¿ç¼“å­˜") } }
+                .onFailure(::fail)
+        }
+    }
+    fun cacheAll(tracks: List<Track>, groupName: String = "æ’­æ”¾åˆ—è¡¨ç¼“å­˜") = tracks.forEach { cache(it, groupName) }
+    fun resumeDownload(item: com.ronan.qmusicwatch.data.DownloadEntity) = cache(
+        Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl, qualities = allAudioQualitySpecs().map(AudioQualitySpec::id)),
+        item.groupName,
+        item.quality,
+    )
+    fun pauseDownload(id: String) = viewModelScope.launch {
+        val owner = accountId ?: return@launch
+        runCatching { graph.downloads.pause(id, owner) }.onFailure(::fail)
+    }
+    fun deleteDownload(id: String, owner: String) = viewModelScope.launch {
+        runCatching { graph.downloads.delete(id, owner) }.onFailure(::fail)
+    }
+    fun deleteInvalidDownloads() = viewModelScope.launch {
+        val owner = accountId ?: return@launch
+        runCatching { graph.downloads.deleteInvalid(owner) }
+            .onSuccess { count -> _state.update { it.copy(message = if (count == 0) "æ²¡æœ‰å¤±æ•ˆç¼“å­˜" else "å·²åˆ é™¤ $count ä¸ªå¤±æ•ˆç¼“å­˜") } }
+            .onFailure(::fail)
+    }
+    fun deleteLockedDownloads() = viewModelScope.launch {
+        runCatching { graph.downloads.deleteLocked(accountId) }
+            .onSuccess { count -> _state.update { it.copy(message = "å·²åˆ é™¤ $count é¦–å…¶ä»–è´¦å·é”å®šç¼“å­˜") } }
+            .onFailure(::fail)
+    }
+    fun deleteDownloadGroup(groupName: String) = viewModelScope.launch {
+        val owner = accountId ?: return@launch fail(IllegalStateException("è¯·å…ˆç™»å½•"))
+        runCatching { graph.downloads.deleteGroup(owner, groupName) }
+            .onSuccess { count -> _state.update { it.copy(message = "å·²åˆ é™¤â€œ$groupNameâ€ä¸­çš„ $count é¦–ç¼“å­˜") } }
+            .onFailure(::fail)
+    }
+    fun like(track: Track, liked: Boolean, onComplete: (Boolean) -> Unit = {}) = viewModelScope.launch {
+        if (!featureEnabled("playlistWrites")) {
+            fail(IllegalStateException(featureMessage("playlistWrites").ifBlank { "æ”¶è—ä¸æ­Œå•ç¼–è¾‘æš‚æ—¶ç»´æŠ¤" }))
+            onComplete(false)
+            return@launch
+        }
+        runCatching { graph.api.like(track, liked) }
+            .onSuccess {
+                _state.update { state -> state.copy(message = if (liked) "å·²æ·»åŠ åˆ°æˆ‘å–œæ¬¢" else "å·²å–æ¶ˆå–œæ¬¢") }
+                onComplete(true)
+                loadLibrary()
+            }
+            .onFailure { error ->
+                onComplete(false)
+                fail(error)
+            }
+    }
+    fun loadDetail(type: String, collection: MusicCollection, editable: Boolean = false) {
+        detailJob?.cancel()
+        val generation = sessionGeneration
+        _state.update { it.copy(detail = null, detailDirectoryId = null, detailLoading = true, detailError = null) }
+        detailJob = viewModelScope.launch {
+            try {
+                val value = graph.api.collection(type, collection)
+                if (generation == sessionGeneration) _state.update {
+                    it.copy(
+                        detail = value,
+                        detailDirectoryId = collection.directoryId.takeIf { editable },
+                        detailLoading = false,
+                        detailError = null,
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                if (generation == sessionGeneration) {
+                    _state.update {
+                        it.copy(
+                            detailLoading = false,
+                            detailError = error.message?.takeIf(String::isNotBlank) ?: "æ­Œå•è¯»å–å¤±è´¥",
+                        )
+                    }
+                    fail(error)
+                }
+            }
+        }
+    }
+    fun createPlaylist(title: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.createPlaylist(title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
+    fun renamePlaylist(id: String, title: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.renamePlaylist(id, title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
+    fun deletePlaylist(id: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.deletePlaylist(id) }.onSuccess { loadLibrary() }.onFailure(::fail) }
+    fun addToPlaylist(track: Track, id: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.changePlaylistTrack(id, track, true) }.onSuccess { _state.update { it.copy(message = "å·²åŠ å…¥æ­Œå•") }; loadLibrary() }.onFailure(::fail) }
+    fun removeFromPlaylist(track: Track, id: String) = viewModelScope.launch {
+        if (!requirePlaylistWrites()) return@launch
+        runCatching { graph.api.changePlaylistTrack(id, track, false) }
+            .onSuccess {
+                val tracks = _state.value.detail?.tracks.orEmpty().filterNot { item -> item.id == track.id }
+                _state.update { state -> state.copy(message = "å·²ä»æ­Œå•ç§»é™¤", detail = state.detail?.copy(tracks = tracks)) }
+            }
+            .onFailure(::fail)
+    }
+    fun setQuality(value: String) {
+        qualitySwitchJob?.cancel()
+        qualitySwitchJob = viewModelScope.launch {
+            val requested = normalizeQualityId(value)
+            val profile = _state.value.profile
+            val entitlement = profileQualityOptions(profile).first { it.id == requested }
+            if (!entitlement.available) {
+                _state.update {
+                    it.copy(message = entitlement.reason.ifBlank { "å½“å‰è´¦å·ä¸èƒ½ä½¿ç”¨${qualityLabel(requested)}" })
+                }
+                return@launch
+            }
+            graph.settings.setQuality(requested)
+            val track = _state.value.currentTrack
+            if (track == null || lastStreamUrl.startsWith("file:") || lastStreamUrl.isBlank()) {
+                _state.update { it.copy(message = "é»˜è®¤éŸ³è´¨å·²è®¾ä¸º${qualityLabel(requested)}") }
+                return@launch
+            }
+            if (!featureEnabled("stream")) {
+                _state.update { it.copy(message = "é»˜è®¤éŸ³è´¨å·²è®¾ä¸º${qualityLabel(requested)}ï¼Œä¸‹æ¬¡åœ¨çº¿æ’­æ”¾æ—¶ç”Ÿæ•ˆ") }
+                return@launch
+            }
+            _state.update { it.copy(message = "æ­£åœ¨åˆ‡æ¢åˆ°${qualityLabel(requested)}â€¦") }
+            try {
+                val target = resolveQuality(requested, track, profile).resolved
+                val stream = graph.api.stream(track, target)
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                if (_state.value.currentTrack?.id != track.id || graph.playback.currentMediaId() != track.id) return@launch
+                val position = graph.playback.position()
+                val playWhenReady = graph.playback.playWhenReady()
+                graph.playback.replaceStream(
+                    id = track.id,
+                    uri = stream.url,
+                    title = track.title,
+                    artist = track.artists.joinToString(" / "),
+                    artwork = track.artworkUrl,
+                    startPositionMs = position,
+                    playWhenReady = playWhenReady,
+                )
+                lastStreamUrl = stream.url
+                lastStreamExpiresAt = stream.expiresAt
+                lastStreamQuality = stream.quality
+                persistSnapshot(position)
+                _state.update {
+                    it.copy(
+                        activeStreamQuality = normalizeQualityId(stream.quality),
+                        message = qualityFallbackMessage(requested, stream.quality, track, profile)
+                            ?: "å·²åˆ‡æ¢åˆ°${qualityLabel(stream.quality)}",
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                failPlayback(error)
+            }
+        }
+    }
+    fun setHeadphoneWarning(value: Boolean) = viewModelScope.launch { graph.settings.setHeadphoneWarning(value) }
+    fun setAutoOpenPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setAutoOpenPlayer(value) }
+    fun setPlayMode(value: String) = viewModelScope.launch { graph.settings.setPlayMode(value) }
+    fun setLyricSize(value: String) = viewModelScope.launch { graph.settings.setLyricSize(value) }
+    fun setLyricTranslation(value: Boolean) = viewModelScope.launch { graph.settings.setLyricTranslation(value) }
+    fun setLyricOriginal(value: Boolean) = viewModelScope.launch { graph.settings.setLyricOriginal(value) }
+    fun setLyricOffset(value: Long) = viewModelScope.launch { graph.settings.setLyricOffset(value) }
+    fun setLyricAnimation(value: String) = viewModelScope.launch { graph.settings.setLyricAnimation(value) }
+    fun setLyricAlignment(value: String) = viewModelScope.launch { graph.settings.setLyricAlignment(value) }
+    fun setPureBlack(value: Boolean) = viewModelScope.launch { graph.settings.setPureBlack(value) }
+    fun setLowPowerPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setLowPowerPlayer(value) }
+    fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch { graph.settings.setWifiOnlyDownload(value) }
+    fun setDailyCount(value: Int) = viewModelScope.launch { graph.settings.setDailyCount(value) }
+    fun addToQueue(track: Track) { if (_queue.value.none { it.id == track.id }) _queue.value = _queue.value + track; persistSnapshot(); _state.update { it.copy(message = "å·²åŠ å…¥æ’­æ”¾åˆ—è¡¨") } }
+    fun enqueueNext(track: Track) {
+        val items = insertNext(_queue.value, _state.value.currentTrack?.id, track)
+        _queue.value = items
+        _queueIndex.value = _state.value.currentTrack?.let { playing -> items.indexOfFirst { it.id == playing.id } } ?: -1
+        persistSnapshot()
+        _state.update { it.copy(message = "å·²è®¾ä¸ºä¸‹ä¸€é¦–") }
+    }
+    fun removeFromQueue(index: Int) {
+        val items = _queue.value.toMutableList()
+        if (index !in items.indices) return
+        items.removeAt(index); _queue.value = items
+        _queueIndex.value = _state.value.currentTrack?.let { playing -> items.indexOfFirst { it.id == playing.id } } ?: -1
+        persistSnapshot()
+    }
+    fun clearQueue() { _queue.value = emptyList(); _queueIndex.value = -1; persistSnapshot() }
+    fun removeQueueDuplicates() {
+        val before = _queue.value.size
+        _queue.value = _queue.value.distinctBy(Track::id)
+        _queueIndex.value = _state.value.currentTrack?.let { playing -> _queue.value.indexOfFirst { it.id == playing.id } } ?: -1
+        persistSnapshot(); _state.update { it.copy(message = "å·²ç§»é™¤ ${before - _queue.value.size} é¦–é‡å¤æ­Œæ›²") }
+    }
+    fun reverseQueue() {
+        _queue.value = _queue.value.reversed(); _queueReversed.value = !_queueReversed.value
+        _queueIndex.value = _state.value.currentTrack?.let { playing -> _queue.value.indexOfFirst { it.id == playing.id } } ?: -1
+        persistSnapshot()
+    }
+    fun replaceQueueOrder(items: List<Track>) {
+        if (items.map(Track::id).sorted() != _queue.value.map(Track::id).sorted()) return
+        if (items.map(Track::id) == _queue.value.map(Track::id)) return
+        _queue.value = items
+        _queueIndex.value = _state.value.currentTrack?.let { playing -> items.indexOfFirst { it.id == playing.id } } ?: -1
+        persistSnapshot()
+    }
+    fun playQueueItem(index: Int) { _queue.value.getOrNull(index)?.let { requestPlay(it, true) } }
+    fun skipNext() = playAdjacent(1, false)
+    fun skipPrevious() = playAdjacent(-1, false)
+    private fun playAdjacent(delta: Int, ended: Boolean) {
+        if (_queue.value.isEmpty()) return
+        val mode = playMode.value
+        val random = if (mode == "shuffle" && _queue.value.size > 1) _queue.value.indices.filter { it != _queueIndex.value }.random() else -1
+        val target = nextQueueIndex(_queue.value.size, _queueIndex.value, delta, mode, ended, random)
+        if (target < 0) return
+        playQueueItem(target)
+    }
+    fun saveQueueAsPlaylist(title: String) = viewModelScope.launch {
+        if (!requirePlaylistWrites()) return@launch
+        runCatching {
+            val playlist = graph.api.createPlaylist(title)
+            _queue.value.forEach { graph.api.changePlaylistTrack(playlist.directoryId, it, true) }
+        }.onSuccess { _state.update { it.copy(message = "æ’­æ”¾åˆ—è¡¨å·²ä¿å­˜ä¸ºæ­Œå•") }; loadLibrary() }.onFailure(::fail)
+    }
+
+    private fun requirePlaylistWrites(): Boolean {
+        if (featureEnabled("playlistWrites")) return true
+        fail(IllegalStateException(featureMessage("playlistWrites").ifBlank { "æ”¶è—ä¸æ­Œå•ç¼–è¾‘æš‚æ—¶ç»´æŠ¤" }))
+        return false
+    }
+    fun loadQueueImportLiked() { queueImportJob?.cancel(); queueImportJob = null; _state.update { it.copy(queueImportTitle = "æˆ‘å–œæ¬¢", queueImportTracks = it.library?.liked.orEmpty(), queueImportLoading = false) } }
+    fun loadQueueImportPlaylist(collection: MusicCollection) {
+        queueImportJob?.cancel()
+        val generation = sessionGeneration
+        queueImportJob = viewModelScope.launch {
+        _state.update { it.copy(queueImportTitle = collection.title, queueImportTracks = emptyList(), queueImportLoading = true) }
+        try {
+            val detail = graph.api.collection("playlist", collection)
+            if (generation == sessionGeneration) _state.update { it.copy(queueImportTitle = detail.title, queueImportTracks = detail.tracks, queueImportLoading = false) }
+        } catch (cancelled: CancellationException) { throw cancelled } catch (error: Throwable) {
+            if (generation == sessionGeneration) { _state.update { it.copy(queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false) }; fail(error) }
+        }
+        }
+    }
+    fun clearQueueImport() { queueImportJob?.cancel(); queueImportJob = null; _state.update { it.copy(queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false) } }
+    fun addSelectedQueueTracks(ids: Set<String>) {
+        val before = _queue.value.size
+        _queue.value = mergeSelectedQueue(_queue.value, _state.value.queueImportTracks, ids)
+        _queueIndex.value = _state.value.currentTrack?.let { current -> _queue.value.indexOfFirst { it.id == current.id } } ?: -1
+        val added = _queue.value.size - before
+        persistSnapshot(); clearQueueImport(); _state.update { it.copy(message = "å·²åŠ å…¥ $added é¦–æ­Œæ›²") }
+    }
+    fun startSleepTimer(minutes: Int, finishCurrent: Boolean = false) { graph.playback.startSleepTimer(minutes, finishCurrent); viewModelScope.launch { graph.settings.setLastSleepMinutes(minutes) }; _state.update { it.copy(message = if (finishCurrent) "$minutes åˆ†é’Ÿåæ’­å®Œå½“å‰æ­Œæ›²å…³é—­" else "å°†åœ¨ $minutes åˆ†é’Ÿååœæ­¢æ’­æ”¾") } }
+    fun cancelSleepTimer() { graph.playback.cancelSleepTimer(); _state.update { it.copy(message = "å·²å–æ¶ˆå®šæ—¶å…³é—­") } }
+    fun playbackPosition() = graph.playback.position()
+    fun playbackDuration() = graph.playback.duration()
+    fun isPlaying() = graph.playback.isPlaying()
+    fun pausePlayback() { graph.playback.pause(); persistSnapshot() }
+    fun resumePlayback() { if (graph.playback.duration() == 0L) _state.value.currentTrack?.let { requestPlay(it, true) } else graph.playback.resume() }
+    fun seek(position: Long) = graph.playback.seek(position)
+    fun adjustVolume(direction: Int) = graph.playback.adjustVolume(direction)
+    fun savePlaybackState() = persistSnapshot()
+    private fun persistSnapshot(position: Long = graph.playback.position()) = viewModelScope.launch {
+        val owner = accountId ?: return@launch
+        graph.settings.setPlaybackSnapshot(json.encodeToString(PlaybackSnapshot(
+            _state.value.currentTrack, _queue.value, position, _queueReversed.value,
+            lastStreamUrl, lastStreamExpiresAt, lastStreamQuality, owner,
+        )))
+    }
+    private fun preferredQuality(track: Track): String =
+        resolveQuality(quality.value, track, _state.value.profile).resolved
+    override fun onCleared() { graph.playback.onError = null; graph.playback.onMediaItemChanged = null; super.onCleared() }
+}
