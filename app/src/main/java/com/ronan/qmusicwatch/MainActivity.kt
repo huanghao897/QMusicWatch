@@ -299,4 +299,1391 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         hideStatusBar()
-        if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.cß}µæÚ$z{-®éÜj×&ÆU7FFTÆ—7DöcÅ7G&–æsâ‚’Ğ¢fÂÆ–'&'’Ò7FFRæÆ–'&'¢ÆVæ6†VDVffV7B‡7FFRçVWVT–×÷'EF—FÆR’²6VÆV7FVD–G2æ6ÆV"‚’Ğ¢ÆVæ6†VDVffV7B‡VWVRÂG&vv–æuG&6´–B’²–b†G&vv–æuG&6´–BÓÒçVÆÂ’v÷&¶–æuVWVRÒVWVRĞ¢fÂÆ—7E7FFRÒ&VÖVÖ&W$Æ§”Æ—7E7FFR‚¢fÂ†F–72ÒÆö6Ä†F–4fVVF&6²æ7W'&Vç@¢fÂf–WrÒÆö6Åf–Wræ7W'&Vç@¢fÂVFvU‚Òv—F‚†æG&ö–G‚æ6ö×÷6RçV’çÆFf÷&ÒäÆö6ÄFVç6—G’æ7W'&VçB’²s"æGçFõ‚‚’Ğ¢fÂ7W'&VçEG&6´–BÒ7FFRæ7W'&VçEG&6³òæ–Bó¢VWVRævWD÷$çVÆÂ†7W'&VçD–æFW‚“òæ–@¢fÂ6†÷vâÒ&VÖVÖ&W"‡v÷&¶–æuVWVRÂVW'’’²v÷&¶–æuVWVRçv—F„–æFW‚‚’æf–ÇFW"²VW'’æ—4&Ææ²‚’ÇÂ—BçfÇVRçF—FÆRæ6öçF–ç2‡VW'’ÂG'VR’ÇÂ—BçfÇVRæ'F—7G2æç’²'F—7BÓâ'F—7Bæ6öçF–ç2‡VW'’ÂG'VR’ÒÒĞ¢Æ§”6öÇVÖâ„ÖöF–f–W"æf–ÆÄÖ…6—¦R‚’çFF–ær††÷&—¦öçFÂÒ"æG’Â7FFRÒÆ—7E7FFRÂ6öçFVçEFF–ærÒFF–æufÇVW2†&÷GFöÒÒ‚æG’’°¢—FVÒ²&÷r„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’ÂfW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’’²–6öä'WGFöâ†öä&6²’²–6öâ„–6öç2äWFôÖ—'&÷&VBäf–ÆÆVBä'&÷t&6²Â.‹ùNY¹â"’Ó²FW‡B‚.[Ù>X˜Şi*ŞiKîX‰~Š‚"ÂÖöF–f–W"çvV–v‡Bƒb’ÂföçE6—¦RÒ#Bç7ÂföçEvV–v‡BÒföçEvV–v‡Bä&öÆB“²FW‡D'WGFöâ‡fÓ£§&WfW'6UVWVR’²–6öâ†–b‡&WfW'6VB’–6öç2äFVfVÇBä'&÷uWv&BVÇ6R–6öç2äFVfVÇBä'&÷tF÷vçv&BÂçVÆÂ“²FW‡B†–b‡&WfW'6VB’.X	.[¨ò"VÇ6R.jÚ>[¨ò"’ÒÒĞ¢—FVÒ²÷WFÆ–æVEFW‡Df–VÆB‡VW'’Â²VW'’Ò—BÒÂÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’æ†V–v‡BƒC‚æG’Â6–ævÆTÆ–æRÒG'VRÂ6†RÒ&÷VæFVD6÷&æW%6†Rƒ’æG’Â6öÆ÷'2ÒvF6…6V&6„6öÆ÷'2‚’ÂÆ6V†öÆFW"Ò²FW‡B‚.zÙ¾˜i*ŞiKîX‰~Š‚"ÂföçE6—¦RÒ2ç7Â6öÆ÷"Ò6öÆ÷"äw&’’ÒÂFW‡E7G–ÆRÒæG&ö–G‚æ6ö×÷6RçV’çFW‡BåFW‡E7G–ÆR†föçE6—¦RÒBç7’ÂÆVF–æt–6öâÒ²–6öâ„–6öç2äFVfVÇBå6V&6‚ÂçVÆÂÂF–çBÒ6öÆ÷"ƒ„dd#d$d$’ÂÖöF–f–W"ÒÖöF–f–W"ç6—¦Rƒ’æG’’Ò’Ğ¢—FVÒ²fÆ÷u&÷r„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’Â†÷&—¦öçFÄ'&ævVÖVçBÒ'&ævVÖVçBäVæBÂfW'F–6Ä'&ævVÖVçBÒ'&ævVÖVçBç76VD'’ƒæG’’²FW‡D'WGFöâ‡²fÒæ66†TÆÂ‡VWVRÂ.[Ù>X˜Şi*ŞiKîX‰~Š‚"’ÒÂ6öçFVçEFF–ærÒFF–æufÇVW2††÷&—¦öçFÂÒræG’’²–6öâ„–6öç2äFVfVÇBäF÷væÆöBÂçVÆÂÂÖöF–f–W"ç6—¦Rƒ‚æG’“²FW‡B‚.{É>ZÙ‚"ÂföçE6—¦RÒ2ç7’Ó²FW‡D'WGFöâ‡²fÒæ6ÆV%VWVT–×÷'B‚“²–×÷'DF–ÆörÒG'VRÒÂ6öçFVçEFF–ærÒFF–æufÇVW2††÷&—¦öçFÂÒræG’’²–6öâ„–6öç2äFVfVÇBäÆ–'&'”FBÂçVÆÂÂÖöF–f–W"ç6—¦Rƒ‚æG’“²FW‡B‚.˜jØÎk{¾Xª"ÂföçE6—¦RÒ2ç7’Ó²FW‡D'WGFöâ‡²6fTF–ÆörÒG'VRÒÂ6öçFVçEFF–ærÒFF–æufÇVW2††÷&—¦öçFÂÒræG’’²–6öâ„–6öç2äWFôÖ—'&÷&VBäf–ÆÆVBåÆ–Æ—7DFBÂçVÆÂÂÖöF–f–W"ç6—¦Rƒ‚æG’“²FW‡B‚.KùŞZÙ‚"ÂföçE6—¦RÒ2ç7’Ó²FW‡D'WGFöâ‡fÓ£§&VÖ÷fUVWVTGWÆ–6FW2Â6öçFVçEFF–ærÒFF–æufÇVW2††÷&—¦öçFÂÒræG’’²FW‡B‚.Xë¾˜xÒ"ÂföçE6—¦RÒ2ç7’Ó²FW‡D'WGFöâ‡fÓ£¦6ÆV%VWVRÂ6öçFVçEFF–ærÒFF–æufÇVW2††÷&—¦öçFÂÒræG’’²FW‡B‚.kˆ^z›¢"ÂföçE6—¦RÒ2ç7’ÒÒĞ¢—FVÒ²FW‡B‚"G·v÷&¶–æuVWVRç6—¦WÒšib"Â6öÆ÷"Ò6öÆ÷"äw&’’Ğ¢–b‡v÷&¶–æuVWVRæ—4V×G’‚’’—FVÒ²&÷‚„ÖöF–f–W"æf–ÆÅ&VçDÖ„†V–v‡B‚ãvb’æf–ÆÄÖ…v–GF‚‚’Â6öçFVçDÆ–væÖVçBÒÆ–væÖVçBä6VçFW"’²FW‡B‚.i*ŞiKîX‰~ŠK‹®z›¢"Â6öÆ÷"Ò6öÆ÷"äw&’’ÒĞ¢—FV×4–æFW†VB‡6†÷vâÂ¶W’Ò²òÂ—FVÒÓâ—FVÒçfÇVRæ–BÒ’²òÂ–æFW†VBÓà¢fÂ–æFW‚Ò–æFW†VBæ–æFWƒ²fÂG&6²Ò–æFW†VBçfÇVP¢f"G&vvVB'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆTfÆöE7FFTöbƒb’Ğ¢fÂG&vv–ærÒG&vv–æuG&6´–BÓÒG&6²æ–@¢f"&÷t†V–v‡E‚'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆT–çE7FFTöbƒ’Ğ¢f"†æFÆUF÷–åv–æF÷r'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆTfÆöE7FFTöbƒb’Ğ¢f"VFvU67&öÆÄF—&V7F–öâ'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆT–çE7FFTöbƒ’Ğ¢f"G&t–æFW‚'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆT–çE7FFTöb†–æFW‚’Ğ¢f"G&u7F'D–æFW‚'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆT–çE7FFTöb†–æFW‚’Ğ¢fÂ&V÷&FW$'”öfg6WC¢‚’ÓâVæ—BÒ°¢–b‡VW'’æ—4&Ææ²‚’bb&÷t†V–v‡E‚â’°¢f"¶VWÖ÷f–ærÒG'VP¢v†–ÆR†¶VWÖ÷f–ær’°¢fÂ7FWÒVWVU&V÷&FW%7FW†G&vvVBÂ&÷t†V–v‡E‚¢fÂF&vWBÒ†G&t–æFW‚²7FW’æ6öW&6T–â‡v÷&¶–æuVWVRæ–æF–6W2¢–b‡7FWÓÒÇÂF&vWBÓÒG&t–æFW‚’¶VWÖ÷f–ærÒfÇ6RVÇ6R°¢v÷&¶–æuVWVRÒÖ÷fUVWVU&Wf–Wr‡v÷&¶–æuVWVRÂG&t–æFW‚ÂF&vWB¢G&t–æFW‚ÒF&vW@¢G&vvVBÓÒ7FW¢&÷t†V–v‡E€¢Ğ¢Ğ¢Ğ¢Ğ¢ÆVæ6†VDVffV7B†G&vv–ærÂVFvU67&öÆÄF—&V7F–öâÂ&÷t†V–v‡E‚’°¢v†–ÆR†G&vv–ærbbVFvU67&öÆÄF—&V7F–öâÒ’°¢fÂ6öç7VÖVBÒÆ—7E7FFRç67&öÆÄ'’†VFvU67&öÆÄF—&V7F–öâ¢&÷t†V–v‡E‚¢ã&b¢G&vvVB³Ò6öç7VÖV@¢&V÷&FW$'”öfg6WB‚¢–b†6öç7VÖVBÓÒb’VFvU67&öÆÄF—&V7F–öâÒ ¢FVÆ’ƒb¢Ğ¢Ğ¢fÂ†æFÆTÖöF–f–W"ÒÖöF–f–W"ç6—¦RƒCBæG’çFF–ærƒ’æG’æöävÆö&ÆÇ•÷6—F–öæVB²†æFÆUF÷–åv–æF÷rÒ—Bç÷6—F–öä–åv–æF÷r‚’ç’ÒçF†Vâ€¢–b‡VW'’æ—4&Ææ²‚’’ÖöF–f–W"çö–çFW$–çWB‡G&6²æ–BÂ&÷t†V–v‡E‚Âf–Wræ†V–v‡B’°¢FWFV7DG&tvW7GW&W4gFW$Æöæu&W72€¢öäG&u7F'BÒ²†F–72çW&f÷&Ô†F–4fVVF&6²„†F–4fVVF&6µG—RäÆöæu&W72“²v÷&¶–æuVWVRÒVWVS²G&t–æFW‚ÒVWVRæ–æFW„ödf—'7B²—Bæ–BÓÒG&6²æ–BÒæ6öW&6TDÆV7Bƒ“²G&u7F'D–æFW‚ÒG&t–æFWƒ²G&vv–æuG&6´–BÒG&6²æ–C²G&vvVBÒbÒÀ¢öäG&t6æ6VÂÒ²VFvU67&öÆÄF—&V7F–öâÒ²v÷&¶–æuVWVRÒVWVS²G&vv–æuG&6´–BÒçVÆÃ²G&vvVBÒbÒÀ¢öäG&tVæBÒ²–b†G&t–æFW‚ÒG&u7F'D–æFW‚’†F–72çW&f÷&Ô†F–4fVVF&6²„†F–4fVVF&6µG—RäÆöæu&W72“²VFvU67&öÆÄF—&V7F–öâÒ²fÒç&WÆ6UVWVT÷&FW"‡v÷&¶–æuVWVR“²G&vv–æuG&6´–BÒçVÆÃ²G&vvVBÒbÒÀ¢’²6†ævRÂÖ÷VçBÓà¢6†ævRæ6öç7VÖR‚“²G&vvVB³ÒÖ÷VçBç“²&V÷&FW$'”öfg6WB‚¢VFvU67&öÆÄF—&V7F–öâÒVWVTVFvU67&öÆÄF—&V7F–öâ††æFÆUF÷–åv–æF÷r²6†ævRç÷6—F–öâç’Âf–Wræ†V–v‡BÂVFvU‚¢Ğ¢ÒVÇ6RÖöF–f–W"æÇ†‚ã#†b¢¢7W&f6R€¢ÖöF–f–W"ÒÖöF–f–W"çFF–ær‡fW'F–6ÂÒ2æG’ææ–ÖFT—FVÒ€¢fFT–å7V2ÒæG&ö–G‚æ6ö×÷6Rææ–ÖF–öâæ6÷&RçGvVVâƒƒ’À¢Æ6VÖVçE7V2Ò–b†G&vv–ær’æG&ö–G‚æ6ö×÷6Rææ–ÖF–öâæ6÷&Rç6æ‚’VÇ6RæG&ö–G‚æ6ö×÷6Rææ–ÖF–öâæ6÷&Rç7&–ær‡7F–ffæW72ÒæG&ö–G‚æ6ö×÷6Rææ–ÖF–öâæ6÷&Rå7&–ærå7F–ffæW74ÖVF—VÔÆ÷r’À¢fFT÷WE7V2ÒæG&ö–G‚æ6ö×÷6Rææ–ÖF–öâæ6÷&RçGvVVâƒc’À¢’ç¤–æFW‚†–b†G&vv–ær’&bVÇ6Rb’æw&†–74Æ–W"°¢G&ç6ÆF–öå’ÒG&vvVC²66ÆU‚Ò–b†G&vv–ær’ã#VbVÇ6Rc²66ÆU’Ò–b†G&vv–ær’ã#VbVÇ6R`¢6†F÷tVÆWfF–öâÒ–b†G&vv–ær’"æGçFõ‚‚’VÇ6R`¢Òæöå6—¦T6†ævVB²&÷t†V–v‡E‚Ò—Bæ†V–v‡BÒÀ¢6†RÒ&÷VæFVD6÷&æW%6†Rƒ‚æG’Â6öÆ÷"Ò–b‡G&6²æ–BÓÒ7W'&VçEG&6´–B’6öÆ÷"ƒ„dcS#cB’VÇ6R7W&f6RÀ¢’°¢&÷r„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’æ6Æ–6¶&ÆR²fÒçÆ•VWVT—FVÒ‡VWVRæ–æFW„ödf—'7B²—Bæ–BÓÒG&6²æ–BÒ’ÒçFF–ær‡7F'BÒæGÂVæBÒ2æGÂF÷ÒræGÂ&÷GFöÒÒræG’ÂfW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’’°¢&÷‚„ÖöF–f–W"ç6—¦Rƒ3æG’Â6öçFVçDÆ–væÖVçBÒÆ–væÖVçBä6VçFW"’²–b‡G&6²æ–BÓÒ7W'&VçEG&6´–B’–6öâ„–6öç2äFVfVÇBäw&†–4WÂçVÆÂÂF–çBÒw&VVâÂÖöF–f–W"ÒÖöF–f–W"ç6—¦Rƒ#æG’’VÇ6RFW‡B‚"G¶–æFW‚²Ò"Â6öÆ÷"Ò6öÆ÷"äw&’ÂföçE6—¦RÒ2ç7’Ğ¢76W"„ÖöF–f–W"çv–GF‚ƒræG’“²6öÇVÖâ„ÖöF–f–W"çvV–v‡Bƒb’’²FW‡B‡G&6²çF—FÆRÂ6öÆ÷"Ò–b‡G&6²æ–BÓÒ7W'&VçEG&6´–B’w&VVâVÇ6R6öÆ÷"åv†—FRÂÖ„Æ–æW2ÒÂ÷fW&fÆ÷rÒFW‡D÷fW&fÆ÷räVÆÆ—6—2ÂföçE6—¦RÒRç7“²FW‡B‡G&6²æ'F—7G2æ¦ö–åFõ7G&–ær‚"ò"’Â6öÆ÷"Ò6öÆ÷"äw&’ÂÖ„Æ–æW2ÒÂ÷fW&fÆ÷rÒFW‡D÷fW&fÆ÷räVÆÆ—6—2ÂföçE6—¦RÒ"ç7’Ğ¢–6öâ„–6öç2äFVfVÇBäG&t†æFÆRÂ–b‡VW'’æ—4&Ææ²‚’’.™[şhÈh¹nXªhé.[¨ò"VÇ6R.zÙ¾˜i{nKˆŞXúşhé.[¨ò"Â†æFÆTÖöF–f–W"¢–6öä'WGFöâ‡²fÒç&VÖ÷fTg&öÕVWVR‡VWVRæ–æFW„ödf—'7B²—Bæ–BÓÒG&6²æ–BÒ’ÒÂÖöF–f–W"ç6—¦RƒCBæG’’²–6öâ„–6öç2äFVfVÇBå&VÖ÷fT6—&6ÆT÷WFÆ–æRÂ.z{¾™šB"ÂÖöF–f–W"ç6—¦Rƒ#æG’’Ğ¢Ğ¢Ğ¢Ğ¢Ğ¢–b‡6fTF–Æör’ÆW'DF–Æör†öäF—6Ö—75&WVW7BÒ²6fTF–ÆörÒfÇ6RÒÂF—FÆRÒ²FW‡B‚.KùŞZÙK‹®h‰y¨NjØÎXÙR"’ÒÂFW‡BÒ²÷WFÆ–æVEFW‡Df–VÆB‡Æ–Æ—7EF—FÆRÂ²Æ–Æ—7EF—FÆRÒ—BçF¶RƒS’ÒÂÆ&VÂÒ²FW‡B‚.jØÎXÙ^YŞz{"’ÒÂ6–ævÆTÆ–æRÒG'VR’ÒÂ6öæf—&Ô'WGFöâÒ²FW‡D'WGFöâ‡²–b‡Æ–Æ—7EF—FÆRæ—4æ÷D&Ææ²‚’’fÒç6fUVWVT5Æ–Æ—7B‡Æ–Æ—7EF—FÆR“²6fTF–ÆörÒfÇ6RÒ’²FW‡B‚.KùŞZÙ‚"’ÒÒÂF—6Ö—74'WGFöâÒ²FW‡D'WGFöâ‡²6fTF–ÆörÒfÇ6RÒ’²FW‡B‚.Xùnkh‚"’ÒÒ¢–b†–×÷'DF–Æör’ÆW'DF–Æör€¢öäF—6Ö—75&WVW7BÒ²–×÷'DF–ÆörÒfÇ6S²fÒæ6ÆV%VWVT–×÷'B‚’ÒÀ¢F—FÆRÒ²FW‡B‡7FFRçVWVT–×÷'EF—FÆRæ–d&Ææ²².˜hºjØÎi».iÚ^k©"Ò’ÒÀ¢FW‡BÒ°¢v†Vâ°¢7FFRçVWVT–×÷'EF—FÆRæ—4&Ææ²‚’ÓâÆ§”6öÇVÖâ„ÖöF–f–W"æ†V–v‡D–â†Ö‚Ò3æG’ÂfW'F–6Ä'&ævVÖVçBÒ'&ævVÖVçBç76VD'’ƒ2æG’’°¢—FVÒ²7W&f6R„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’æ6Æ–6¶&ÆR²fÒæÆöEVWVT–×÷'DÆ–¶VB‚’ÒÂ6†RÒ&÷VæFVD6÷&æW%6†RƒBæG’Â6öÆ÷"Ò7W&f6R’²&÷r„ÖöF–f–W"çFF–ærƒ"æG’ÂfW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’’²–6öâ„–6öç2äFVfVÇBäff÷&—FRÂçVÆÂÂF–çBÒw&VVâ“²76W"„ÖöF–f–W"çv–GF‚ƒ’æG’“²6öÇVÖâ²FW‡B‚.h‰YiÎjÊ""“²FW‡B‚"G¶Æ–'&'“òæÆ–¶VCòç6—¦Ró¢Òšib"Â6öÆ÷"Ò6öÆ÷"äw&’ÂföçE6—¦RÒ2ç7’ÒÒÒĞ¢—FV×2†Æ–'&'“òçÆ–Æ—7G2æ÷$V×G’‚’Â¶W’Ò²"G¶—BæF—&V7F÷'”–GÓ¢G¶—Bæ–GÒ"Ò’²Æ–Æ—7BÓâ7W&f6R„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’æ6Æ–6¶&ÆR²fÒæÆöEVWVT–×÷'EÆ–Æ—7B‡Æ–Æ—7B’ÒÂ6†RÒ&÷VæFVD6÷&æW%6†RƒBæG’Â6öÆ÷"Ò7W&f6R’²&÷r„ÖöF–f–W"çFF–ærƒ"æG’ÂfW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’’²–6öâ„–6öç2äWFôÖ—'&÷&VBäf–ÆÆVBåVWVT×W6–2ÂçVÆÂÂF–çBÒw&VVâ“²76W"„ÖöF–f–W"çv–GF‚ƒ’æG’“²6öÇVÖâ²FW‡B‡Æ–Æ—7BçF—FÆRÂÖ„Æ–æW2Ò“²FW‡B†–b‡Æ–Æ—7BçG&6´6÷VçBãÒ’"G·Æ–Æ—7BçG&6´6÷VçGÒšib"VÇ6R.x+X{¾Šû¾Xùb"Â6öÆ÷"Ò6öÆ÷"äw&’ÂföçE6—¦RÒ2ç7’ÒÒÒÒĞ¢7FFRçVWVT–×÷'DÆöF–ærÓâ&÷‚„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’æ†V–v‡Bƒ#æG’Â6öçFVçDÆ–væÖVçBÒÆ–væÖVçBä6VçFW"’²6—&7VÆ%&öw&W74–æF–6F÷"‚’Ğ¢VÇ6RÓâ6öÇVÖâ°¢&÷r„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’ÂfW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’’²FW‡B‚.[{.˜’G·6VÆV7FVD–G2ç6—¦WÒšib"ÂÖöF–f–W"çvV–v‡Bƒb’Â6öÆ÷"Òw&VVâ“²FW‡D'WGFöâ‡²–b‡6VÆV7FVD–G2ç6—¦RÓÒ7FFRçVWVT–×÷'EG&6·2ç6—¦R’6VÆV7FVD–G2æ6ÆV"‚’VÇ6R²6VÆV7FVD–G2æ6ÆV"‚“²6VÆV7FVD–G2æFDÆÂ‡7FFRçVWVT–×÷'EG&6·2æÖ…G&6³£¦–B’’ÒÒ’²FW‡B†–b‡6VÆV7FVD–G2ç6—¦RÓÒ7FFRçVWVT–×÷'EG&6·2ç6—¦R’.XùnkhXZ˜’"VÇ6R.XZ˜’"’ÒĞ¢Æ§”6öÇVÖâ„ÖöF–f–W"æ†V–v‡D–â†Ö‚Ò#ƒæG’ÂfW'F–6Ä'&ævVÖVçBÒ'&ævVÖVçBç76VD'’ƒ"æG’’°¢—FV×2‡7FFRçVWVT–×÷'EG&6·2Â¶W’Ò²—Bæ–BÒ’²G&6²Óà¢fÂ6VÆV7FVBÒG&6²æ–B–â6VÆV7FVD–G0¢&÷r„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’æ6Æ—…&÷VæFVD6÷&æW%6†Rƒ"æG’’æ6Æ–6¶&ÆR²–b‡6VÆV7FVB’6VÆV7FVD–G2ç&VÖ÷fR‡G&6²æ–B’VÇ6R6VÆV7FVD–G2æFB‡G&6²æ–B’ÒçFF–ær††÷&—¦öçFÂÒbæGÂfW'F–6ÂÒBæG’ÂfW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’’²6†V6¶&÷‚‡6VÆV7FVBÂ²6†V6¶VBÓâ–b†6†V6¶VB’6VÆV7FVD–G2æFB‡G&6²æ–B’VÇ6R6VÆV7FVD–G2ç&VÖ÷fR‡G&6²æ–B’ÒÂÖöF–f–W"ç6—¦Rƒ3‚æG’“²6öÇVÖâ„ÖöF–f–W"çvV–v‡Bƒb’’²FW‡B‡G&6²çF—FÆRÂÖ„Æ–æW2ÒÂföçE6—¦RÒRç7“²FW‡B‡G&6²æ'F—7G2æ¦ö–åFõ7G&–ær‚"ò"’ÂÖ„Æ–æW2ÒÂ6öÆ÷"Ò6öÆ÷"äw&’ÂföçE6—¦RÒ"ç7’ÒĞ¢Ğ¢Ğ¢Ğ¢Ğ¢ÒÀ¢6öæf—&Ô'WGFöâÒ²–b‡7FFRçVWVT–×÷'EF—FÆRæ—4æ÷D&Ææ²‚’bb7FFRçVWVT–×÷'DÆöF–ær’FW‡D'WGFöâ‡²fÒæFE6VÆV7FVEVWVUG&6·2‡6VÆV7FVD–G2çFõ6WB‚’“²–×÷'DF–ÆörÒfÇ6RÒÂVæ&ÆVBÒ6VÆV7FVD–G2æ—4æ÷DV×G’‚’’²FW‡B‚.k{¾XªG·6VÆV7FVD–G2ç6—¦WÒšib"’ÒÒÀ¢F—6Ö—74'WGFöâÒ²FW‡D'WGFöâ‡²–b‡7FFRçVWVT–×÷'EF—FÆRæ—4&Ææ²‚’’²–×÷'DF–ÆörÒfÇ6S²fÒæ6ÆV%VWVT–×÷'B‚’ÒVÇ6RfÒæ6ÆV%VWVT–×÷'B‚’Ò’²FW‡B†–b‡7FFRçVWVT–×÷'EF—FÆRæ—4&Ææ²‚’’.Xùnkh‚"VÇ6R.‹ùNY¹â"’ÒÒÀ¢§Ğ ¤6ö×÷6&ÆR&—fFRgVâ6öÆÆV7F–öå&÷r‡fÇVS¢×W6–46öÆÆV7F–öâÂ÷Vã¢‚’ÓâVæ—BÒ·Ò’ÒÆ—7D—FVÒ†ÖöF–f–W"ÒÖöF–f–W"æ6Æ–6¶&ÆR†öä6Æ–6²Ò÷Vâ’Â†VFÆ–æT6öçFVçBÒ²FW‡B‡fÇVRçF—FÆR’ÒÂ7W÷'F–æt6öçFVçBÒ²FW‡B†–b‡fÇVRçG&6´6÷VçBãÒ’"G·fÇVRçG&6´6÷VçGÒšib"VÇ6R.x+X{¾iú^yÈ²"’ÒÂÆVF–æt6öçFVçBÒ²–6öâ„–6öç2äWFôÖ—'&÷&VBäf–ÆÆVBåVWVT×W6–2ÂçVÆÂÂF–çBÒw&VVâ’Ò¤6ö×÷6&ÆR&—fFRgVâ6V7F–öåF—FÆR‡FW‡C¢7G&–ærÂ7F–öã¢7G&–æsòÒçVÆÂÂöä7F–öã¢‚’ÓâVæ—BÒ·Ò’Ò&÷r„ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’çFF–ær‡F÷Ò‚æG’ÂfW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’’²FW‡B‡FW‡BÂföçE6—¦RÒ#ç7ÂföçEvV–v‡BÒföçEvV–v‡Bä&öÆBÂÖöF–f–W"ÒÖöF–f–W"çvV–v‡Bƒb’“²7F–öãòæÆWB²FW‡D'WGFöâ†öä7F–öâ’²FW‡B†—B’ÒÒĞ¤6ö×÷6&ÆR&—fFRgVâÖ–æ•Æ–W"‡G&6³¢G&6³òÂÇ—&–73¢Æ—7CÄÇ—&–4Æ–æSâÂfÓ¢f–WtÖöFVÂÂ÷Vã¢‚’ÓâVæ—B’°¢–b‡G&6²ÓÒçVÆÂ’&WGW&à¢f"÷6—F–öâ'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆTÆöæu7FFTöbƒÂ’Ğ¢f"Æ––ær'’&VÖVÖ&W"‡G&6²æ–B’²×WF&ÆU7FFTöb†fÇ6R’Ğ¢ÆVæ6†VDVffV7B‡G&6²æ–B’°¢v†–ÆR†—47F—fR’°¢÷6—F–öâÒfÒçÆ–&6µ÷6—F–öâ‚¢Æ––ærÒfÒæ—5Æ––ær‚¢FVÆ’ƒ3S¢Ğ¢Ğ¢fÂ&Wf–Wt–æFW‚Ò7F—fTÇ—&–4–æFW‚†Ç—&–72Â÷6—F–öâ’çF¶T–b²—BãÒĞ¢ó¢Ç—&–72æ–æFW„ödf—'7B²—BçF–ÖT×2ãÒÒçF¶T–b²—BãÒĞ¢ó¢Ç—&–72æ–æFW„ödf—'7B²—BçFW‡Bæ—4æ÷D&Ææ²‚’Ğ¢fÂ&Wf–WrÒÇ—&–72ævWD÷$çVÆÂ‡&Wf–Wt–æFW‚“òçFW‡CòçF¶T–b²—Bæ—4æ÷D&Ææ²‚’Òó¢.jÚ>YÊi*ŞiKâ ¢7W&f6R†6öÆ÷"Ò7W&f6RÂFöæÄVÆWfF–öâÒ2æG’°¢&÷r€¢ÖöF–f–W"æf–ÆÄÖ…v–GF‚‚’æ†V–v‡Bƒc"æG’çFF–ær‡7F'BÒ‚æGÂVæBÒBæG’æ6Æ–6¶&ÆR†öä6Æ–6²Ò÷Vâ’À¢fW'F–6ÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW%fW'F–6ÆÇ’À¢’°¢7–æ4–ÖvR€¢ÖöFVÂÒ6fTÆö6Ä÷$vFWv•W&’‡G&6²æ'Gv÷&µW&Â’æ–d&Ææ²²çVÆÂÒÀ¢6öçFVçDFW67&—F–öâÒ.[Ù>X˜ŞjØÎi».[™Ú""À¢ÖöF–f–W"ÒÖöF–f–W"ç6—¦RƒCBæG’æ6Æ—…&÷VæFVD6÷&æW%6†RƒæG’’æ&6¶w&÷VæB„6öÆ÷"äF&´w&’’À¢¢76W"„ÖöF–f–W"çv–GF‚ƒ‚æG’¢6öÇVÖâ„ÖöF–f–W"çvV–v‡Bƒb’ÂfW'F–6Ä'&ævVÖVçBÒ'&ævVÖVçBä6VçFW"’°¢FW‡B‡G&6²çF—FÆRÂÖ„Æ–æW2ÒÂ÷fW&fÆ÷rÒFW‡D÷fW&fÆ÷räVÆÆ—6—2ÂföçE6—¦RÒBç7ÂföçEvV–v‡BÒföçEvV–v‡Bå6VÖ”&öÆB¢FW‡B‡&Wf–WrÂÖ„Æ–æW2ÒÂ÷fW&fÆ÷rÒFW‡D÷fW&fÆ÷räVÆÆ—6—2Â6öÆ÷"Ò6öÆ÷"äw&’ÂföçE6—¦RÒç7¢Ğ¢–6öä'WGFöâ‡²–b‡Æ––ær’fÒçW6UÆ–&6²‚’VÇ6RfÒç&W7VÖUÆ–&6²‚’ÒÂÖöF–f–W"ç6—¦RƒCBæG’’°¢–6öâ†–b‡Æ––ær’–6öç2äFVfVÇBåW6RVÇ6R–6öç2äFVfVÇBåÆ”'&÷rÂ–b‡Æ––ær’.i¨.XÂ"VÇ6R.i*ŞiKâ"ÂÖöF–f–W"ç6—¦Rƒ#BæG’ÂF–çBÒ6öÆ÷"åv†—FR¢Ğ¢–6öâ„–6öç2äFVfVÇBä¶W–&ö&D'&÷uWÂ.h™>[Èi*ŞiKîYš‚"ÂÖöF–f–W"ç6—¦Rƒ#æG’ÂF–çBÒ6öÆ÷"äw&’¢Ğ¢Ğ§Ğ 
+        if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+        }
+        setContent { QMusicTheme { QMusicApp() } }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideStatusBar()
+    }
+
+    override fun onResume() { super.onResume(); FramePerformanceMonitor.start() }
+    override fun onPause() { FramePerformanceMonitor.stop(); super.onPause() }
+
+    private fun hideStatusBar() = WindowCompat.getInsetsController(window, window.decorView)
+        .hide(WindowInsetsCompat.Type.statusBars())
+}
+
+@Composable private fun QMusicTheme(content: @Composable () -> Unit) = MaterialTheme(
+    colorScheme = darkColorScheme(primary = Green, background = Color(0xFF090C0B), surface = Surface, onBackground = Color.White),
+    typography = Typography(bodyLarge = androidx.compose.ui.text.TextStyle(fontSize = 17.sp)), content = content,
+)
+
+@Composable private fun QMusicApp(vm: AppViewModel = viewModel()) {
+    val context = LocalContext.current
+    val noticePrefs = remember { context.getSharedPreferences("notice", android.content.Context.MODE_PRIVATE) }
+    var showNotice by remember { mutableStateOf(!noticePrefs.getBoolean("accepted", false)) }
+    val nav = rememberNavController()
+    val backStack by nav.currentBackStackEntryAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
+    val downloads by vm.downloads.collectAsStateWithLifecycle()
+    val quality by vm.quality.collectAsStateWithLifecycle()
+    val headphoneWarning by vm.headphoneWarning.collectAsStateWithLifecycle()
+    val autoOpenPlayer by vm.autoOpenPlayer.collectAsStateWithLifecycle()
+    val playMode by vm.playMode.collectAsStateWithLifecycle()
+    val lyricSize by vm.lyricSize.collectAsStateWithLifecycle()
+    val lyricTranslation by vm.lyricTranslation.collectAsStateWithLifecycle()
+    val lyricOriginal by vm.lyricOriginal.collectAsStateWithLifecycle()
+    val lyricOffset by vm.lyricOffset.collectAsStateWithLifecycle()
+    val lyricAnimation by vm.lyricAnimation.collectAsStateWithLifecycle()
+    val lyricAlignment by vm.lyricAlignment.collectAsStateWithLifecycle()
+    val pureBlack by vm.pureBlack.collectAsStateWithLifecycle()
+    val lowPowerPlayer by vm.lowPowerPlayer.collectAsStateWithLifecycle()
+    val wifiOnlyDownload by vm.wifiOnlyDownload.collectAsStateWithLifecycle()
+    val lastSleepMinutes by vm.lastSleepMinutes.collectAsStateWithLifecycle()
+    val dailyCount by vm.dailyCount.collectAsStateWithLifecycle()
+    val searchHistory by vm.searchHistory.collectAsStateWithLifecycle()
+    val seenAnnouncements by vm.seenAnnouncements.collectAsStateWithLifecycle()
+    val queue by vm.queue.collectAsStateWithLifecycle()
+    val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
+    val queueReversed by vm.queueReversed.collectAsStateWithLifecycle()
+    val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
+    var dismissedAnnouncements by remember { mutableStateOf(emptySet<String>()) }
+    var dismissedUpdateId by remember { mutableLongStateOf(0L) }
+    var pendingAutomaticInstallId by rememberSaveable { mutableLongStateOf(0L) }
+    var permissionInstallId by rememberSaveable { mutableLongStateOf(0L) }
+    var installLaunchError by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { AppLog.write("PERF", "startup_ui_ready_ms=${android.os.SystemClock.elapsedRealtime() - QMusicApplication.processStartedAt}") }
+    val snackbar = remember { SnackbarHostState() }
+    val openVerifiedInstaller: (UpdateUiState.Ready) -> Unit = { ready ->
+        vm.prepareUpdateInstall(ready.release, ready.filePath) { verified ->
+            runCatching { context.startActivity(UpdateInstaller.installIntent(context, verified)) }
+                .onSuccess { installLaunchError = null }
+                .onFailure { error ->
+                    AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                    installLaunchError = "ç³»ç»Ÿæ²¡æœ‰å¯ç”¨çš„ APK å®‰è£…å™¨"
+                }
+        }
+    }
+    val installPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val requestedId = permissionInstallId
+        permissionInstallId = 0L
+        val ready = (state.updateState as? UpdateUiState.Ready)
+            ?.takeIf { it.release.releaseId == requestedId }
+        if (ready != null && UpdateInstaller.canInstallPackages(context)) {
+            openVerifiedInstaller(ready)
+        } else if (requestedId > 0) {
+            installLaunchError = "éœ€è¦å…è®¸ QMusic Watch å®‰è£…æœªçŸ¥æ¥æºåº”ç”¨"
+        }
+    }
+    val requestUpdateInstall: (UpdateUiState.Ready) -> Unit = { ready ->
+        installLaunchError = null
+        if (UpdateInstaller.canInstallPackages(context)) {
+            openVerifiedInstaller(ready)
+        } else {
+            permissionInstallId = ready.release.releaseId
+            runCatching { installPermissionLauncher.launch(UpdateInstaller.permissionIntent(context)) }
+                .onFailure { error ->
+                    permissionInstallId = 0L
+                    AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                    installLaunchError = "ç³»ç»Ÿæ²¡æœ‰å¯ç”¨çš„æœªçŸ¥æ¥æºå®‰è£…è®¾ç½®å…¥å£"
+                }
+        }
+    }
+    val startUpdate: (ControlUpdate) -> Unit = { release ->
+        dismissedUpdateId = release.releaseId
+        pendingAutomaticInstallId = release.releaseId
+        installLaunchError = null
+        vm.downloadUpdate(release)
+    }
+    DisposableEffect(backStack?.destination?.route) {
+        FramePerformanceMonitor.section = backStack?.destination?.route ?: "home"
+        onDispose { }
+    }
+    LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it); vm.consumeMessage() } }
+    LaunchedEffect(installLaunchError) {
+        installLaunchError?.let {
+            snackbar.showSnackbar(it)
+            installLaunchError = null
+        }
+    }
+    LaunchedEffect(state.updateState, pendingAutomaticInstallId) {
+        automaticInstallCandidate(pendingAutomaticInstallId, state.updateState)?.let { ready ->
+            pendingAutomaticInstallId = 0L
+            requestUpdateInstall(ready)
+        }
+    }
+    LaunchedEffect(state.playEvent, autoOpenPlayer) {
+        if (state.playEvent != 0L && autoOpenPlayer && state.currentTrack != null && backStack?.destination?.route != "player") nav.navigate("player") { launchSingleTop = true }
+    }
+    Scaffold(containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom), snackbarHost = { SnackbarHost(snackbar) }, bottomBar = { if (backStack?.destination?.route != "player") MiniPlayer(state.currentTrack, state.lyrics, vm) { nav.navigate("player") } }) { padding ->
+        NavHost(nav, "home", Modifier.padding(padding)) {
+            composable("home") { HomeScreen(nav, state, vm, dailyCount) }
+            composable("login") { LoginScreen(state, vm) { nav.popBackStack() } }
+            composable("search") { SearchScreen(nav, state, vm, searchHistory) }
+            composable("library/{section}") { entry ->
+                val section = LibrarySection.fromRoute(entry.arguments?.getString("section"))
+                LaunchedEffect(section) { vm.loadLibrary() }
+                LibraryScreen(nav, state, vm, section)
+            }
+            composable("recent") { LaunchedEffect(Unit) { vm.loadRecent() }; TrackListScreen("æœ€è¿‘æ’­æ”¾", state.recent, writablePlaylists(state.library?.playlists.orEmpty()), vm) }
+            composable("downloads") { DownloadScreen(downloads, vm) }
+            composable("player") {
+                PlayerScreen(
+                    track = state.currentTrack,
+                    lyrics = state.lyrics,
+                    vm = vm,
+                    playMode = playMode,
+                    lyricSize = lyricSize,
+                    showOriginal = lyricOriginal,
+                    showTranslation = lyricTranslation,
+                    lyricOffset = lyricOffset,
+                    lyricAnimation = lyricAnimation,
+                    lyricAlignment = lyricAlignment,
+                    lowPowerPlayer = lowPowerPlayer,
+                    quality = quality,
+                    activeQuality = state.activeStreamQuality,
+                    profile = state.profile,
+                    profileLoaded = state.profileLoaded,
+                    playlists = writablePlaylists(state.library?.playlists.orEmpty()),
+                    liked = state.library?.liked?.any { it.id == state.currentTrack?.id } == true,
+                    openQueue = { nav.navigate("queue") },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable("queue") { LaunchedEffect(Unit) { if (vm.signedIn) vm.loadLibrary() }; QueueScreen(queue, queueIndex, queueReversed, state, vm) { nav.popBackStack() } }
+            composable("detail") { DetailScreen(state.detail, state.detailDirectoryId, state.detailLoading, state.detailError, writablePlaylists(state.library?.playlists.orEmpty()), vm) { nav.popBackStack() } }
+            composable("settings") { SettingsCenter(nav) { nav.popBackStack() } }
+            composable("settings/display") { DisplaySettingsScreen(vm, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, lyricAlignment, pureBlack, lowPowerPlayer) { nav.popBackStack() } }
+            composable("settings/playback") { PlaybackSettingsScreen(vm, quality, state.profile, state.profileLoaded, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() } }
+            composable("settings/network") {
+                NetworkSettingsScreen(vm, dailyCount, state, onAnnouncements = { nav.navigate("settings/announcements") }, onRelogin = {
+                    vm.logout()
+                    nav.navigate("login") { popUpTo("home") }
+                }) { nav.popBackStack() }
+            }
+            composable("settings/announcements") { AnnouncementsScreen(state.announcements, seenAnnouncements, vm) { nav.popBackStack() } }
+            composable("settings/about") {
+                AboutScreen(vm, state.updateState, startUpdate, requestUpdateInstall) { nav.popBackStack() }
+            }
+        }
+    }
+    state.pendingSpeakerTrack?.let { track ->
+        AlertDialog(onDismissRequest = vm::dismissSpeakerPrompt, title = { Text("æœªæ£€æµ‹åˆ°è€³æœº") }, text = { Text("å»ºè®®è¿æ¥è“ç‰™æˆ–æœ‰çº¿è€³æœºï¼Œæ˜¯å¦ä»ä½¿ç”¨æ‰‹è¡¨æ‰¬å£°å™¨æ’­æ”¾ï¼Ÿ") },
+            confirmButton = { TextButton(onClick = vm::continueOnSpeaker) { Text("ç»§ç»­å¤–æ”¾") } },
+            dismissButton = { TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }) { Text("è¿æ¥è“ç‰™") } })
+    }
+    val startupAnnouncement = nextStartupAnnouncement(state.announcements, seenAnnouncements, dismissedAnnouncements)
+    val automaticUpdate = state.updateState.takeIf {
+        pendingAutomaticInstallId > 0 && updateStateRelease(it)?.releaseId == pendingAutomaticInstallId
+    }
+    val startupUpdate = when (val update = state.updateState) {
+        is UpdateUiState.Available -> update.release
+        is UpdateUiState.Ready -> update.release
+        else -> null
+    }?.takeIf { it.releaseId != dismissedUpdateId }
+    if (showNotice) AlertDialog(onDismissRequest = {}, title = { Text("ç¬¬ä¸‰æ–¹éå®˜æ–¹å®¢æˆ·ç«¯") }, text = { Text("QMusic Watch ä¸è…¾è®¯æˆ– QQ éŸ³ä¹æ— éš¶å±æˆ–è®¤å¯å…³ç³»ã€‚è¯·å°Šé‡ç‰ˆæƒå’Œè´¦å·æƒç›Šï¼Œæœ¬é¡¹ç›®ä¸ä¼šç»•è¿‡ä¼šå‘˜ã€åœ°åŒºã€ä»˜è´¹æˆ– DRM é™åˆ¶ã€‚") }, confirmButton = { Button({ noticePrefs.edit().putBoolean("accepted", true).apply(); showNotice = false }) { Text("æˆ‘çŸ¥é“äº†") } })
+    else if (startupAnnouncement != null) startupAnnouncement.let { announcement ->
+        val dismiss: () -> Unit = {
+            dismissedAnnouncements = dismissedAnnouncements + announcement.id
+            vm.markAnnouncementSeen(announcement.id)
+        }
+        AlertDialog(
+            onDismissRequest = dismiss,
+            title = { Text(announcement.title.take(80), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            text = { Box(Modifier.heightIn(max = 165.dp).verticalScroll(rememberScrollState())) { Text(announcement.content.take(1200)) } },
+            confirmButton = { TextButton(dismiss) { Text("çŸ¥é“äº†") } },
+        )
+    }
+    else if (automaticUpdate is UpdateUiState.Downloading) AlertDialog(
+        onDismissRequest = {},
+        title = { Text("æ­£åœ¨æ›´æ–°") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(downloadProgressSummary(automaticUpdate.downloadedBytes, automaticUpdate.totalBytes))
+                LinearProgressIndicator(
+                    progress = {
+                        if (automaticUpdate.totalBytes > 0) {
+                            automaticUpdate.downloadedBytes.toFloat()
+                                .div(automaticUpdate.totalBytes)
+                                .coerceIn(0f, 1f)
+                        } else 0f
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("ä¸‹è½½å®Œæˆåå°†è‡ªåŠ¨æ‰“å¼€ç³»ç»Ÿå®‰è£…å™¨", color = Color.Gray, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {},
+    )
+    else if (automaticUpdate is UpdateUiState.Verifying) AlertDialog(
+        onDismissRequest = {},
+        title = { Text("æ­£åœ¨æ ¡éªŒæ›´æ–°") },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(9.dp))
+                Text("æ­£åœ¨æ£€æŸ¥ç­¾åã€åŒ…åå’Œæ–‡ä»¶å®Œæ•´æ€§")
+            }
+        },
+        confirmButton = {},
+    )
+    else if (automaticUpdate is UpdateUiState.Error) automaticUpdate.release?.let { release ->
+        AlertDialog(
+            onDismissRequest = { pendingAutomaticInstallId = 0L },
+            title = { Text("æ›´æ–°å¤±è´¥") },
+            text = { Text(automaticUpdate.message.take(300)) },
+            confirmButton = {
+                TextButton({ startUpdate(release) }) {
+                    Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("é‡è¯•")
+                }
+            },
+            dismissButton = { TextButton({ pendingAutomaticInstallId = 0L }) { Text("ç¨å") } },
+        )
+    }
+    else if (startupUpdate != null) startupUpdate.let { update ->
+        val ready = (state.updateState as? UpdateUiState.Ready)
+            ?.takeIf { it.release.releaseId == update.releaseId }
+        AlertDialog(
+            onDismissRequest = { dismissedUpdateId = update.releaseId },
+            title = { Text("å‘ç°æ–°ç‰ˆæœ¬ ${update.versionName}", maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            text = {
+                Column(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    if (update.title.isNotBlank()) Text(update.title, fontWeight = FontWeight.Bold)
+                    if (update.changelog.isNotBlank()) Text(update.changelog.take(1200), color = Color.LightGray, fontSize = 14.sp)
+                    Text(formatFileSize(update.apk.sizeBytes), color = Color.Gray, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    dismissedUpdateId = update.releaseId
+                    if (ready != null) requestUpdateInstall(ready) else startUpdate(update)
+                }) {
+                    Icon(if (ready != null) Icons.Default.InstallMobile else Icons.Default.Download, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (ready != null) "å®‰è£…æ›´æ–°" else "ç«‹å³æ›´æ–°")
+                }
+            },
+            dismissButton = { TextButton({ dismissedUpdateId = update.releaseId }) { Text("ç¨å") } },
+        )
+    }
+}
+
+@Composable private fun HomeScreen(nav: NavHostController, state: AppUiState, vm: AppViewModel, dailyCount: Int) {
+    val context = LocalContext.current
+    val pager = rememberPagerState { 2 }
+    var dailyOffset by remember { mutableIntStateOf(0) }
+    val daily = state.home?.daily.orEmpty()
+    val shown = dailyBatch(daily, dailyOffset, dailyCount)
+    LaunchedEffect(pager.settledPage, vm.signedIn, state.profileLoaded, state.library, state.recentLoaded) {
+        if (pager.settledPage == 1 && vm.signedIn) {
+            if (!state.profileLoaded) vm.loadProfile()
+            if (state.library == null) vm.loadLibrary()
+            if (!state.recentLoaded) vm.loadRecent()
+        }
+    }
+    Column(Modifier.fillMaxSize()) {
+        HorizontalPager(state = pager, modifier = Modifier.weight(1f), beyondViewportPageCount = 1) { page ->
+            if (page == 0) LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item { Spacer(Modifier.height(8.dp)); Text("QMusic Watch", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("ç¬¬ä¸‰æ–¹éå®˜æ–¹å®¢æˆ·ç«¯", color = Color.Gray) }
+                item { Surface(Modifier.fillMaxWidth().height(52.dp).clickable { nav.navigate("search") }, shape = RoundedCornerShape(20.dp), color = Surface) { Row(Modifier.padding(horizontal = 15.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(9.dp)); Text("æœç´¢æ­Œæ›²ã€æ­Œå•ã€æ­Œæ‰‹ã€ä¸“è¾‘", color = Color(0xFFB6BFBA), fontSize = 14.sp) } } }
+                item { SectionTitle("æ¯æ—¥æ¨è", "æ¢ä¸€æ¢") { if (daily.isNotEmpty()) dailyOffset = (dailyOffset + dailyCount) % daily.size } }
+                items(shown, key = { it.id }) { TrackRow(it, vm, queue = shown, playlists = writablePlaylists(state.library?.playlists.orEmpty())) }
+            } else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item { Spacer(Modifier.height(8.dp)); Text("æˆ‘çš„", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+                item {
+                    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = Surface) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            AccountAvatar(state.profile?.avatarUrl, vm.loginProvider, vm.accountId, 68.dp)
+                            Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(if (vm.signedIn) state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}éŸ³ä¹ç”¨æˆ·" else "å°šæœªç™»å½•", fontSize = 21.sp, fontWeight = FontWeight.Bold); Text(if (vm.signedIn) accountLabel(vm.loginProvider, vm.accountId) else "ç™»å½•ååŒæ­¥æ”¶è—ä¸æ­Œå•", color = Color.Gray); if (vm.signedIn) Text(vipSummary(state.profile, state.profileLoaded, state.profileError), color = if (state.profile?.isVipActive() == true) Color(0xFFFFC857) else Color.Gray, fontSize = 13.sp) }
+                        }
+                    }
+                }
+                if (!vm.signedIn) item { Button({ nav.navigate("login") }, Modifier.fillMaxWidth()) { Text("æ‰«ç ç™»å½•") } }
+                else {
+                    item { SettingsModule("æˆ‘å–œæ¬¢", "${state.library?.liked?.size ?: 0} é¦–æ­Œæ›²", Icons.Default.Favorite) { nav.navigate(libraryRoute(LibrarySection.Liked)) } }
+                    item { SettingsModule("æˆ‘åˆ›å»ºçš„æ­Œå•", "${state.library?.playlists?.count { it.owned != false } ?: 0} ä¸ªæ­Œå•", Icons.AutoMirrored.Filled.QueueMusic) { nav.navigate(libraryRoute(LibrarySection.Created)) } }
+                    item { SettingsModule("æ”¶è—æ­Œå•", "${state.library?.playlists?.count { it.owned == false } ?: 0} ä¸ªæ­Œå•", Icons.Default.LibraryMusic) { nav.navigate(libraryRoute(LibrarySection.Collected)) } }
+                }
+                item { SettingsModule("æœ€è¿‘æ’­æ”¾", "æœ¬æœºæ’­æ”¾è®°å½•", Icons.Default.History) { nav.navigate("recent") } }
+                item { SettingsModule("ç¦»çº¿ç¼“å­˜", "å·²ä¸‹è½½æ­Œæ›²ä¸ä»»åŠ¡", Icons.Default.Download) { nav.navigate("downloads") } }
+                item { SettingsModule("è®¾ç½®ä¸­å¿ƒ", "æ˜¾ç¤ºã€æ’­æ”¾ã€ç½‘ç»œä¸å…³äº", Icons.Default.Settings) { nav.navigate("settings") } }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.Center) { repeat(2) { page -> Box(Modifier.padding(3.dp).size(if (pager.currentPage == page) 8.dp else 5.dp).background(if (pager.currentPage == page) Green else Color.Gray, RoundedCornerShape(50))) } }
+    }
+}
+
+@Composable private fun RowScope.HomeButton(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    FilledTonalButton(onClick, Modifier.weight(1f).height(58.dp), shape = RoundedCornerShape(18.dp)) { Icon(icon, null); Spacer(Modifier.width(6.dp)); Text(text, maxLines = 1) }
+}
+
+@Composable private fun LoginScreen(state: AppUiState, vm: AppViewModel, onSuccess: () -> Unit) {
+    var provider by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.qrStatus) { if (state.qrStatus == "ç™»å½•æˆåŠŸ") onSuccess() }
+    BoxWithConstraints(Modifier.fillMaxSize().padding(10.dp)) {
+        if (!vm.featureEnabled("qrLogin")) {
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Default.BuildCircle, null, Modifier.size(42.dp), tint = Color.Gray)
+                Spacer(Modifier.height(10.dp))
+                Text(vm.featureMessage("qrLogin").ifBlank { "æ‰«ç ç™»å½•æš‚æ—¶ç»´æŠ¤" }, color = Color.Gray)
+            }
+        } else if (provider == null) {
+            Column(
+                Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("æ‰«ç ç™»å½•", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(18.dp))
+                Button({ provider = "qq" }, Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(16.dp)) { Text("ä½¿ç”¨ QQ æ‰«ç ") }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton({ provider = "wechat" }, Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(16.dp)) { Text("ä½¿ç”¨å¾®ä¿¡æ‰«ç ") }
+                Spacer(Modifier.height(12.dp))
+                Text("ä»…é€šè¿‡æ‰‹æœºæ‰«ç æˆæƒ", color = Color.Gray, fontSize = 12.sp)
+            }
+        } else {
+            val selectedProvider = provider!!
+            val qrSide = minOf(maxWidth, (maxHeight - 76.dp).coerceAtLeast(1.dp), 356.dp)
+            LaunchedEffect(selectedProvider) { vm.startQrLogin(selectedProvider) }
+            DisposableEffect(selectedProvider) { onDispose(vm::cancelQrLogin) }
+            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton({ provider = null }, Modifier.size(36.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "è¿”å›ç™»å½•æ–¹å¼", Modifier.size(20.dp))
+                    }
+                    Text(if (selectedProvider == "wechat") "å¾®ä¿¡ç™»å½•" else "QQ ç™»å½•", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    IconButton({ vm.startQrLogin(selectedProvider) }, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Refresh, "åˆ·æ–°äºŒç»´ç ", Modifier.size(19.dp))
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                ServerQrLogin(
+                    imageBase64 = state.qrImageBase64,
+                    modifier = Modifier.size(qrSide),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    state.qrStatus.ifBlank { "æ‰«ç ååœ¨æ‰‹æœºç¡®è®¤" },
+                    color = if (state.qrStatus.startsWith("ç™»å½•å¤±è´¥")) MaterialTheme.colorScheme.error else Color.Gray,
+                    fontSize = 12.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServerQrLogin(imageBase64: String, modifier: Modifier = Modifier) {
+    val image = remember(imageBase64) { decodeServerQrImage(imageBase64) }
+    Surface(modifier, shape = RoundedCornerShape(5.dp), color = Color.White) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = "ç™»å½•äºŒç»´ç ",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillBounds,
+                    filterQuality = FilterQuality.None,
+                )
+            } else {
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = Color(0xFF28312D))
+            }
+        }
+    }
+}
+
+private fun decodeServerQrImage(value: String) = runCatching {
+    require(value.length in 128..700_000)
+    val bytes = Base64.decode(value, Base64.DEFAULT)
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    require(bounds.outWidth in 32..2_048 && bounds.outHeight in 32..2_048)
+    require(bounds.outWidth.toLong() * bounds.outHeight <= 4_194_304L)
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() ?: error("äºŒç»´ç å›¾ç‰‡æ— æ³•è§£ç ")
+}.getOrNull()
+
+@Composable private fun SearchScreen(nav: NavHostController, state: AppUiState, vm: AppViewModel, history: List<String>) {
+    var query by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf("track") }
+    val names = linkedMapOf("track" to "æ­Œæ›²", "playlist" to "æ­Œå•", "artist" to "æ­Œæ‰‹", "album" to "ä¸“è¾‘")
+    Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(50.dp), singleLine = true, shape = RoundedCornerShape(20.dp), colors = watchSearchColors(), placeholder = { Text("æœç´¢", fontSize = 14.sp, color = Color.Gray) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp), trailingIcon = { IconButton({ vm.search(query, type) }, Modifier.size(38.dp)) { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(20.dp)) } }, keyboardActions = KeyboardActions(onDone = { vm.search(query, type) }))
+        if (query.isBlank() && history.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) { Text("æœ€è¿‘æœç´¢", Modifier.weight(1f), color = Color.Gray, fontSize = 13.sp); TextButton(vm::clearSearchHistory, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("æ¸…ç©º", fontSize = 13.sp) } }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) { history.forEach { value -> AssistChip({ query = value; vm.search(value, type) }, label = { Text(value, maxLines = 1, fontSize = 13.sp) }, leadingIcon = { Icon(Icons.Default.History, null, Modifier.size(14.dp)) }) } }
+        }
+        PrimaryScrollableTabRow(names.keys.indexOf(type), edgePadding = 0.dp, modifier = Modifier.height(42.dp)) { names.forEach { (key, label) -> Tab(type == key, { type = key; if (query.isNotBlank()) vm.search(query, key) }, modifier = Modifier.height(42.dp), text = { Text(label, fontSize = 14.sp) }) } }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) { if (type == "track") items(state.searchTracks, key = { it.id }) { TrackRow(it, vm, queue = state.searchTracks, playlists = writablePlaylists(state.library?.playlists.orEmpty())) } else items(state.searchCollections, key = { "${it.directoryId}:${it.id}" }) { CollectionRow(it) { vm.loadDetail(type, it); nav.navigate("detail") } }; if (state.searchCursor != null) item { TextButton({ vm.search(state.searchQuery, type, loadMore = true) }, Modifier.fillMaxWidth(), enabled = !state.searchLoading) { if (state.searchLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text("åŠ è½½æ›´å¤š") } } }
+    }
+}
+
+@Composable private fun LibraryScreen(nav: NavHostController, state: AppUiState, vm: AppViewModel, section: LibrarySection) {
+    var editing by remember { mutableStateOf<MusicCollection?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf<MusicCollection?>(null) }
+    var title by remember { mutableStateOf("") }
+    val created = state.library?.playlists.orEmpty().filter { it.owned != false }
+    val collected = state.library?.playlists.orEmpty().filter { it.owned == false }
+    LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
+        when (section) {
+            LibrarySection.Liked -> {
+                item { SectionTitle("æˆ‘å–œæ¬¢") }
+                items(state.library?.liked.orEmpty(), key = { it.id }) { TrackRow(it, vm, liked = true, queue = state.library?.liked.orEmpty(), playlists = created) }
+                if (state.library != null && state.library.liked.isEmpty()) item { Text("è¿˜æ²¡æœ‰å–œæ¬¢çš„æ­Œæ›²", color = Color.Gray) }
+            }
+            LibrarySection.Created -> {
+                item { SectionTitle("æˆ‘åˆ›å»ºçš„æ­Œå•", "æ–°å»º") { title = ""; creating = true } }
+                items(created, key = { "${it.directoryId}:${it.id}" }) { item ->
+                    ListItem(modifier = Modifier.clickable { vm.loadDetail("playlist", item, editable = true); nav.navigate("detail") }, headlineContent = { Text(item.title) }, supportingContent = { Text("${item.trackCount} é¦–") }, leadingContent = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = Green) }, trailingContent = { Row { IconButton({ title = item.title; editing = item }) { Icon(Icons.Default.Edit, null) }; IconButton({ deleting = item }) { Icon(Icons.Default.Delete, "åˆ é™¤æ­Œå•") } } })
+                }
+                if (state.library != null && created.isEmpty()) item { Text("è¿˜æ²¡æœ‰åˆ›å»ºæ­Œå•", color = Color.Gray) }
+            }
+            LibrarySection.Collected -> {
+                item { SectionTitle("æ”¶è—æ­Œå•") }
+                items(collected, key = { "${it.directoryId}:${it.id}" }) { item -> CollectionRow(item) { vm.loadDetail("playlist", item); nav.navigate("detail") } }
+                if (state.library != null && collected.isEmpty()) item { Text("è¿˜æ²¡æœ‰æ”¶è—æ­Œå•", color = Color.Gray) }
+            }
+        }
+        item { OutlinedButton(vm::logout, Modifier.fillMaxWidth()) { Text("é€€å‡ºç™»å½•") } }
+    }
+    if (creating || editing != null) AlertDialog(onDismissRequest = { creating = false; editing = null }, title = { Text(if (creating) "æ–°å»ºæ­Œå•" else "é‡å‘½åæ­Œå•") }, text = { OutlinedTextField(title, { title = it.take(50) }, singleLine = true) }, confirmButton = { TextButton({ if (creating) vm.createPlaylist(title.trim()) else vm.renamePlaylist(editing!!.directoryId, title.trim()); creating = false; editing = null }, enabled = title.isNotBlank()) { Text("ä¿å­˜") } }, dismissButton = { TextButton({ creating = false; editing = null }) { Text("å–æ¶ˆ") } })
+    deleting?.let { playlist -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("åˆ é™¤æ­Œå•ï¼Ÿ") }, text = { Text("å°†ä» QQ éŸ³ä¹æ°¸ä¹…åˆ é™¤â€œ${playlist.title}â€ï¼Œæ­Œæ›²æœ¬èº«ä¸ä¼šåˆ é™¤ã€‚") }, confirmButton = { TextButton({ vm.deletePlaylist(playlist.directoryId); deleting = null }) { Text("ç¡®è®¤åˆ é™¤", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ deleting = null }) { Text("å–æ¶ˆ") } }) }
+}
+
+@Composable private fun TrackListScreen(title: String, tracks: List<Track>, playlists: List<MusicCollection>, vm: AppViewModel) = LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
+    item { SectionTitle(title) }; items(tracks, key = { it.id }) { TrackRow(it, vm, queue = tracks, playlists = playlists) }
+}
+
+@Composable private fun DownloadScreen(downloads: List<DownloadEntity>, vm: AppViewModel) {
+    var confirmDeleteLocked by remember { mutableStateOf(false) }
+    var deletingGroup by remember { mutableStateOf<String?>(null) }
+    val own = downloads.filter { it.ownerAccountId == vm.accountId }
+    val locked = downloads.filter { it.ownerAccountId != vm.accountId }
+    val totalBytes = own.sumOf { item -> maxOf(item.downloadedBytes, java.io.File(item.filePath).takeIf { item.status == "complete" && it.exists() }?.length() ?: 0L) }
+    val lockedBytes = locked.sumOf { item -> maxOf(item.downloadedBytes, java.io.File(item.filePath).takeIf { item.status == "complete" && it.exists() }?.length() ?: 0L) }
+    LazyColumn(Modifier.fillMaxSize().padding(14.dp)) {
+        item { SectionTitle("ç¦»çº¿ç¼“å­˜") }
+        item { Text("å½“å‰è´¦å·å ç”¨ %.1f MB Â· ${own.size} é¦–".format(totalBytes / 1024f / 1024f), color = Color.Gray); TextButton(vm::deleteInvalidDownloads) { Text("ä¸€é”®åˆ é™¤å¤±æ•ˆç¼“å­˜") } }
+        if (locked.isNotEmpty()) item { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Surface) { Row(Modifier.padding(12.dp, 9.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("å…¶ä»–è´¦å·ç¼“å­˜å·²é”å®š"); Text("${locked.size} é¦– Â· %.1f MBï¼Œç™»å½•åŸè´¦å·åå¯æ¢å¤".format(lockedBytes / 1024f / 1024f), color = Color.Gray, fontSize = 13.sp) }; TextButton({ confirmDeleteLocked = true }) { Text("åˆ é™¤å…¨éƒ¨") } } } }
+        own.groupBy(DownloadEntity::groupName).forEach { (group, values) ->
+            item(key = "group-$group") { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(group, Modifier.weight(1f).padding(top = 10.dp), color = Green, fontWeight = FontWeight.Bold); TextButton({ deletingGroup = group }, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("åˆ é™¤æœ¬ç»„", fontSize = 12.sp) } } }
+            items(values, key = { "${it.ownerAccountId}-${it.trackId}" }) { item ->
+                val status = when (item.status) { "complete" -> "å·²å®Œæˆ"; "queued_wifi" -> "ç­‰å¾… Wi-Fi"; "queued" -> "æ’é˜Ÿä¸­"; "downloading" -> "ä¸‹è½½ä¸­"; "paused" -> "å·²æš‚åœ"; "locked" -> "ç­‰å¾…åŸè´¦å·ç™»å½•"; "failed_storage" -> "å­˜å‚¨ä¸è¶³ï¼Œéœ€ä¿ç•™ 256MB"; else -> "ä¸‹è½½å¤±è´¥" }
+                ListItem(headlineContent = { Text(item.title) }, supportingContent = { Text("$status Â· ${downloadProgressSummary(item.downloadedBytes, item.totalBytes)}${if (vm.accountId != item.ownerAccountId) " Â· å·²é”å®š" else ""}") },
+                    trailingContent = { Row { if (item.status in setOf("downloading", "queued", "queued_wifi")) IconButton({ vm.pauseDownload(item.trackId) }) { Icon(Icons.Default.Pause, null) } else if (item.status == "paused" || item.status == "locked" || item.status.startsWith("failed")) IconButton({ vm.resumeDownload(item) }, enabled = vm.accountId == item.ownerAccountId) { Icon(Icons.Default.PlayArrow, null) }; IconButton({ vm.deleteDownload(item.trackId, item.ownerAccountId) }) { Icon(Icons.Default.Delete, null) } } })
+            }
+        }
+    }
+    if (confirmDeleteLocked) AlertDialog(onDismissRequest = { confirmDeleteLocked = false }, title = { Text("åˆ é™¤å…¨éƒ¨é”å®šç¼“å­˜ï¼Ÿ") }, text = { Text("å°†æ°¸ä¹…åˆ é™¤å…¶ä»–è´¦å·çš„ ${locked.size} é¦–ç¦»çº¿æ­Œæ›²ï¼›æ­Œæ›²åç§°å’Œè´¦å·ä¿¡æ¯ä¸ä¼šæ˜¾ç¤ºã€‚") }, confirmButton = { TextButton({ vm.deleteLockedDownloads(); confirmDeleteLocked = false }) { Text("ç¡®è®¤åˆ é™¤", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ confirmDeleteLocked = false }) { Text("å–æ¶ˆ") } })
+    deletingGroup?.let { group ->
+        val count = own.count { it.groupName == group }
+        AlertDialog(onDismissRequest = { deletingGroup = null }, title = { Text("åˆ é™¤â€œ$groupâ€ï¼Ÿ") }, text = { Text("å°†æ°¸ä¹…åˆ é™¤æœ¬ç»„çš„ $count é¦–ç¦»çº¿æ­Œæ›²ã€‚") }, confirmButton = { TextButton({ vm.deleteDownloadGroup(group); deletingGroup = null }) { Text("ç¡®è®¤åˆ é™¤", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ deletingGroup = null }) { Text("å–æ¶ˆ") } })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun PlayerScreen(
+    track: Track?, lyrics: List<LyricLine>, vm: AppViewModel,
+    playMode: String, lyricSize: String, showOriginal: Boolean, showTranslation: Boolean, lyricOffset: Long,
+    lyricAnimation: String, lyricAlignment: String, lowPowerPlayer: Boolean, quality: String,
+    activeQuality: String,
+    profile: UserProfile?, profileLoaded: Boolean, playlists: List<MusicCollection>, liked: Boolean,
+    openQueue: () -> Unit, onBack: () -> Unit,
+) {
+    if (track == null) return Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { IconButton(onBack, Modifier.align(Alignment.TopStart).padding(8.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "è¿”å›") }; Text("å°šæœªæ’­æ”¾") }
+    var position by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+    var playing by remember { mutableStateOf(false) }
+    val hasTimeline = lyrics.any { it.timeMs >= 0 }
+    val active = activeLyricIndex(lyrics, position + lyricOffset)
+    val (renderOriginal, renderTranslation) = lyricLayers(showOriginal, showTranslation, lyrics.any { !it.translation.isNullOrBlank() })
+    val lyricSp = when (lyricSize) { "small" -> 15f; "large" -> 21f; else -> 18f }
+    val centerLyrics = lyricAlignment == "center"
+    val listState = key(track.id) { rememberLazyListState() }
+    val lyricLineHeightPx = with(LocalDensity.current) { 40.dp.roundToPx() }
+    val lyricListDragged by listState.interactionSource.collectIsDraggedAsState()
+    var manualLyricSelection by remember(track.id) { mutableStateOf(false) }
+    var manualLyricInteraction by remember(track.id) { mutableIntStateOf(0) }
+    var selectedLike by remember(track.id) { mutableStateOf<Boolean?>(null) }
+    var likePending by remember(track.id) { mutableStateOf(false) }
+    var showPlaylistDialog by remember(track.id) { mutableStateOf(false) }
+    var showQualityDialog by remember(track.id) { mutableStateOf(false) }
+    var showModeDialog by remember(track.id) { mutableStateOf(false) }
+    val effectiveLiked = selectedLike ?: liked
+    val centeredLyricIndex by remember(listState) {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            lyricIndexClosestToCenter(
+                layout.viewportStartOffset,
+                layout.viewportEndOffset,
+                layout.visibleItemsInfo.map { Triple(it.index, it.offset, it.size) },
+            )
+        }
+    }
+    // During automatic playback, avoid observing layoutInfo. That observation
+    // makes every scroll animation frame recompose the whole player.
+    val focusedLyricIndex = if (manualLyricSelection) {
+        centeredLyricIndex.takeIf { it >= 0 } ?: active
+    } else active
+    val pager = rememberPagerState(initialPage = 0) { 2 }
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    var locked by rememberSaveable { mutableStateOf(false) }
+    val view = LocalView.current
+    DisposableEffect(locked) {
+        val previous = view.keepScreenOn
+        if (locked) view.keepScreenOn = true
+        onDispose { view.keepScreenOn = previous }
+    }
+    LaunchedEffect(Unit) { delay(100); focusRequester.requestFocus() }
+    LaunchedEffect(track.id, lowPowerPlayer) { var ticks = 0; val interval = if (lowPowerPlayer) 500L else 100L; while (true) { position = vm.playbackPosition(); duration = vm.playbackDuration(); playing = vm.isPlaying(); if (++ticks * interval >= 10_000) { ticks = 0; vm.savePlaybackState() }; delay(interval) } }
+    suspend fun centerLyric(index: Int) {
+        if (index !in lyrics.indices) return
+        while (listState.layoutInfo.viewportSize.height == 0) delay(16)
+        val layout = listState.layoutInfo
+        val itemHeight = layout.visibleItemsInfo.firstOrNull { it.index == index }?.size ?: lyricLineHeightPx
+        listState.animateScrollToItem(
+            index,
+            scrollOffset = lyricCenterScrollOffset(
+                layout.viewportStartOffset,
+                layout.viewportEndOffset,
+                itemHeight,
+            ),
+        )
+    }
+    LaunchedEffect(track.id, lyricListDragged, manualLyricInteraction) {
+        if (lyricListDragged) {
+            manualLyricSelection = true
+        } else if (manualLyricSelection) {
+            while (listState.isScrollInProgress) delay(50)
+            delay(2_000)
+            manualLyricSelection = false
+        }
+    }
+    LaunchedEffect(track.id, active, lyrics.size, manualLyricSelection) {
+        if (active >= 0 && lyrics.isNotEmpty() && !manualLyricSelection) {
+            centerLyric(active)
+        }
+    }
+    Box(Modifier.fillMaxSize().focusRequester(focusRequester).focusable().onRotaryScrollEvent { event ->
+        if (!locked) {
+            if (pager.currentPage == 0) vm.adjustVolume(if (event.verticalScrollPixels < 0) 1 else -1)
+            else {
+                manualLyricSelection = true
+                manualLyricInteraction++
+                scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+            }
+        }
+        true
+    }) {
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), userScrollEnabled = !locked) { page ->
+            if (page == 1) {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            Modifier.fillMaxSize().padding(start = if (centerLyrics) 14.dp else 20.dp, end = if (centerLyrics) 14.dp else 12.dp),
+                            state = listState,
+                            contentPadding = PaddingValues(vertical = (maxHeight / 2 - 34.dp).coerceAtLeast(0.dp)),
+                            horizontalAlignment = if (centerLyrics) Alignment.CenterHorizontally else Alignment.Start,
+                        ) {
+                            if (lyrics.isEmpty()) item {
+                                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("æš‚æ— æ­Œè¯", color = Color.Gray, fontSize = 18.sp)
+                                    TextButton(vm::reloadLyrics) { Text("é‡æ–°åŠ è½½") }
+                                }
+                            }
+                            items(lyrics.size, key = { index -> "${track.id}:$index" }) { index ->
+                                val line = lyrics[index]
+                                val nextTime = lyrics.getOrNull(index + 1)?.timeMs ?: (line.timeMs + 4_000)
+                                val distance = if (focusedLyricIndex >= 0) kotlin.math.abs(index - focusedLyricIndex) else Int.MAX_VALUE
+                                val isFocused = index == focusedLyricIndex
+                                val isPlaybackLine = index == active
+                                val targetAlpha = if (!hasTimeline) .86f else when (distance) {
+                                    0 -> 1f
+                                    1 -> if (lyricAnimation == "strong") .58f else .66f
+                                    2 -> if (lyricAnimation == "strong") .28f else .38f
+                                    else -> if (lyricAnimation == "off") .42f else .18f
+                                }
+                                val motionDuration = if (lyricAnimation == "off") 0 else 180
+                                val lineAlpha by animateFloatAsState(targetAlpha, tween(motionDuration), label = "lyricFade")
+                                // Keep row measurement fixed. The active-line
+                                // emphasis is applied in the draw layer below.
+                                val lineScale by animateFloatAsState(
+                                    if (isFocused && hasTimeline) 1.1f else 1f,
+                                    tween(motionDuration), label = "lyricFocusScale",
+                                )
+                                val lineFontSize = if (hasTimeline) {
+                                    (lyricSp - 1f).coerceAtLeast(12f)
+                                } else lyricSp
+                                val karaokeProgress = if (isPlaybackLine) lyricRenderProgress(line, position + lyricOffset, nextTime) else null
+                                val seek = {
+                                    if (line.timeMs >= 0) {
+                                        manualLyricSelection = false
+                                        vm.seek((line.timeMs - lyricOffset).coerceAtLeast(0))
+                                    }
+                                }
+                                val showTime = hasTimeline && line.timeMs >= 0 && (isPlaybackLine || (manualLyricSelection && isFocused))
+                                Row(
+                                    Modifier.fillMaxWidth()
+                                        .graphicsLayer {
+                                            alpha = lineAlpha
+                                        }
+                                        .then(if (line.timeMs >= 0) Modifier.clickable(onClick = seek) else Modifier)
+                                        .height(if (renderTranslation && !line.translation.isNullOrBlank()) 48.dp else 40.dp)
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    if (centerLyrics && hasTimeline) Spacer(Modifier.width(43.dp))
+                                    Column(
+                                        Modifier.weight(1f),
+                                        horizontalAlignment = if (centerLyrics) Alignment.CenterHorizontally else Alignment.Start,
+                                    ) {
+                                        if (renderOriginal) SingleLineLyricText(
+                                            text = line.text,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            requestedFontSp = lineFontSize,
+                                            color = if (isFocused) Color.White else Color.White.copy(alpha = .72f),
+                                            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal,
+                                            renderProgress = karaokeProgress,
+                                            lowPower = lowPowerPlayer,
+                                            centered = centerLyrics,
+                                            emphasisScale = lineScale,
+                                        )
+                                        if (renderTranslation) line.translation?.takeIf { it.isNotBlank() }?.let { translation ->
+                                            SingleLineLyricText(
+                                                text = translation,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                requestedFontSp = (lineFontSize - 4f).coerceAtLeast(11f),
+                                                color = if (isFocused) Green.copy(alpha = .86f) else Color(0xFF9EB8A8),
+                                                fontWeight = if (isFocused && !renderOriginal) FontWeight.Bold else FontWeight.Normal,
+                                                centered = centerLyrics,
+                                                emphasisScale = lineScale,
+                                            )
+                                        }
+                                    }
+                                    if (hasTimeline) Box(Modifier.width(43.dp), contentAlignment = Alignment.CenterEnd) {
+                                        Text(
+                                            lyricTime(line.timeMs),
+                                            color = if (isFocused) Green else Color.Gray,
+                                            fontSize = 10.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            modifier = Modifier.alpha(if (showTime) 1f else 0f),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                }
+            } else {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val compactPlayer = maxHeight < 520.dp
+                    val coverSize = when {
+                        maxHeight < 420.dp -> 88.dp
+                        compactPlayer -> 108.dp
+                        else -> 150.dp
+                    }
+                    Column(
+                        Modifier.fillMaxSize().padding(
+                            start = 14.dp,
+                            end = 14.dp,
+                            top = if (compactPlayer) 42.dp else 48.dp,
+                            bottom = if (compactPlayer) 22.dp else 34.dp,
+                        ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(if (compactPlayer) 1.dp else 4.dp, Alignment.CenterVertically),
+                    ) {
+                        var dragY by remember { mutableFloatStateOf(0f) }
+                        AsyncImage(
+                            model = safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null },
+                            contentDescription = "æ­Œæ›²å°é¢",
+                            modifier = Modifier.size(coverSize).background(Surface, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
+                                .pointerInput(track.id) { detectTapGestures(onDoubleTap = { if (vm.isPlaying()) vm.pausePlayback() else vm.resumePlayback() }) }
+                                .pointerInput(track.id) { detectVerticalDragGestures(onDragStart = { dragY = 0f }, onDragEnd = { if (abs(dragY) > 60) vm.adjustVolume(if (dragY < 0) 1 else -1) }) { change, amount -> change.consume(); dragY += amount } },
+                        )
+                        Text(track.title, fontSize = if (compactPlayer) 18.sp else 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Text(track.artists.joinToString(" / "), color = Color.Gray, fontSize = if (compactPlayer) 12.sp else 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        val previewIndex = active.takeIf { it >= 0 }
+                            ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
+                            ?: lyrics.indexOfFirst { it.text.isNotBlank() }
+                        val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() }
+                        AnimatedContent(
+                            targetState = preview.orEmpty(),
+                            transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(100)) },
+                            modifier = Modifier.fillMaxWidth().height(if (compactPlayer) 20.dp else 28.dp),
+                            label = "playerLyricPreview",
+                        ) { line ->
+                            if (line.isNotBlank()) SingleLineLyricText(line, Modifier.fillMaxWidth(), if (compactPlayer) 12.5f else 14f, Color.White.copy(alpha = .82f), centered = true) else Spacer(Modifier.height(1.dp))
+                        }
+                        Row(Modifier.fillMaxWidth().height(if (compactPlayer) 24.dp else 28.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(lyricTime(position), color = Color.Gray, fontSize = 10.sp, modifier = Modifier.width(34.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            val safeDuration = duration.coerceAtLeast(1L)
+                            val safePosition = position.coerceIn(0L, safeDuration)
+                            val sliderFraction = (safePosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+                            Slider(
+                                value = safePosition.toFloat(),
+                                onValueChange = { vm.seek(it.toLong()); position = it.toLong() },
+                                valueRange = 0f..safeDuration.toFloat(),
+                                modifier = Modifier.weight(1f).height(if (compactPlayer) 24.dp else 28.dp),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Green,
+                                    activeTrackColor = Green,
+                                    inactiveTrackColor = Color(0xFF343B38),
+                                ),
+                                thumb = {
+                                    Box(Modifier.width(12.dp).height(16.dp), contentAlignment = Alignment.Center) {
+                                        Box(Modifier.size(12.dp).background(Green, RoundedCornerShape(50)))
+                                    }
+                                },
+                                track = {
+                                    Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Color(0xFF343B38))) {
+                                        Box(Modifier.fillMaxHeight().fillMaxWidth(sliderFraction).background(Green))
+                                    }
+                                },
+                            )
+                            Text(lyricTime(duration), color = Color.Gray, fontSize = 10.sp, modifier = Modifier.width(34.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                        Row(Modifier.height(if (compactPlayer) 46.dp else 54.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(vm::skipPrevious, Modifier.size(if (compactPlayer) 40.dp else 44.dp)) { Icon(Icons.Default.SkipPrevious, "ä¸Šä¸€é¦–", Modifier.size(if (compactPlayer) 24.dp else 27.dp)) }
+                            IconButton({ if (playing) vm.pausePlayback() else vm.resumePlayback() }, Modifier.size(if (compactPlayer) 46.dp else 54.dp)) { Icon(if (playing) Icons.Default.PauseCircleFilled else Icons.Default.PlayCircleFilled, if (playing) "æš‚åœ" else "æ’­æ”¾", Modifier.size(if (compactPlayer) 41.dp else 47.dp), tint = Color.White) }
+                            IconButton(vm::skipNext, Modifier.size(if (compactPlayer) 40.dp else 44.dp)) { Icon(Icons.Default.SkipNext, "ä¸‹ä¸€é¦–", Modifier.size(if (compactPlayer) 24.dp else 27.dp)) }
+                        }
+                        Row(Modifier.fillMaxWidth().height(if (compactPlayer) 40.dp else 48.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                            PlayerActionButton(Icons.Default.Favorite.takeIf { effectiveLiked } ?: Icons.Default.FavoriteBorder, if (effectiveLiked) "å·²å–œæ¬¢" else "å–œæ¬¢", tint = if (effectiveLiked) Color(0xFFFF718B) else Color.White, compact = compactPlayer) {
+                                if (!likePending) {
+                                    val target = !effectiveLiked
+                                    selectedLike = target
+                                    likePending = true
+                                    vm.like(track, target) { success ->
+                                        likePending = false
+                                        selectedLike = target.takeIf { success }
+                                    }
+                                }
+                            }
+                            PlayerActionButton(Icons.AutoMirrored.Filled.PlaylistAdd, "åŠ æ­Œå•", compact = compactPlayer) { showPlaylistDialog = true }
+                            PlayerActionButton(Icons.Default.Tune, qualityShortLabel(activeQuality), tint = Green, compact = compactPlayer) { showQualityDialog = true }
+                            PlayerActionButton(playModeIcon(playMode), playModeName(playMode), tint = Green, compact = compactPlayer) { showModeDialog = true }
+                            PlayerActionButton(Icons.AutoMirrored.Filled.QueueMusic, "é˜Ÿåˆ—", compact = compactPlayer) { openQueue() }
+                        }
+                    }
+                }
+            }
+        }
+        IconButton(onBack, Modifier.align(Alignment.TopStart).padding(8.dp).background(Color.Black.copy(alpha = .35f), RoundedCornerShape(20.dp))) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "è¿”å›") }
+        if (!locked) IconButton({ locked = true }, Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = .35f), RoundedCornerShape(20.dp))) { Icon(Icons.Default.LockOpen, "é”å®šè§¦æ§") }
+        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            repeat(2) { page -> Box(Modifier.size(if (pager.currentPage == page) 7.dp else 5.dp).background(if (pager.currentPage == page) Green else Color.Gray, RoundedCornerShape(50))) }
+        }
+        if (locked) {
+            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures {} })
+            IconButton({ locked = false }, Modifier.align(Alignment.TopEnd).padding(8.dp).background(Surface, RoundedCornerShape(20.dp))) { Icon(Icons.Default.Lock, "è§£é™¤é”å®š", tint = Green) }
+        }
+    }
+    if (showPlaylistDialog) PlayerPlaylistDialog(track, playlists, vm) { showPlaylistDialog = false }
+    if (showQualityDialog) QualityDialog(track, quality, activeQuality, profile, profileLoaded, vm) { showQualityDialog = false }
+    if (showModeDialog) PlayModeDialog(playMode, vm) { showModeDialog = false }
+}
+
+@Composable private fun PlayerActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color = Color.White,
+    compact: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Column(
+        Modifier.widthIn(min = if (compact) 44.dp else 48.dp).height(if (compact) 40.dp else 48.dp).clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, label, Modifier.size(if (compact) 18.dp else 21.dp), tint = tint)
+        Text(label, color = Color.Gray, fontSize = if (compact) 8.sp else 9.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable private fun QualityDialog(
+    track: Track?,
+    selectedQuality: String,
+    activeQuality: String?,
+    profile: UserProfile?,
+    profileLoaded: Boolean,
+    vm: AppViewModel,
+    onDismiss: () -> Unit,
+) {
+    val options = qualityAvailability(track, profile)
+    val rights = when {
+        !profileLoaded -> "ä¼šå‘˜èµ„æ–™å°šæœªç¡®è®¤ï¼Œæ’­æ”¾æ—¶ä»ä¼šç”± QQ éŸ³ä¹éªŒè¯å®é™…æƒç›Š"
+        profile?.isVipActive() == true -> "${profile.vipName.ifBlank { "éŸ³ä¹ä¼šå‘˜" }} Â· æœ€ç»ˆä»¥æ­Œæ›² vkey è¿”å›ä¸ºå‡†"
+        else -> "ä¼šå‘˜éŸ³è´¨å¯é€‰æ‹©ï¼ŒQQ éŸ³ä¹ä¼šåœ¨æ’­æ”¾æ—¶éªŒè¯å®é™…æƒç›Š"
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (track == null) "é»˜è®¤éŸ³è´¨" else "é€‰æ‹©éŸ³è´¨", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(Modifier.heightIn(max = 292.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(rights, color = Color.Gray, fontSize = 12.sp)
+                options.forEach { option ->
+                    val spec = audioQualitySpec(option.id)
+                    val enabled = option.available
+                    Surface(
+                        onClick = { if (enabled) { vm.setQuality(option.id); onDismiss() } },
+                        enabled = enabled,
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (normalizeQualityId(selectedQuality) == option.id) Green.copy(alpha = .14f) else Surface,
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(normalizeQualityId(selectedQuality) == option.id, onClick = null, enabled = enabled)
+                            Column(Modifier.weight(1f)) {
+                                Text(option.label, color = if (enabled) Color.White else Color.Gray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    listOf(spec.format, option.reason).filter(String::isNotBlank).joinToString(" Â· "),
+                                    color = if (enabled) Color.Gray else Color(0xFFFFC857),
+                                    fontSize = 10.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            val status = when {
+                                activeQuality != null && activeQuality != QUALITY_LEGACY_UNKNOWN && normalizeQualityId(activeQuality) == option.id -> "æ­£åœ¨æ’­æ”¾"
+                                normalizeQualityId(selectedQuality) == option.id -> "é»˜è®¤"
+                                else -> ""
+                            }
+                            if (status.isNotBlank()) Text(status, color = Green, fontSize = 10.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("å…³é—­") } },
+    )
+}
+
+@Composable private fun PlayModeDialog(mode: String, vm: AppViewModel, onDismiss: () -> Unit) {
+    val modes = listOf("sequential", "loop_all", "repeat_one", "shuffle")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("æ’­æ”¾é¡ºåº") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                modes.forEach { value ->
+                    Surface(
+                        onClick = { vm.setPlayMode(value); onDismiss() },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (mode == value) Green.copy(alpha = .14f) else Surface,
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(playModeIcon(value), null, Modifier.size(20.dp), tint = if (mode == value) Green else Color.Gray)
+                            Spacer(Modifier.width(10.dp))
+                            Text(playModeName(value), Modifier.weight(1f), fontSize = 14.sp)
+                            RadioButton(mode == value, onClick = null)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("å…³é—­") } },
+    )
+}
+
+@Composable private fun PlayerPlaylistDialog(track: Track, playlists: List<MusicCollection>, vm: AppViewModel, onDismiss: () -> Unit) {
+    val candidates = playlists.filter { it.directoryId != "201" }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("åŠ å…¥å“ªä¸ªæ­Œå•ï¼Ÿ") },
+        text = {
+            if (candidates.isEmpty()) {
+                Text("æš‚æ— å¯ç¼–è¾‘æ­Œå•ï¼Œè¯·å…ˆåœ¨â€œæˆ‘çš„â€ä¸­åˆ›å»ºæ­Œå•ã€‚", color = Color.Gray)
+            } else {
+                LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    items(candidates, key = { "player:${it.directoryId}" }) { playlist ->
+                        Surface(
+                            onClick = { vm.addToPlaylist(track, playlist.directoryId); onDismiss() },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Surface,
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.size(19.dp), tint = Green)
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp)
+                                    if (playlist.trackCount >= 0) Text("${playlist.trackCount} é¦–", color = Color.Gray, fontSize = 11.sp)
+                                }
+                                Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = Color.Gray)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("å–æ¶ˆ") } },
+    )
+}
+
+@Composable private fun DetailScreen(detail: CollectionDetail?, editableDirectoryId: String?, loading: Boolean, error: String?, playlists: List<MusicCollection>, vm: AppViewModel, onBack: () -> Unit) = LazyColumn(Modifier.fillMaxSize().padding(horizontal = 14.dp)) {
+    item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "è¿”å›") }; Text(detail?.title ?: if (loading) "åŠ è½½ä¸­" else "æ­Œå•è¯¦æƒ…", Modifier.weight(1f), fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (detail != null) TextButton({ vm.cacheAll(detail.tracks, detail.title) }) { Text("å…¨éƒ¨ç¼“å­˜") } } }
+    if (loading) item { Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp) } }
+    if (!loading && error != null) item { Text(error, Modifier.fillMaxWidth().padding(16.dp), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) }
+    if (!loading && error == null && detail != null && detail.tracks.isEmpty()) item { Text("è¿™ä¸ªæ­Œå•æš‚æ—¶æ²¡æœ‰å¯æ˜¾ç¤ºçš„æ­Œæ›²", Modifier.fillMaxWidth().padding(16.dp), color = Color.Gray, textAlign = TextAlign.Center) }
+    items(detail?.tracks.orEmpty(), key = { it.id }) { TrackRow(it, vm, playlistId = editableDirectoryId, removeFromPlaylist = editableDirectoryId != null, queue = detail?.tracks.orEmpty(), playlists = playlists) }
+}
+
+@Composable private fun SettingsModule(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, open: () -> Unit) = Surface(
+    Modifier.fillMaxWidth().clickable(onClick = open), shape = RoundedCornerShape(16.dp), color = Surface,
+) { ListItem(
+    modifier = Modifier.heightIn(min = 60.dp),
+    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    headlineContent = { Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+    supportingContent = { Text(subtitle, color = Color.Gray, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+    leadingContent = { Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF252A28)) { Icon(icon, null, Modifier.padding(10.dp).size(21.dp), tint = Color.White) } },
+    trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(20.dp)) },
+) }
+
+@Composable private fun SettingsGroup(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) = Surface(
+    Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Surface,
+) {
+    Column {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            subtitle?.let { Text(it, color = Color.Gray, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+        }
+        HorizontalDivider(color = Color.White.copy(alpha = .06f))
+        content()
+    }
+}
+
+@Composable private fun SettingsSwitchRow(title: String, subtitle: String? = null, checked: Boolean, onCheckedChange: (Boolean) -> Unit) = Row(
+    Modifier.fillMaxWidth().heightIn(min = 46.dp).padding(horizontal = 12.dp, vertical = 3.dp),
+    verticalAlignment = Alignment.CenterVertically,
+) {
+    Column(Modifier.weight(1f).padding(end = 8.dp)) {
+        Text(title, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        subtitle?.let { Text(it, color = Color.Gray, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+    }
+    Switch(checked, onCheckedChange, modifier = Modifier.width(52.dp).height(32.dp))
+}
+
+@Composable private fun SettingsChoiceBlock(title: String, content: @Composable ColumnScope.() -> Unit) = Column(
+    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+) {
+    Text(title, color = Color.Gray, fontSize = 12.sp)
+    Spacer(Modifier.height(5.dp))
+    content()
+}
+
+@Composable private fun SettingsHeader(title: String, onBack: () -> Unit) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    IconButton(onBack, Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "è¿”å›") }; Spacer(Modifier.width(2.dp)); Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+@Composable private fun SettingsCenter(nav: NavHostController, onBack: () -> Unit) = LazyColumn(
+    Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(7.dp),
+) {
+    item { SettingsHeader("è®¾ç½®ä¸­å¿ƒ", onBack) }
+    item { SettingsModule("æ˜¾ç¤ºä¸ä¸»é¢˜", "ä¸»é¢˜ã€æ­Œè¯ã€å­—å·ä¸ç•Œé¢æ˜¾ç¤º", Icons.Default.Palette) { nav.navigate("settings/display") } }
+    item { SettingsModule("æ’­æ”¾ä¸ç¼“å­˜", "éŸ³è´¨ã€æ’­æ”¾æ¨¡å¼ã€è€³æœºä¸å®šæ—¶å…³é—­", Icons.Default.PlayCircle) { nav.navigate("settings/playback") } }
+    item { SettingsModule("å†…å®¹ä¸ç½‘ç»œ", "æ¯æ—¥æ¨èã€è´¦å·ã€è¯Šæ–­ä¸æ—¥å¿—", Icons.Default.Language) { nav.navigate("settings/network") } }
+    item { SettingsModule("å…³äº", "${BuildConfig.VERSION_NAME} Â· å¼€å‘è€… Ronan", Icons.Default.Info) { nav.navigate("settings/about") } }
+}
+
+@Composable private fun DisplaySettingsScreen(vm: AppViewModel, lyricSize: String, lyricOriginal: Boolean, lyricTranslation: Boolean, lyricOffset: Long, lyricAnimation: String, lyricAlignment: String, pureBlack: Boolean, lowPowerPlayer: Boolean, onBack: () -> Unit) = LazyColumn(
+    Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+) {
+    item { SettingsHeader("æ˜¾ç¤ºä¸ä¸»é¢˜", onBack) }
+    item { SettingsGroup("å±å¹•", "ä¸ºæ–¹å±æ‰‹è¡¨ä¿ç•™æ¸…æ™°åº¦å’Œç»­èˆªå¹³è¡¡") {
+        SettingsSwitchRow("AMOLED çº¯é»‘èƒŒæ™¯", "å‡å°‘æ¯å±æ’­æ”¾å™¨çš„è€—ç”µ", pureBlack, vm::setPureBlack)
+        SettingsSwitchRow("ä½åŠŸè€—æ’­æ”¾å™¨", "é™ä½è¿›åº¦åˆ·æ–°é¢‘ç‡å¹¶ç¼©å°å°é¢", lowPowerPlayer, vm::setLowPowerPlayer)
+    } }
+    item { SettingsGroup("æ­Œè¯", "å·¦æ»‘è¿›å…¥æ­Œè¯ï¼›ç‚¹å‡»ä»»æ„æœ‰æ—¶é—´è½´çš„å¥å­è·³è½¬") {
+        SettingsChoiceBlock("å¯¹é½æ–¹å¼") {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                listOf("left" to "é å·¦", "center" to "å±…ä¸­").forEachIndexed { index, (value, label) ->
+                    SegmentedButton(
+                        selected = lyricAlignment == value,
+                        onClick = { vm.setLyricAlignment(value) },
+                        shape = SegmentedButtonDefaults.itemShape(index, 2),
+                        icon = { Icon(if (value == "left") Icons.AutoMirrored.Filled.FormatAlignLeft else Icons.Default.FormatAlignCenter, null, Modifier.size(16.dp)) },
+                    ) { Text(label, fontSize = 12.sp) }
+                }
+            }
+        }
+        SettingsChoiceBlock("å­—å·") {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("small" to "å°", "normal" to "æ ‡å‡†", "large" to "å¤§").forEach { (value, label) -> FilterChip(lyricSize == value, { vm.setLyricSize(value) }, label = { Text(label, fontSize = 12.sp) }, modifier = Modifier.height(32.dp)) } }
+        }
+        SettingsSwitchRow("æ˜¾ç¤ºåŸæ–‡æ­Œè¯", checked = lyricOriginal, onCheckedChange = { if (it || lyricTranslation) vm.setLyricOriginal(it) })
+        SettingsSwitchRow("æ˜¾ç¤ºç¿»è¯‘æ­Œè¯", "æ²¡æœ‰ç¿»è¯‘æ—¶è‡ªåŠ¨éšè—", checked = lyricTranslation, onCheckedChange = { if (it || lyricOriginal) vm.setLyricTranslation(it) })
+        SettingsChoiceBlock("åŠ¨æ•ˆ") {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("off" to "å…³é—­", "soft" to "æŸ”å’Œ", "strong" to "æ˜æ˜¾").forEach { (value, label) -> FilterChip(lyricAnimation == value, { vm.setLyricAnimation(value) }, label = { Text(label, fontSize = 12.sp) }, modifier = Modifier.height(32.dp)) } }
+        }
+        SettingsChoiceBlock("æ—¶é—´åç§» ${if (lyricOffset >= 0) "+" else ""}${lyricOffset}ms") {
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) { TextButton({ vm.setLyricOffset(lyricOffset - 500) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("-0.5ç§’", fontSize = 12.sp) }; TextButton({ vm.setLyricOffset(0) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("å½’é›¶", fontSize = 12.sp) }; TextButton({ vm.setLyricOffset(lyricOffset + 500) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("+0.5ç§’", fontSize = 12.sp) } }
+        }
+    } }
+}
+
+@Composable private fun PlaybackSettingsScreen(vm: AppViewModel, quality: String, profile: UserProfile?, profileLoaded: Boolean, headphoneWarning: Boolean, autoOpenPlayer: Boolean, playMode: String, sleepRemaining: Long, wifiOnlyDownload: Boolean, lastSleepMinutes: Int?, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var customTimer by remember { mutableStateOf(false) }; var customMinutes by remember { mutableStateOf("") }; var finishCurrent by remember { mutableStateOf(false) }; var showQualityDialog by remember { mutableStateOf(false) }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        item { SettingsHeader("æ’­æ”¾ä¸ç¼“å­˜", onBack) }
+        item { SettingsGroup("éŸ³è´¨", "ä¸è´¦å·æƒç›Šå’Œæ­Œæ›²å¯ç”¨èµ„æºåŒæ­¥") {
+            Row(
+                Modifier.fillMaxWidth().clickable { showQualityDialog = true }.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Tune, null, Modifier.size(20.dp), tint = Green)
+                Spacer(Modifier.width(9.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("é»˜è®¤éŸ³è´¨", fontSize = 14.sp)
+                    Text(qualityLabel(quality), color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Icon(Icons.Default.ChevronRight, null, Modifier.size(19.dp), tint = Color.Gray)
+            }
+            Text(
+                when {
+                    !profileLoaded -> "ä¼šå‘˜èµ„æ–™æœªçŸ¥æ—¶ä¸ä¼šæ‹¦æˆªæ’­æ”¾ï¼Œç”± QQ éŸ³ä¹æŒ‰æ­Œæ›²éªŒè¯"
+                    profile?.isVipActive() == true -> "${profile.vipName.ifBlank { "éŸ³ä¹ä¼šå‘˜" }} Â· å®é™…éŸ³è´¨ä»¥ vkey è¿”å›ä¸ºå‡†"
+                    else -> "HQ ä¸ SQ å¯èƒ½éœ€è¦éŸ³ä¹ä¼šå‘˜ï¼Œé€‰æ‹©åç”± QQ éŸ³ä¹éªŒè¯"
+                },
+                color = Color.Gray,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(start = 41.dp, end = 12.dp, bottom = 8.dp),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } }
+        item { SettingsGroup("æ’­æ”¾", "æ‰‹è¡¨æŒ‰é”®å’Œè€³æœºæ–­å¼€è¡Œä¸º") {
+            SettingsSwitchRow("æ— è€³æœºæ’­æ”¾æé†’", "æœªè¿æ¥è€³æœºæ—¶æ’­æ”¾å‰ç¡®è®¤", headphoneWarning, vm::setHeadphoneWarning)
+            SettingsSwitchRow("è‡ªåŠ¨è¿›å…¥æ’­æ”¾å™¨", "ç‚¹æ­Œåç›´æ¥æ‰“å¼€æ’­æ”¾å™¨é¡µé¢", autoOpenPlayer, vm::setAutoOpenPlayer)
+            SettingsChoiceBlock("æ’­æ”¾é¡ºåº") { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Icon(playModeIcon(playMode), null, tint = Green, modifier = Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text(playModeName(playMode), Modifier.weight(1f), fontSize = 14.sp); TextButton({ vm.setPlayMode(nextPlayMode(playMode)) }, contentPadding = PaddingValues(horizontal = 5.dp)) { Text("åˆ‡æ¢", fontSize = 12.sp) } } }
+        } }
+        item { SettingsGroup("å®šæ—¶å…³é—­", "æ’­æ”¾ä¸€æ®µæ—¶é—´åè‡ªåŠ¨åœæ­¢") {
+            if (sleepRemaining > 0) SettingsChoiceBlock("å‰©ä½™ ${sleepRemaining / 60}:${(sleepRemaining % 60).toString().padStart(2, '0')}") { Text("è®¡æ—¶å™¨è¿è¡Œä¸­", color = Green, fontSize = 12.sp) }
+            SettingsChoiceBlock("å¸¸ç”¨æ—¶é•¿") { FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) { (listOfNotNull(lastSleepMinutes) + listOf(15, 30, 60)).distinct().take(4).forEach { minutes -> FilterChip(false, { vm.startSleepTimer(minutes, finishCurrent) }, label = { Text(if (minutes == lastSleepMinutes) "ä¸Šæ¬¡${minutes}åˆ†" else "${minutes}åˆ†", fontSize = 12.sp) }, modifier = Modifier.height(32.dp)) } } }
+            SettingsSwitchRow("æ’­å®Œå½“å‰æ­Œæ›²å†å…³é—­", checked = finishCurrent, onCheckedChange = { finishCurrent = it })
+            Row(Modifier.padding(horizontal = 13.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) { TextButton({ customTimer = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("è‡ªå®šä¹‰", fontSize = 12.sp) }; if (sleepRemaining > 0) TextButton(vm::cancelSleepTimer, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("å–æ¶ˆ", fontSize = 12.sp) } }
+        } }
+        item { SettingsGroup("è®¾å¤‡ä¸ä¸‹è½½", "è“ç‰™è¿æ¥äº¤ç»™ Android ç³»ç»Ÿç®¡ç†") {
+            SettingsSwitchRow("ä»… Wi-Fi ä¸‹è½½", "å…³é—­åå…è®¸ç§»åŠ¨ç½‘ç»œç¼“å­˜", wifiOnlyDownload, vm::setWifiOnlyDownload)
+            OutlinedButton({ context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }, Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 7.dp)) { Icon(Icons.Default.Bluetooth, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text("æ‰“å¼€è“ç‰™è®¾ç½®", fontSize = 13.sp) }
+        } }
+    }
+    if (showQualityDialog) QualityDialog(null, quality, null, profile, profileLoaded, vm) { showQualityDialog = false }
+    if (customTimer) AlertDialog(onDismissRequest = { customTimer = false }, title = { Text("è‡ªå®šä¹‰æ’­æ”¾æ—¶é—´") }, text = { OutlinedTextField(customMinutes, { customMinutes = it.filter(Char::isDigit).take(4) }, label = { Text("åˆ†é’Ÿï¼ˆ1-1440ï¼‰") }, singleLine = true) }, confirmButton = { TextButton({ customMinutes.toIntOrNull()?.coerceIn(1, 1440)?.let { vm.startSleepTimer(it, finishCurrent) }; customTimer = false }) { Text("å¼€å§‹") } }, dismissButton = { TextButton({ customTimer = false }) { Text("å–æ¶ˆ") } })
+}
+
+@Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, state: AppUiState, onAnnouncements: () -> Unit, onRelogin: () -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var confirmUpload by remember { mutableStateOf(false) }
+    val saveLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> uri?.let { runCatching { AppLog.copyTo(context, it) } } }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        item { SettingsHeader("å†…å®¹ä¸ç½‘ç»œ", onBack) }
+        item { SettingsGroup("æ¨è", "æ§åˆ¶é¦–é¡µæ¯æ—¥æ¨èçš„å¯†åº¦") {
+            SettingsChoiceBlock("æ¯æ—¥æ¨èæ˜¾ç¤ºæ•°é‡") { Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { FilterChip(dailyCount == 5, { vm.setDailyCount(5) }, label = { Text("5 é¦–", fontSize = 12.sp) }, modifier = Modifier.height(32.dp)); FilterChip(dailyCount == 10, { vm.setDailyCount(10) }, label = { Text("10 é¦–", fontSize = 12.sp) }, modifier = Modifier.height(32.dp)) } }
+        } }
+        if (vm.signedIn) item { SettingsGroup("è´¦å·ä¸æƒç›Š", "ç™»å½•æ–¹å¼ã€ä¼šå‘˜çŠ¶æ€å’Œæ­Œå•åŒæ­¥") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                AccountAvatar(state.profile?.avatarUrl, vm.loginProvider, vm.accountId, 44.dp)
+                Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) {
+                    Text(state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}éŸ³ä¹ç”¨æˆ·", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(accountLabel(vm.loginProvider, vm.accountId), color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(vipSummary(state.profile, state.profileLoaded, state.profileError), color = if (state.profile?.isVipActive() == true) Color(0xFFFFC857) else Color.Gray, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(vm::refreshMembership, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp), enabled = !state.profileLoaded || state.profileError != null || state.profile != null) { Icon(Icons.Default.VerifiedUser, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("åˆ·æ–°èµ„æ–™", fontSize = 11.sp, maxLines = 1) }
+                OutlinedButton(onRelogin, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp)) { Icon(Icons.AutoMirrored.Filled.Login, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("é‡æ–°ç™»å½•", fontSize = 11.sp, maxLines = 1) }
+            }
+        } }
+        state.diagnostic?.let { item { Text(it, color = if (it.startsWith("è¯Šæ–­å¤±è´¥")) MaterialTheme.colorScheme.error else Green, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 4.dp)) } }
+        item { SettingsGroup("æœåŠ¡ä¸å…¬å‘Š", "è¿œç¨‹é…ç½®ä¸å¯ç”¨æ—¶ç»§ç»­ä½¿ç”¨æœ¬åœ°éŸ³ä¹åŠŸèƒ½") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (state.controlError == null) Icons.Default.CloudDone else Icons.Default.CloudOff, null, tint = if (state.controlError == null) Green else Color.Gray, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) {
+                    Text(when { state.controlError != null -> "æ­£åœ¨ä½¿ç”¨æœ¬åœ°é…ç½®"; state.controlFetchedAt > 0 -> "æœåŠ¡é…ç½®å·²åŒæ­¥"; else -> "æœåŠ¡å°šæœªåŒæ­¥" }, fontSize = 14.sp)
+                    Text(state.controlError?.take(100) ?: state.controlFetchedAt.takeIf { it > 0 }?.let { "ä¸Šæ¬¡åŒæ­¥ ${android.text.format.DateFormat.format("MM-dd HH:mm", it)}" } ?: "å°šæœªåŒæ­¥", color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton({ vm.refreshControlPlane() }, enabled = !state.controlRefreshing, modifier = Modifier.size(38.dp)) { if (state.controlRefreshing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Default.Refresh, "åˆ·æ–°", modifier = Modifier.size(19.dp)) }
+            }
+            Row(Modifier.fillMaxWidth().clickable(onClick = onAnnouncements).padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Campaign, null, tint = Green, modifier = Modifier.size(21.dp)); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("å…¬å‘Š", fontSize = 14.sp); Text("${state.announcements.size} æ¡å¯ç”¨å…¬å‘Š", color = Color.Gray, fontSize = 11.sp) }; Icon(Icons.Default.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(19.dp))
+            }
+        } }
+        item { SettingsGroup("è¯Šæ–­ä¸æ—¥å¿—", "æ—¥å¿—ä¼šè„±æ•ï¼Œä¸è®°å½• Cookieã€ä»¤ç‰Œæˆ–æ’­æ”¾ URL") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(vm::diagnose, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp)) { Icon(Icons.Default.HealthAndSafety, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("å®Œæ•´è¯Šæ–­", fontSize = 11.sp, maxLines = 1) }
+                OutlinedButton({ confirmUpload = true }, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp), enabled = state.diagnosticUploadState !is DiagnosticUploadState.Uploading && vm.featureEnabled("diagnostics")) { Icon(Icons.Default.BugReport, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(if (state.diagnosticUploadState is DiagnosticUploadState.Uploading) "æ­£åœ¨æäº¤" else "æäº¤è¯Šæ–­", fontSize = 11.sp, maxLines = 1) }
+            }
+            when (val upload = state.diagnosticUploadState) {
+                is DiagnosticUploadState.Success -> Text("è¯Šæ–­å·²æäº¤${upload.requestId.takeIf(String::isNotBlank)?.let { " Â· $it" }.orEmpty()}", color = Green, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 4.dp))
+                is DiagnosticUploadState.Error -> Text(upload.message, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 4.dp))
+                else -> Unit
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                OutlinedButton({ context.startActivity(Intent.createChooser(AppLog.shareIntent(context), "åˆ†äº«æ—¥å¿—")) }, Modifier.weight(1f)) { Icon(Icons.Default.Share, null, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text("åˆ†äº«", fontSize = 12.sp) }
+                OutlinedButton({ saveLog.launch("QMusicWatch-${BuildConfig.VERSION_NAME}.log") }, Modifier.weight(1f)) { Icon(Icons.Default.Save, null, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text("ä¿å­˜", fontSize = 12.sp) }
+                TextButton(AppLog::clear, Modifier.weight(1f)) { Text("æ¸…ç©º", fontSize = 12.sp) }
+            }
+        } }
+        if (vm.signedIn) item { OutlinedButton(vm::logout, Modifier.fillMaxWidth()) { Text("é€€å‡ºç™»å½•", fontSize = 13.sp) } }
+    }
+    if (confirmUpload) AlertDialog(
+        onDismissRequest = { confirmUpload = false },
+        title = { Text("æäº¤è¯Šæ–­ï¼Ÿ") },
+        text = { Text("ä»…ä¸Šä¼ ç‰ˆæœ¬ã€è®¾å¤‡å‹å·å’Œç»è¿‡äºŒæ¬¡è„±æ•çš„æ—¥å¿—ç‰‡æ®µï¼Œä¸åŒ…å«è´¦å·ã€Cookieã€äºŒç»´ç ã€æœç´¢è¯æˆ–æ’­æ”¾åœ°å€ã€‚") },
+        confirmButton = { TextButton({ confirmUpload = false; vm.submitDiagnostics() }) { Text("æäº¤") } },
+        dismissButton = { TextButton({ confirmUpload = false }) { Text("å–æ¶ˆ") } },
+    )
+}
+
+@Composable private fun AnnouncementsScreen(items: List<ControlAnnouncement>, seen: Set<String>, vm: AppViewModel, onBack: () -> Unit) {
+    LaunchedEffect(items.map(ControlAnnouncement::id)) { items.forEach { vm.markAnnouncementSeen(it.id) } }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 14.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        item { SettingsHeader("å…¬å‘Š", onBack) }
+        if (items.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("æš‚æ— å…¬å‘Š", color = Color.Gray) } }
+        items(items, key = ControlAnnouncement::id) { announcement ->
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Surface) {
+                Column(Modifier.padding(12.dp, 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) { Text(announcement.title.take(80), Modifier.weight(1f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (announcement.pinned) Icon(Icons.Default.PushPin, "ç½®é¡¶", Modifier.size(16.dp), tint = Green) }
+                    Text(announcement.content.take(2000), color = Color.LightGray, fontSize = 14.sp)
+                    if (announcement.id !in seen) Text("æ–°å…¬å‘Š", color = Green, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable private fun AboutScreen(
+    vm: AppViewModel,
+    update: UpdateUiState,
+    onDownloadUpdate: (ControlUpdate) -> Unit,
+    onInstallUpdate: (UpdateUiState.Ready) -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    var externalError by rememberSaveable { mutableStateOf<String?>(null) }
+    val openExternal: (Intent, String) -> Unit = { intent, failureMessage ->
+        runCatching { context.startActivity(intent) }
+            .onSuccess { externalError = null }
+            .onFailure { error -> AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}"); externalError = failureMessage }
+    }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+    item { SettingsHeader("å…³äº", onBack) }
+    item { ListItem(headlineContent = { Text("QMusic Watch") }, supportingContent = { Text("ç‰ˆæœ¬ ${BuildConfig.VERSION_NAME}\nç¬¬ä¸‰æ–¹éå®˜æ–¹ã€å¼€æºã€éå•†ä¸šå®¢æˆ·ç«¯") }) }
+    item { ListItem(headlineContent = { Text("å¼€å‘è€…") }, supportingContent = { Text("Ronan") }, leadingContent = { Icon(Icons.Default.Code, null, tint = Green) }) }
+    when (update) {
+        UpdateUiState.Idle -> item { OutlinedButton(vm::checkForUpdate, Modifier.fillMaxWidth()) { Icon(Icons.Default.SystemUpdate, null); Spacer(Modifier.width(7.dp)); Text("æ£€æŸ¥æœåŠ¡å™¨æ›´æ–°") } }
+        UpdateUiState.Checking -> item { OutlinedButton({}, Modifier.fillMaxWidth(), enabled = false) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("æ­£åœ¨æ£€æŸ¥") } }
+        UpdateUiState.NoUpdate -> { item { ListItem(headlineContent = { Text("å½“å‰å·²æ˜¯æœ€æ–°ç‰ˆæœ¬") }, leadingContent = { Icon(Icons.Default.Verified, null, tint = Green) }) }; item { TextButton(vm::checkForUpdate, Modifier.fillMaxWidth()) { Text("é‡æ–°æ£€æŸ¥") } } }
+        is UpdateUiState.Available -> {
+            item { ListItem(headlineContent = { Text("å‘ç° ${update.release.versionName}${if (update.release.forceUpdate) " Â· é‡è¦æ›´æ–°" else ""}") }, supportingContent = { Text("${update.release.title}\n${update.release.changelog.take(400)}\n${formatFileSize(update.release.apk.sizeBytes)}") }, leadingContent = { Icon(Icons.Default.NewReleases, null, tint = Green) }) }
+            item { Button({ onDownloadUpdate(update.release) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(6.dp)); Text("ä¸‹è½½å¹¶å®‰è£…") } }
+        }
+        is UpdateUiState.Downloading -> { item { Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text("æ­£åœ¨ä¸‹è½½ ${formatFileSize(update.downloadedBytes)} / ${formatFileSize(update.totalBytes)}"); LinearProgressIndicator(progress = { if (update.totalBytes > 0) update.downloadedBytes.toFloat() / update.totalBytes else 0f }, modifier = Modifier.fillMaxWidth()) } } }
+        is UpdateUiState.Verifying -> item { Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("æ­£åœ¨æ ¡éªŒå®‰è£…åŒ…") } }
+        is UpdateUiState.Ready -> {
+            item { ListItem(headlineContent = { Text("å®‰è£…åŒ…æ ¡éªŒé€šè¿‡") }, supportingContent = { Text("${update.release.versionName} Â· ç­¾åã€åŒ…åå’Œå“ˆå¸Œå‡ä¸€è‡´") }, leadingContent = { Icon(Icons.Default.Verified, null, tint = Green) }) }
+            item { Button({ onInstallUpdate(update) }, Modifier.fillMaxWidth()) { Icon(Icons.Default.InstallMobile, null); Spacer(Modifier.width(6.dp)); Text("æ‰“å¼€ç³»ç»Ÿå®‰è£…å™¨") } }
+        }
+        is UpdateUiState.Error -> {
+            item { Text(update.message, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
+            item { OutlinedButton({ update.release?.let(onDownloadUpdate) ?: vm.checkForUpdate() }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("é‡è¯•") } }
+        }
+    }
+    externalError?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) } }
+    item { TextButton({ openExternal(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/huanghao897/QMusicWatch/releases")), "ç³»ç»Ÿæ²¡æœ‰å¯ç”¨çš„æµè§ˆå™¨") }, Modifier.fillMaxWidth()) { Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(6.dp)); Text("æ‰‹åŠ¨æ‰“å¼€ GitHub å‘å¸ƒé¡µ") } }
+    item { Text("æœ¬é¡¹ç›®ä¸è…¾è®¯æˆ– QQ éŸ³ä¹æ— éš¶å±ã€èµåŠ©æˆ–è®¤å¯å…³ç³»ã€‚ä¸ç»•è¿‡ä¼šå‘˜ã€åœ°åŒºã€ä»˜è´¹æˆ– DRM é™åˆ¶ã€‚", color = Color.Gray) }
+    item { Text("å¼€æºä¸è‡´è°¢", fontWeight = FontWeight.Bold); Text("QQMusicApiï¼ˆGPL-3.0ï¼Œæœªå¤åˆ¶ä»£ç ï¼‰\nQQmusic-APIï¼ˆApache-2.0ï¼Œåè®®å®ç°å‚è€ƒï¼‰\nLX Music / Harmonyï¼ˆéŸ³è´¨æ˜ å°„ç ”ç©¶ï¼Œæœªå¤åˆ¶ä»£ç ï¼‰\nTides-WearOSï¼ˆGPL-3.0ï¼Œæœªå¤åˆ¶ä»£ç ï¼‰\nHorologistï¼ˆApache-2.0ï¼‰\nHeyWearï¼ˆMITï¼‰", color = Color.Gray, fontSize = 14.sp) }
+    }
+}
+
+private fun formatFileSize(bytes: Long): String = when {
+    bytes <= 0 -> "å¤§å°æœªçŸ¥"
+    bytes >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1024f / 1024f)
+    else -> "${bytes / 1024} KB"
+}
+
+@Composable private fun TrackRow(track: Track, vm: AppViewModel, liked: Boolean = false, playlistId: String? = null, removeFromPlaylist: Boolean = false, queue: List<Track> = listOf(track), playlists: List<MusicCollection> = emptyList()) {
+    var menu by remember { mutableStateOf(false) }
+    var choosePlaylist by remember { mutableStateOf(false) }
+    var selectedLike by remember(track.id) { mutableStateOf<Boolean?>(null) }
+    var likePending by remember(track.id) { mutableStateOf(false) }
+    val effectiveLiked = selectedLike ?: liked
+    ListItem(modifier = Modifier.clickable { vm.requestPlay(track, sourceQueue = queue) }, headlineContent = { Row(verticalAlignment = Alignment.CenterVertically) { Text(track.title, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis); if (track.requiresVip) { Spacer(Modifier.width(5.dp)); Text("VIP", color = Color(0xFFFFC857), fontSize = 11.sp, fontWeight = FontWeight.Bold) } } }, supportingContent = { Text(track.artists.joinToString(" / "), maxLines = 1) },
+        leadingContent = { AsyncImage(safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null }, null, Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)).background(Color.DarkGray)) },
+        trailingContent = { Row { IconButton({ vm.cache(track) }, Modifier.size(38.dp)) { Icon(Icons.Default.Download, null, Modifier.size(21.dp)) }; IconButton({
+            if (!likePending) {
+                val target = !effectiveLiked
+                selectedLike = target
+                likePending = true
+                vm.like(track, target) { success ->
+                    likePending = false
+                    selectedLike = target.takeIf { success }
+                }
+            }
+        }, Modifier.size(38.dp)) { Icon(if (effectiveLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, Modifier.size(21.dp), tint = if (effectiveLiked) Green else LocalContentColor.current) }; Box { IconButton({ menu = true }, Modifier.size(38.dp)) { Icon(Icons.Default.MoreVert, "æ›´å¤š", Modifier.size(21.dp)) }; DropdownMenu(menu, { menu = false }) { DropdownMenuItem({ Text("ä¸‹ä¸€é¦–æ’­æ”¾") }, { vm.enqueueNext(track); menu = false }); DropdownMenuItem({ Text("æ·»åŠ åˆ°æ’­æ”¾åˆ—è¡¨") }, { vm.addToQueue(track); menu = false }); if (playlists.isNotEmpty()) DropdownMenuItem({ Text("åŠ å…¥æˆ‘çš„æ­Œå•") }, { menu = false; choosePlaylist = true }); if (removeFromPlaylist && playlistId != null) DropdownMenuItem({ Text("ä»æ­¤æ­Œå•ç§»é™¤") }, { vm.removeFromPlaylist(track, playlistId); menu = false }) } } } })
+    if (choosePlaylist) AlertDialog(onDismissRequest = { choosePlaylist = false }, title = { Text("åŠ å…¥å“ªä¸ªæ­Œå•ï¼Ÿ") }, text = { LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) { items(playlists.filter { it.owned != false && it.directoryId != "201" }, key = { it.directoryId }) { playlist -> Surface(Modifier.fillMaxWidth().clickable { vm.addToPlaylist(track, playlist.directoryId); choosePlaylist = false }, shape = RoundedCornerShape(14.dp), color = Surface) { Column(Modifier.padding(12.dp, 9.dp)) { Text(playlist.title, maxLines = 1); Text(if (playlist.trackCount >= 0) "${playlist.trackCount} é¦–" else "æˆ‘çš„æ­Œå•", color = Color.Gray, fontSize = 12.sp) } } } } }, confirmButton = {}, dismissButton = { TextButton({ choosePlaylist = false }) { Text("å–æ¶ˆ") } })
+}
+
+@Composable private fun QueueScreen(queue: List<Track>, currentIndex: Int, reversed: Boolean, state: AppUiState, vm: AppViewModel, onBack: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    var saveDialog by remember { mutableStateOf(false) }
+    var importDialog by remember { mutableStateOf(false) }
+    var playlistTitle by remember { mutableStateOf("") }
+    var workingQueue by remember { mutableStateOf(queue) }
+    var draggingTrackId by remember { mutableStateOf<String?>(null) }
+    val selectedIds = remember { mutableStateListOf<String>() }
+    val library = state.library
+    LaunchedEffect(state.queueImportTitle) { selectedIds.clear() }
+    LaunchedEffect(queue, draggingTrackId) { if (draggingTrackId == null) workingQueue = queue }
+    val listState = rememberLazyListState()
+    val haptics = LocalHapticFeedback.current
+    val view = LocalView.current
+    val edgePx = with(androidx.compose.ui.platform.LocalDensity.current) { 72.dp.toPx() }
+    val currentTrackId = state.currentTrack?.id ?: queue.getOrNull(currentIndex)?.id
+    val shown = remember(workingQueue, query) { workingQueue.withIndex().filter { query.isBlank() || it.value.title.contains(query, true) || it.value.artists.any { artist -> artist.contains(query, true) } } }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), state = listState, contentPadding = PaddingValues(bottom = 18.dp)) {
+        item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "è¿”å›") }; Text("å½“å‰æ’­æ”¾åˆ—è¡¨", Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.Bold); TextButton(vm::reverseQueue) { Icon(if (reversed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null); Text(if (reversed) "å€’åº" else "æ­£åº") } } }
+        item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().height(48.dp), singleLine = true, shape = RoundedCornerShape(19.dp), colors = watchSearchColors(), placeholder = { Text("ç­›é€‰æ’­æ”¾åˆ—è¡¨", fontSize = 13.sp, color = Color.Gray) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp), leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFFB6BFBA), modifier = Modifier.size(19.dp)) }) }
+        item { FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalArrangement = Arrangement.spacedBy(0.dp)) { TextButton({ vm.cacheAll(queue, "å½“å‰æ’­æ”¾åˆ—è¡¨") }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Text("ç¼“å­˜", fontSize = 13.sp) }; TextButton({ vm.clearQueueImport(); importDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.Default.LibraryAdd, null, Modifier.size(18.dp)); Text("é€‰æ­Œæ·»åŠ ", fontSize = 13.sp) }; TextButton({ saveDialog = true }, contentPadding = PaddingValues(horizontal = 7.dp)) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, Modifier.size(18.dp)); Text("ä¿å­˜", fontSize = 13.sp) }; TextButton(vm::removeQueueDuplicates, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("å»é‡", fontSize = 13.sp) }; TextButton(vm::clearQueue, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("æ¸…ç©º", fontSize = 13.sp) } } }
+        item { Text("${workingQueue.size} é¦–", color = Color.Gray) }
+        if (workingQueue.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("æ’­æ”¾åˆ—è¡¨ä¸ºç©º", color = Color.Gray) } }
+        itemsIndexed(shown, key = { _, item -> item.value.id }) { _, indexed ->
+            val index = indexed.index; val track = indexed.value
+            var dragged by remember(track.id) { mutableFloatStateOf(0f) }
+            val dragging = draggingTrackId == track.id
+            var rowHeightPx by remember(track.id) { mutableIntStateOf(1) }
+            var handleTopInWindow by remember(track.id) { mutableFloatStateOf(0f) }
+            var edgeScrollDirection by remember(track.id) { mutableIntStateOf(0) }
+            var dragIndex by remember(track.id) { mutableIntStateOf(index) }
+            var dragStartIndex by remember(track.id) { mutableIntStateOf(index) }
+            val reorderByOffset: () -> Unit = {
+                if (query.isBlank() && rowHeightPx > 1) {
+                    var keepMoving = true
+                    while (keepMoving) {
+                        val step = queueReorderStep(dragged, rowHeightPx)
+                        val target = (dragIndex + step).coerceIn(workingQueue.indices)
+                        if (step == 0 || target == dragIndex) keepMoving = false else {
+                            workingQueue = moveQueuePreview(workingQueue, dragIndex, target)
+                            dragIndex = target
+                            dragged -= step * rowHeightPx
+                        }
+                    }
+                }
+            }
+            LaunchedEffect(dragging, edgeScrollDirection, rowHeightPx) {
+                while (dragging && edgeScrollDirection != 0) {
+                    val consumed = listState.scrollBy(edgeScrollDirection * rowHeightPx * .12f)
+                    dragged += consumed
+                    reorderByOffset()
+                    if (consumed == 0f) edgeScrollDirection = 0
+                    delay(16)
+                }
+            }
+            val handleModifier = Modifier.size(44.dp).padding(9.dp).onGloballyPositioned { handleTopInWindow = it.positionInWindow().y }.then(
+                if (query.isBlank()) Modifier.pointerInput(track.id, rowHeightPx, view.height) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); workingQueue = queue; dragIndex = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0); dragStartIndex = dragIndex; draggingTrackId = track.id; dragged = 0f },
+                        onDragCancel = { edgeScrollDirection = 0; workingQueue = queue; draggingTrackId = null; dragged = 0f },
+                        onDragEnd = { if (dragIndex != dragStartIndex) haptics.performHapticFeedback(HapticFeedbackType.LongPress); edgeScrollDirection = 0; vm.replaceQueueOrder(workingQueue); draggingTrackId = null; dragged = 0f },
+                    ) { change, amount ->
+                        change.consume(); dragged += amount.y; reorderByOffset()
+                        edgeScrollDirection = queueEdgeScrollDirection(handleTopInWindow + change.position.y, view.height, edgePx)
+                    }
+                } else Modifier.alpha(.28f)
+            )
+            Surface(
+                modifier = Modifier.padding(vertical = 3.dp).animateItem(
+                    fadeInSpec = androidx.compose.animation.core.tween(180),
+                    placementSpec = if (dragging) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
+                    fadeOutSpec = androidx.compose.animation.core.tween(160),
+                ).zIndex(if (dragging) 2f else 0f).graphicsLayer {
+                    translationY = dragged; scaleX = if (dragging) 1.025f else 1f; scaleY = if (dragging) 1.025f else 1f
+                    shadowElevation = if (dragging) 12.dp.toPx() else 0f
+                }.onSizeChanged { rowHeightPx = it.height },
+                shape = RoundedCornerShape(18.dp), color = if (track.id == currentTrackId) Color(0xFF15261D) else Surface,
+            ) {
+                Row(Modifier.fillMaxWidth().clickable { vm.playQueueItem(queue.indexOfFirst { it.id == track.id }) }.padding(start = 11.dp, end = 3.dp, top = 7.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) { if (track.id == currentTrackId) Icon(Icons.Default.GraphicEq, null, tint = Green, modifier = Modifier.size(21.dp)) else Text("${index + 1}", color = Color.Gray, fontSize = 13.sp) }
+                    Spacer(Modifier.width(7.dp)); Column(Modifier.weight(1f)) { Text(track.title, color = if (track.id == currentTrackId) Green else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp); Text(track.artists.joinToString(" / "), color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp) }
+                    Icon(Icons.Default.DragHandle, if (query.isBlank()) "é•¿æŒ‰æ‹–åŠ¨æ’åº" else "ç­›é€‰æ—¶ä¸å¯æ’åº", handleModifier)
+                    IconButton({ vm.removeFromQueue(queue.indexOfFirst { it.id == track.id }) }, Modifier.size(44.dp)) { Icon(Icons.Default.RemoveCircleOutline, "ç§»é™¤", Modifier.size(21.dp)) }
+                }
+            }
+        }
+    }
+    if (saveDialog) AlertDialog(onDismissRequest = { saveDialog = false }, title = { Text("ä¿å­˜ä¸ºæˆ‘çš„æ­Œå•") }, text = { OutlinedTextField(playlistTitle, { playlistTitle = it.take(50) }, label = { Text("æ­Œå•åç§°") }, singleLine = true) }, confirmButton = { TextButton({ if (playlistTitle.isNotBlank()) vm.saveQueueAsPlaylist(playlistTitle); saveDialog = false }) { Text("ä¿å­˜") } }, dismissButton = { TextButton({ saveDialog = false }) { Text("å–æ¶ˆ") } })
+    if (importDialog) AlertDialog(
+        onDismissRequest = { importDialog = false; vm.clearQueueImport() },
+        title = { Text(state.queueImportTitle.ifBlank { "é€‰æ‹©æ­Œæ›²æ¥æº" }) },
+        text = {
+            when {
+                state.queueImportTitle.isBlank() -> LazyColumn(Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    item { Surface(Modifier.fillMaxWidth().clickable { vm.loadQueueImportLiked() }, shape = RoundedCornerShape(14.dp), color = Surface) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Favorite, null, tint = Green); Spacer(Modifier.width(9.dp)); Column { Text("æˆ‘å–œæ¬¢"); Text("${library?.liked?.size ?: 0} é¦–", color = Color.Gray, fontSize = 13.sp) } } } }
+                    items(library?.playlists.orEmpty(), key = { "${it.directoryId}:${it.id}" }) { playlist -> Surface(Modifier.fillMaxWidth().clickable { vm.loadQueueImportPlaylist(playlist) }, shape = RoundedCornerShape(14.dp), color = Surface) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = Green); Spacer(Modifier.width(9.dp)); Column { Text(playlist.title, maxLines = 1); Text(if (playlist.trackCount >= 0) "${playlist.trackCount} é¦–" else "ç‚¹å‡»è¯»å–", color = Color.Gray, fontSize = 13.sp) } } } } }
+                state.queueImportLoading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                else -> Column {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("å·²é€‰ ${selectedIds.size} é¦–", Modifier.weight(1f), color = Green); TextButton({ if (selectedIds.size == state.queueImportTracks.size) selectedIds.clear() else { selectedIds.clear(); selectedIds.addAll(state.queueImportTracks.map(Track::id)) } }) { Text(if (selectedIds.size == state.queueImportTracks.size) "å–æ¶ˆå…¨é€‰" else "å…¨é€‰") } }
+                    LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        items(state.queueImportTracks, key = { it.id }) { track ->
+                            val selected = track.id in selectedIds
+                            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { if (selected) selectedIds.remove(track.id) else selectedIds.add(track.id) }.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { Checkbox(selected, { checked -> if (checked) selectedIds.add(track.id) else selectedIds.remove(track.id) }, Modifier.size(38.dp)); Column(Modifier.weight(1f)) { Text(track.title, maxLines = 1, fontSize = 15.sp); Text(track.artists.joinToString(" / "), maxLines = 1, color = Color.Gray, fontSize = 12.sp) } }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { if (state.queueImportTitle.isNotBlank() && !state.queueImportLoading) TextButton({ vm.addSelectedQueueTracks(selectedIds.toSet()); importDialog = false }, enabled = selectedIds.isNotEmpty()) { Text("æ·»åŠ  ${selectedIds.size} é¦–") } },
+        dismissButton = { TextButton({ if (state.queueImportTitle.isBlank()) { importDialog = false; vm.clearQueueImport() } else vm.clearQueueImport() }) { Text(if (state.queueImportTitle.isBlank()) "å–æ¶ˆ" else "è¿”å›") } },
+    )
+}
+
+@Composable private fun CollectionRow(value: MusicCollection, open: () -> Unit = {}) = ListItem(modifier = Modifier.clickable(onClick = open), headlineContent = { Text(value.title) }, supportingContent = { Text(if (value.trackCount >= 0) "${value.trackCount} é¦–" else "ç‚¹å‡»æŸ¥çœ‹") }, leadingContent = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = Green) })
+@Composable private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) = Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) { Text(text, fontSize = 21.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); action?.let { TextButton(onAction) { Text(it) } } }
+@Composable private fun MiniPlayer(track: Track?, lyrics: List<LyricLine>, vm: AppViewModel, open: () -> Unit) {
+    if (track == null) return
+    var position by remember(track.id) { mutableLongStateOf(0L) }
+    var playing by remember(track.id) { mutableStateOf(false) }
+    LaunchedEffect(track.id) {
+        while (isActive) {
+            position = vm.playbackPosition()
+            playing = vm.isPlaying()
+            delay(350)
+        }
+    }
+    val previewIndex = activeLyricIndex(lyrics, position).takeIf { it >= 0 }
+        ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
+        ?: lyrics.indexOfFirst { it.text.isNotBlank() }
+    val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() } ?: "æ­£åœ¨æ’­æ”¾"
+    Surface(color = Surface, tonalElevation = 3.dp) {
+        Row(
+            Modifier.fillMaxWidth().height(62.dp).padding(start = 8.dp, end = 4.dp).clickable(onClick = open),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AsyncImage(
+                model = safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null },
+                contentDescription = "å½“å‰æ­Œæ›²å°é¢",
+                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(Color.DarkGray),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(preview, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.Gray, fontSize = 11.sp)
+            }
+            IconButton({ if (playing) vm.pausePlayback() else vm.resumePlayback() }, Modifier.size(44.dp)) {
+                Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "æš‚åœ" else "æ’­æ”¾", Modifier.size(24.dp), tint = Color.White)
+            }
+            Icon(Icons.Default.KeyboardArrowUp, "æ‰“å¼€æ’­æ”¾å™¨", Modifier.size(21.dp), tint = Color.Gray)
+        }
+    }
+}
