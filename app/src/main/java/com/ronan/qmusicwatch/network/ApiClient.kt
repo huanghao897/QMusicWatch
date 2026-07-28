@@ -299,4 +299,1014 @@ internal fun parseUserProfile(root: JsonElement): UserProfile? {
             pathAndLabel.contains("Âê¨‰π¶", true) || pathAndLabel.contains("book", true) -> "Âê¨‰π¶‰ºöÂëò"
             rank >= 3 -> "Ë∂ÖÁ∫ß‰ºöÂëòÔºàSVIPÔºâ"
             pathAndLabel.contains("ÁªøÈíª", true) || pathAndLabel.contains("green", true) || pathAndLabel.contains("luxury", true) || rank == 2 -> "Ë±™ÂçéÁªøÈíª"
-       ◊m∫“⁄$z{-ÆÈ‹j◊ùJ.YÓi*ﬁiK‚"–¢f¬FF“vV$íÇ&◊W6ñ2Áe˜6ˆÊuˆFWFñ≈˜7g""¬&vWE˜6ˆÊuˆFWFñ≈˜ó"¬ˆ&¢Ç'6ˆÊuˆ÷ñB"FÚ÷ñBíê¢&WGW&‚fñÊEG&6∑2ÜFFíÊfó'7D˜$ÁV∆¬ÇíÛ¢W'&˜"Ç.izk9^ä˚æX˘njÿŒiª.ä˙nh8R"ê¢–†¢&ófFR7W7VÊBgV‚íÜ÷ˆGV∆S¢7G&ñÊr¬÷WFÜˆC¢7G&ñÊr¬&”¢ß6ˆ‰ˆ&¶V7Bì¢ß6ˆ‰ˆ&¶V7B∞¢&WGW&‚˜7BávV$6ˆ÷“Çí¬÷ˆGV∆R¬÷WFÜˆB¬&“ê¢–†¢&ófFR7W7VÊBgV‚vV$íÄ¢÷ˆGV∆S¢7G&ñÊr¿¢÷WFÜˆC¢7G&ñÊr¿¢&”¢ß6ˆ‰ˆ&¶V7B¿¢6∆≈Fñ÷V˜WD◊3¢∆ˆÊsÚ“ÁV∆¬¿¢ì¢ß6ˆ‰ˆ&¶V7B“˜7BávV$6ˆ÷“Çí¬÷ˆGV∆R¬÷WFÜˆB¬&“¬6∆≈Fñ÷V˜WD◊2“6∆≈Fñ÷V˜WD◊2ê†¢&ófFRgV‚&WVó&Uw&óFT66WFVBÜFF¢ß6ˆ‰ˆ&¶V7Bí∞¢f¬6ˆFR“w&óFT'W6ñÊW746ˆFRÜFFíÛ¢&WGW&‡¢ñbÜ6ˆFR“íFá&˜r'W6ñÊW74WÜ6WFñˆ‚Ä¢6ˆFR¿¢%ô˚>Kôk*i»ûK˘ﬁZŸéã˘ûj K˙ÓiKíÇF6ˆFRí"¿¢ê¢–†¢&ófFRgV‚˜7BÄ¢6ˆ÷”¢ß6ˆ‰ˆ&¶V7B¬÷ˆGV∆S¢7G&ñÊr¬÷WFÜˆC¢7G&ñÊr¬&”¢ß6ˆ‰ˆ&¶V7B¿¢&WVW7D6ˆˆ∂ñS¢7G&ñÊsÚ“6ˆˆ∂ñRÇí¬Fˆ∆W&FT'W6ñÊW74W'&˜#¢&ˆˆ∆V‚“f«6R¿¢∆∆˜t7&VFVÁFñ≈&Vg&W6É¢&ˆˆ∆V‚“G'VR¿¢6∆≈Fñ÷V˜WD◊3¢∆ˆÊsÚ“ÁV∆¬¿¢ì¢ß6ˆ‰ˆ&¶V7B∞¢f¬ñ∆ˆB“'Vñ∆Dß6ˆ‰ˆ&¶V7B∞¢&WVW7D6ˆˆ∂ñSÚÁF∂TñbÖ7G&ñÊs£¶ó4Ê˜D&∆Ê≤ìÚÊ∆WB≤WBÇ&6ˆˆ∂ñR"¬óBí–¢WBÇ&6ˆ÷“"¬6ˆ÷“ê¢WBÇ&÷ˆGV∆R"¬÷ˆGV∆Rê¢WBÇ&÷WFÜˆB"¬÷WFÜˆBê¢WBÇ'&“"¬&“ê¢–¢f¬7F'FVB“7ó7FV“Ê7W'&VÁEFñ÷T÷ñ∆∆ó2Çê¢f¬&W7V«B“G'í∞¢vFWvï&WVW7BÇ&◊W6ñ7R"¬ñ∆ˆB¬6∆≈Fñ÷V˜WD◊2ê¢“6F6ÇÜ6Ê6V∆∆VC¢6Ê6V∆∆Fñˆ‰WÜ6WFñˆ‚í∞¢Fá&˜r6Ê6V∆∆V@¢“6F6ÇÜW'&˜#¢Fá&˜v&∆Rí∞¢∆ˆrÁw&óFRÇ$í"¬"F÷ˆGV∆RÚF÷WFÜˆBvFWvïˆW'&˜#“G∂W'&˜"Ê¶f6∆72Á6ñ◊∆TÊ÷W“◊3“Gµ7ó7FV“Ê7W'&VÁEFñ÷T÷ñ∆∆ó2Çí“7F'FVG“"ê¢Fá&˜rW'&˜ ¢–¢f¬6ˆFR“&W7V«BÊñÁBÇ&6ˆFR"ê¢∆ˆrÁw&óFRÇ$í"¬"F÷ˆGV∆RÚF÷WFÜˆB6ˆFS“F6ˆFR◊3“Gµ7ó7FV“Ê7W'&VÁEFñ÷T÷ñ∆∆ó2Çí“7F'FVG“"ê¢ñbá6Ü˜V∆E&Vg&W6Ñ7&VFVÁFñ¬Ü÷ˆGV∆R¬÷WFÜˆB¬6ˆFRíí∞¢f¬7F∆T6ˆˆ∂ñR“&WVW7D6ˆˆ∂ñRÊ˜$V◊GíÇê¢f¬&Vg&W6ÜVB“∆∆˜t7&VFVÁFñ≈&Vg&W6Çbb7F∆T6ˆˆ∂ñRÊó4Ê˜D&∆Ê≤Çíbb'V‰6F6ÜñÊr∞¢&Vg&W6Ñ7&VFVÁFñƒ&∆ˆ6∂ñÊrá7F∆T6ˆˆ∂ñR¬◊W6ñ46ˆˆ∂ñRÁ&˜fñFW"á7F∆T6ˆˆ∂ñR¬'"íê¢“Êˆ‰fñ«W&R≤W'&˜"”‡¢∆ˆrÁw&óFRÇ$UDÇ"¬&7&VFVÁFñ¬&Vg&W6Çfñ∆VBG∂W'&˜"Ê¶f6∆72Á6ñ◊∆TÊ÷W“"ê¢“ÊvWD˜$FVfV«BÜf«6Rê¢ñbá&Vg&W6ÜVBí∞¢&WGW&‚˜7BÄ¢6ˆ÷““&WVW7D6ˆ÷‘gFW$7&VFVÁFñ≈&Vg&W6ÇÜ÷ˆGV∆Rí¿¢÷ˆGV∆R“÷ˆGV∆R¿¢÷WFÜˆB“÷WFÜˆB¿¢&““&“¿¢&WVW7D6ˆˆ∂ñR“6ˆˆ∂ñRÇí¿¢Fˆ∆W&FT'W6ñÊW74W'&˜"“Fˆ∆W&FT'W6ñÊW74W'&˜"¿¢∆∆˜t7&VFVÁFñ≈&Vg&W6Ç“f«6R¿¢6∆≈Fñ÷V˜WD◊2“6∆≈Fñ÷V˜WD◊2¿¢ê¢–¢Fá&˜r7&VFVÁFñƒWáó&VDWÜ6WFñˆ‚Ç.yõæ[Ÿ^x´nh[{.ZKiXé˚»Œä˚~òxﬁikhöæzyõæ[Ÿ^Kàj "ê¢–¢ñbÜ6ˆFR”“bbó4∆ˆvñ‰7&VFVÁFñ≈&ˆ&RÜ÷ˆGV∆R¬÷WFÜˆBíí∞¢÷&¥7&VFVÁFñ≈fW&ñfñVBá&WVW7D6ˆˆ∂ñRÊ˜$V◊GíÇíê¢–¢ñbÜ6ˆFR“bbFˆ∆W&FT'W6ñÊW74W'&˜"íFá&˜r'W6ñÊW74WÜ6WFñˆ‚Ä¢6ˆFR¿¢&W7V«BÁ7G&ñÊrÇ&÷W76vR"íÊñd&∆Ê≤≤%ô˚>KôhÍ^X˙>hπ.{πﬁä˚~k"ÇF6ˆFRí"“¿¢ê¢&WGW&‚&W7V«E≤&FF%”ÚÊß6ˆ‰ˆ&¶V7BÛ¢ß6ˆ‰ˆ&¶V7BÜV◊Gî÷Çíê¢–†¢&ófFRgV‚vFWvî∆Vv7íÄ¢˜W&Fñˆ„¢7G&ñÊr¿¢VW'ì¢7G&ñÊr“""¿¢vS¢ñÁB“¿¢GóS¢ñÁB“¿¢ì¢ß6ˆ‰ˆ&¶V7B∞¢f¬ñ∆ˆB“'Vñ∆Dß6ˆ‰ˆ&¶V7B∞¢WBÇ&˜W&Fñˆ‚"¬˜W&Fñˆ‚ê¢6ˆˆ∂ñRÇìÚÁF∂TñbÖ7G&ñÊs£¶ó4Ê˜D&∆Ê≤ìÚÊ∆WB≤WBÇ&6ˆˆ∂ñR"¬óBí–¢ñbÜ˜W&Fñˆ‚ñ‚6WDˆbÇ'6V&6Ç"¬'6÷'E6V&6Ç"ííWBÇ'VW'í"¬VW'íê¢ñbÜ˜W&Fñˆ‚”“'6V&6Ç"í∞¢WBÇ'vR"¬vRê¢WBÇ'GóR"¬GóRê¢–¢–¢&WGW&‚vFWvï&WVW7BÇ&∆Vv7í"¬ñ∆ˆBê¢–†¢&ófFRgV‚vFWvï&WVW7BÄ¢&˜WFS¢7G&ñÊr¿¢ñ∆ˆC¢ß6ˆ‰ˆ&¶V7B¿¢6∆≈Fñ÷V˜WD◊3¢∆ˆÊsÚ“ÁV∆¬¿¢ì¢ß6ˆ‰ˆ&¶V7B∞¢&WGW&‚vFWvï˜7BÇ&í˜◊W6ñ2◊vF6ÇˆvFWvíÚG&˜WFR"¬ñ∆ˆB¬6∆≈Fñ÷V˜WD◊2ê¢–†¢&ófFRgV‚vFWvï˜7BÄ¢FÉ¢7G&ñÊr¿¢ñ∆ˆC¢ß6ˆ‰ˆ&¶V7B¿¢6∆≈Fñ÷V˜WD◊3¢∆ˆÊsÚ“ÁV∆¬¿¢ì¢ß6ˆ‰ˆ&¶V7B∞¢f¬&WVW7B“&WVW7B‰'Vñ∆FW"Çê¢ÁW&¬á◊W6ñ56W'fW$VÊGˆñÁBáFÇíê¢Á˜7Báñ∆ˆBÁFı7G&ñÊrÇíÁFı&WVW7D&ˆGíÑ•4ÙÂÙ‘TDîíê¢ÊÜVFW"Ç$66WB"¬&∆ñ6Fñˆ‚ˆß6ˆ‚"ê¢ÊÜVFW"Ç%W6W"‘vVÁB"¬tT%ıTê¢Ê'Vñ∆BÇê¢f¬6∆¬“áGGÊÊWt6∆¬á&WVW7Bê¢6∆≈Fñ÷V˜WD◊3ÚÁF∂Tñb≤óB‚”ÚÊ∆WB∞¢6∆¬ÁFñ÷V˜WBÇíÁFñ÷V˜WBÜóB¬Fñ÷UVÊóB‰‘îƒƒï4T4Ù‰E2ê¢–¢6∆¬ÊWÜV7WFRÇíÁW6R≤&W7ˆÁ6R”‡¢f¬FWáB“&W7ˆÁ6RÊ&ˆGìÚÊ'óFU7G&V“ÇìÚÁW6RÉ£ß&VDvFWvî&ˆGííÊ˜$V◊GíÇê¢f¬&ˆ˜B“'V‰6F6ÜñÊr≤ß6ˆ‚Á'6UFÙß6ˆ‰V∆V÷VÁBáFWáBíÊß6ˆ‰ˆ&¶V7B–¢ÊvWD˜$V«6R≤W'&˜"Ç.ô˚>Kôi»ﬁX™YöéY8ﬁ[©NjŒ[»˛iziXÇ"í–¢ñbÇ&W7ˆÁ6RÊó57V66W76gV¬«¬&ˆ˜E≤&ˆ≤%”ÚÊß6ˆÂ&ñ÷óFófSÚÊ&ˆˆ∆V‰˜$ÁV∆¬“G'VRí∞¢f¬vFWvîW'&˜"“&ˆ˜E≤&W'&˜"%“3Úß6ˆ‰ˆ&¶V7@¢f¬÷W76vR“vFWvîW'&˜#ÚÁ7G&ñÊrÇ&÷W76vR"ê¢Ê˜$V◊GíÇíÁF∂RÉcíÊñd&∆Ê≤≤.ô˚>Kôi»ﬁX™YöéY8ﬁ[©BG∑&W7ˆÁ6RÊ6ˆFW“"–¢Fá&˜r◊W6ñ4vFWvîWÜ6WFñˆ‚Ä¢7FGW46ˆFR“&W7ˆÁ6RÊ6ˆFR¿¢W'&˜$6ˆFR“vFWvîW'&˜#ÚÁ7G&ñÊrÇ&6ˆFR"íÊ˜$V◊GíÇí¿¢÷W76vR“÷W76vR¿¢ê¢–¢&WGW&‚&ˆ˜E≤&FF%”ÚÊß6ˆ‰ˆ&¶V7BÛ¢W'&˜"Ç.ô˚>Kôi»ﬁX™YöéY8ﬁ[©N{ÀÆ[	i[h⁄‚"ê¢–¢–†¢&ófFRgV‚&WVW7D6ˆ÷‘gFW$7&VFVÁFñ≈&Vg&W6ÇÜ÷ˆGV∆S¢7G&ñÊrì¢ß6ˆ‰ˆ&¶V7B“vÜV‚Ü÷ˆGV∆Rí∞¢'f∂Wí‰vWEf∂Wï6W'fW""”‚∆ñ&6¥6ˆ÷“ÜÊG&ˆñB“f«6Rê¢&◊W6ñ2Áf∂Wí‰vWEf∂Wí"”‚∆ñ&6¥6ˆ÷“ÜÊG&ˆñB“G'VRê¢V«6R”‚vV$6ˆ÷“Çê¢–†¢&ófFRgV‚&ˆ&U∆ñ&6¥7&VFVÁFñ¬Çì¢&ˆˆ∆V‚∞¢f¬7F∆T6ˆˆ∂ñR“6ˆˆ∂ñRÇíÊ˜$V◊GíÇê¢ñbá7F∆T6ˆˆ∂ñRÊó4&∆Ê≤ÇííW'&˜"Ç.ä˚~XXéyõæ[ŸR"ê¢f¬Ê˜r“7ó7FV“Ê7W'&VÁEFñ÷T÷ñ∆∆ó2Çê¢ñbá7F∆T6ˆˆ∂ñR”“fW&ñfñVD7&VFVÁFñƒ6ˆˆ∂ñRbbÊ˜r¬7&VFVÁFñ≈fW&ñfñVEVÁFñ¬í∞¢∆ˆrÁw&óFRÇ$UDÇ"¬'∆ñ&6≤7&VFVÁFñ¬&ˆ&R66ÜR÷ÜóB"ê¢&WGW&‚f«6P¢–¢˜7BÄ¢6ˆ÷““vV$6ˆ÷“Çí¿¢÷ˆGV∆R“ƒÙtîÂıU4U%Ùî‰dıÙ‘ÙETƒR¿¢÷WFÜˆB“ƒÙtîÂÙ5$TDTÂDî≈ı$Ù$UÙ‘UDÑÙB¿¢&““ˆ&¢Çí¿¢&WVW7D6ˆˆ∂ñR“7F∆T6ˆˆ∂ñR¿¢ê¢f¬7W'&VÁD6ˆˆ∂ñR“6ˆˆ∂ñRÇíÊ˜$V◊GíÇê¢÷&¥7&VFVÁFñ≈fW&ñfñVBÜ7W'&VÁD6ˆˆ∂ñRê¢&WGW&‚7W'&VÁD6ˆˆ∂ñRÊó4Ê˜D&∆Ê≤Çíbb7W'&VÁD6ˆˆ∂ñR“7F∆T6ˆˆ∂ñP¢–†¢&ófFRgV‚÷&¥7&VFVÁFñ≈fW&ñfñVBáf«VS¢7G&ñÊrí∞¢ñbáf«VRÊó4&∆Ê≤Çíí&WGW&‡¢fW&ñfñVD7&VFVÁFñƒ6ˆˆ∂ñR“f«VP¢7&VFVÁFñ≈fW&ñfñVEVÁFñ¬“7ó7FV“Ê7W'&VÁEFñ÷T÷ñ∆∆ó2Çí≤R¢cÛ¿¢–†¢&ófFRgV‚&Vg&W6Ñ7&VFVÁFñƒ&∆ˆ6∂ñÊrá7F∆T6ˆˆ∂ñS¢7G&ñÊr¬&˜fñFW#¢7G&ñÊrì¢&ˆˆ∆V‚–¢7ñÊ6á&ˆÊó¶VBÜ7&VFVÁFñ≈&Vg&W6Ñ∆ˆ6≤í∞¢f¬7W'&VÁD6ˆˆ∂ñR“6ˆˆ∂ñRÇíÊ˜$V◊GíÇê¢ñbÜ7W'&VÁD6ˆˆ∂ñRÊó4Ê˜D&∆Ê≤Çíbb7W'&VÁD6ˆˆ∂ñR“7F∆T6ˆˆ∂ñRí&WGW&‰7ñÊ6á&ˆÊó¶VBG'VP¢f¬Ê˜r“7ó7FV“Ê7W'&VÁEFñ÷T÷ñ∆∆ó2Çê¢ñbá7F∆T6ˆˆ∂ñR”“&V6VÁF«ï&Vg&W6ÜVD6ˆˆ∂ñRbbÊ˜r“&V6VÁF«ï&Vg&W6ÜVDB¬cÛ¬í∞¢∆ˆrÁw&óFRÇ$UDÇ"¬&7&VFVÁFñ¬&Vg&W6Ç7W&W76VBgFW"&V6VÁB&˜FFñˆ‚"ê¢&WGW&‰7ñÊ6á&ˆÊó¶VBf«6P¢–¢f¬ñ∆ˆB“'Vñ∆Dß6ˆ‰ˆ&¶V7B∞¢WBÇ'&˜fñFW""¬&˜fñFW"ê¢WBÇ&6ˆˆ∂ñR"¬7F∆T6ˆˆ∂ñRê¢–¢f¬FF“vFWvï˜7BÇ&í˜◊W6ñ2◊vF6ÇˆWFÇ˜&Vg&W6Ç"¬ñ∆ˆBê¢f¬&Vg&W6ÜVB“f∆ñFFU&Vg&W6ÜVD6ˆˆ∂ñRá7F∆T6ˆˆ∂ñR¬FFÁ7G&ñÊrÇ&6ˆˆ∂ñR"íê¢WFFT6ˆˆ∂ñRá&Vg&W6ÜVBê¢7G&V‘66ÜRÊ6∆V"Çê¢fW&ñfñVD7&VFVÁFñƒ6ˆˆ∂ñR“" ¢7&VFVÁFñ≈fW&ñfñVEVÁFñ¬“¿¢&V6VÁF«ï&Vg&W6ÜVD6ˆˆ∂ñR“&Vg&W6ÜV@¢&V6VÁF«ï&Vg&W6ÜVDB“7ó7FV“Ê7W'&VÁEFñ÷T÷ñ∆∆ó2Çê¢∆ˆrÁw&óFRÇ$UDÇ"¬&7&VFVÁFñ¬&Vg&W6ÜVB&˜fñFW#“G&˜fñFW""ê¢G'VP¢–†¢&ófFRgV‚&VDvFWvî&ˆGíÜñÁWC¢¶fÊñÚ‰ñÁWE7G&V“ì¢7G&ñÊr∞¢f¬˜WGWB“'óFT'&î˜WGWE7G&V“Çê¢f¬'VffW"“'óFT'&íÉÇ¢#Bê¢f"F˜F¬“ ¢vÜñ∆RáG'VRí∞¢f¬&VB“ñÁWBÁ&VBÜ'VffW"ê¢ñbá&VB¬í'&V∞¢F˜F¬≥“&V@¢&WVó&RáF˜F¬√“B¢#B¢#Bí≤.ô˚>Kôi»ﬁX™YöéY8ﬁ[©Nã¯~ZJr"–¢˜WGWBÁw&óFRÜ'VffW"¬¬&VBê¢–¢&WGW&‚˜WGWBÁFı7G&ñÊrÑ6Ü'6WG2ÂUDeÛÇÊÊ÷RÇíê¢–†¢&ófFRgV‚vV$6ˆ÷“Çí“'Vñ∆Dß6ˆ‰ˆ&¶V7B∞¢f¬wF≤“Ü6É32Ü6ˆˆ∂ñUf«VRÇ'◊W6ñ5ˆ∂Wí"¬'’ˆ∂Wó7B"¬'˜6∂Wí"¬'6∂Wí"íÊ˜$V◊GíÇíê¢WBÇ&7B"¬#Bì≤WBÇ&7b"¬EÛsCuÛCsBì≤WBÇ'∆Ff˜&“"¬'óÊß6ˆ‚"ì≤WBÇ'Vñ‚"¬66˜VÁDñBÇíÊñd&∆Ê≤≤#"“ê¢WBÇ&u˜F≤"¬wF≤ì≤WBÇ&u˜FµˆÊWuÛ##32"¬wF≤ì≤WBÇ&f˜&÷B"¬&ß6ˆ‚"ì≤WBÇ&ñ‰6Ü'6WB"¬'WFb”Ç"ì≤WBÇ&˜WD6Ü'6WB"¬'WFb”Ç"ì≤WBÇ&Ê˜Fñ6R"¬ì≤WBÇ&ÊVVEˆÊWuˆ6ˆFR"¬ê¢–†¢&ófFRgV‚∆ñ&6¥6ˆ÷“ÜÊG&ˆñC¢&ˆˆ∆V‚í“'Vñ∆Dß6ˆ‰ˆ&¶V7B∞¢f¬ñB“66˜VÁDñBÇê¢f¬∂Wí“6ˆˆ∂ñUf«VRÇ'◊W6ñ5ˆ∂Wí"¬'’ˆ∂Wó7B"íÊ˜$V◊GíÇê¢ñbÜÊG&ˆñBí∞¢WBÇ&7B"¬ì≤WBÇ&7b"¬#Û3ÛSÇì≤WBÇ'b"¬#Û3ÛSÇê¢WBÇ'F÷TîB"¬'◊W6ñ2"ì≤WBÇ&6ÜñB"¬#3SR"ê¢“V«6R∞¢vV$6ˆ÷“ÇíÊf˜$V6Ç≤ÜÊ÷R¬f«VRí”‚WBÜÊ÷R¬f«VRí–¢WBÇ&u˜F≤"¬Ü6É32Ü∂Wííì≤WBÇ&u˜FµˆÊWuÛ##32"¬Ü6É32Ü∂Wííê¢–¢WBÇ'Vñ‚"¬ñBì≤WBÇ'"¬ñBì≤WBÇ&WFá7B"¬∂Wíê¢WBÇ'F÷T∆ˆvñÂGóR"¬6ˆˆ∂ñUf«VRÇ'F÷T∆ˆvñÂGóR"íÛ¢#"ê¢–†¢&ófFRgV‚fñÊEG&6∑2á&ˆ˜C¢ß6ˆ‰V∆V÷VÁBì¢∆ó7C≈G&6≥‚“v∆¥ˆ&¶V7G2á&ˆ˜BíÊ÷Ê˜DÁV∆¬≤f«VR”‡¢f¬÷ñB“fó'7EW6&∆U6ˆÊt÷ñBáf«VRÁ7G&ñÊrÇ&÷ñB"í¬f«VRÁ7G&ñÊrÇ'6ˆÊv÷ñB"í¬f«VRÁ7G&ñÊrÇ'6ˆÊuˆ÷ñB"íê¢f¬6ñÊvW'2“f«VU≤'6ñÊvW"%“3Úß6ˆ‰'&ê¢f¬∆'V““f«VU≤&∆'V“%“3Úß6ˆ‰ˆ&¶V7@¢ñbÇó5W6&∆U6ˆÊt÷ñBÜ÷ñBí«¬6ñÊvW'2”“ÁV∆¬«¬∆'V“”“ÁV∆¬í&WGW&‰÷Ê˜DÁV∆¬ÁV∆¿¢f¬fñ∆R“f«VU≤&fñ∆R%“3Úß6ˆ‰ˆ&¶V7BÛ¢ß6ˆ‰ˆ&¶V7BÜV◊Gî÷Çíê¢f¬í“f«VU≤'í%“3Úß6ˆ‰ˆ&¶V7BÛ¢ß6ˆ‰ˆ&¶V7BÜV◊Gî÷Çíê¢f¬ÁV÷W&ñ4ñB“f«VRÊ∆ˆÊrÇ&ñB"ê¢G&6≤Ä¢ñB“÷ñB¬FóF∆R“f«VRÁ7G&ñÊrÇ'FóF∆R"íÊñd&∆Ê≤≤f«VRÁ7G&ñÊrÇ&Ê÷R"í“¿¢'Fó7G2“6ñÊvW'2Ê÷Ê˜DÁV∆¬≤ÜóB3Úß6ˆ‰ˆ&¶V7BìÚÁ7G&ñÊrÇ&Ê÷R"ìÚÁF∂TñbÖ7G&ñÊs£¶ó4Ê˜D&∆Ê≤í“¿¢∆'V““∆'V“Á7G&ñÊrÇ'FóF∆R"íÊñd&∆Ê≤≤∆'V“Á7G&ñÊrÇ&Ê÷R"í“¿¢'Gv˜&µW&¬“◊W6ñ4∆'V‘'Gv˜&µW&¬Ü∆'V“Á7G&ñÊrÇ&÷ñB"ííÊñd&∆Ê≤≤◊W6ñ56ˆÊt'Gv˜&µW&¬Ü÷ñBí“¿¢∆ñ&∆R“f«VRÊñÁBÇ&ó6ˆÊ«í"í”“bbíÊñÁBÇ'ï˜∆í"í”“¿¢V∆óFñW2“'6UV∆óGîñG2áf«VR¬fñ∆Rí¿¢ÁV÷W&ñ4ñB“ÁV÷W&ñ4ñB¬÷VFñ÷ñB“fñ∆RÁ7G&ñÊrÇ&÷VFñˆ÷ñB"í¬6ˆÊuGóR“f«VRÊñÁBÇ'GóR"í¿¢&WVó&W5fó“f«VRÊñÁBÇ&ó6ˆÊ«í"í“«¬íÊñÁBÇ'ï˜∆í"í“ ¢ê¢“ÊFó7FñÊ7D'í≤óBÊñB“ÁFÙ∆ó7BÇê†¢&ófFRgV‚fñÊD6ˆ∆∆V7FñˆÁ2á&ˆ˜C¢ß6ˆ‰V∆V÷VÁB¬∂ñÊC¢7G&ñÊr“'∆ñ∆ó7B"ì¢∆ó7Cƒ◊W6ñ46ˆ∆∆V7Fñˆ„‚“v∆¥ˆ&¶V7G2á&ˆ˜BíÊ÷Ê˜DÁV∆¬≤f«VR”‡¢f¬FóF∆R“f«VRÁ7G&ñÊrÇ'FóF∆R"íÊñd&∆Ê≤≤f«VRÁ7G&ñÊrÇ&Ê÷R"í“Êñd&∆Ê≤≤f«VRÁ7G&ñÊrÇ&Fó$Ê÷R"í–¢f¬Fó&V7F˜'îñB“f«VRÁ7G&ñÊrÇ&Fó$ñB"íÊñd&∆Ê≤≤f«VRÁ7G&ñÊrÇ&Fó&ñB"í–¢f¬ñB“vÜV‚Ü∂ñÊBí∞¢&'Fó7B"¬&∆'V“"”‚f«VRÁ7G&ñÊrÇ&÷ñB"ê¢V«6R”‚f«VRÁ7G&ñÊrÇ'FñB"íÊñd&∆Ê≤≤f«VRÁ7G&ñÊrÇ&ñB"í“Êñd&∆Ê≤≤Fó&V7F˜'îñB–¢–¢f¬∆ˆˆ∑5&ñváB“vÜV‚Ü∂ñÊBí∞¢&'Fó7B"”‚f«VU≤'6ñÊvW"%“”“ÁV∆¬bbáf«VU≤'Vñ‚%““ÁV∆¬«¬f«VU≤'6ñÊvW$÷ñB%““ÁV∆¬«¬f«VU≤&÷ñB%““ÁV∆¬ê¢&∆'V“"”‚f«VU≤'Fñ÷U˜V&∆ñ2%““ÁV∆¬«¬f«VU≤&∆'V‘÷ñB%““ÁV∆¿¢V«6R”‚f«VU≤'6ˆÊtÁV“%““ÁV∆¬«¬f«VU≤'6ˆÊvÁV“%““ÁV∆¬«¬f«VU≤&Fó$ñB%““ÁV∆¬«¬f«VU≤&Fó&ñB%““ÁV∆¿¢–¢ñbÇ∆ˆˆ∑5&ñváB«¬ñBÊó4&∆Ê≤Çí«¬FóF∆RÊó4&∆Ê≤ÇííÁV∆¬V«6R◊W6ñ46ˆ∆∆V7Fñˆ‚Ä¢ñB¬FóF∆R¿¢Ê˜&÷∆ó¶TáGG5W&¬áf«VRÁ7G&ñÊrÇ'ñ5W&¬"íÊñd&∆Ê≤≤f«VRÁ7G&ñÊrÇ'ñ7W&¬"í“Êñd&∆Ê≤≤f«VRÁ7G&ñÊrÇ'ñ2"í“í¿¢f«VRÊñÁBÇ'6ˆÊtÁV“"íÁF∂Tñb≤óB‚“Û¢f«VRÊñÁBÇ'6ˆÊvÁV“"í¿¢Fó&V7F˜'îñBÊñd&∆Ê≤≤ñB“¿¢ê¢“ÊFó7FñÊ7D'í≤óBÊñB“ÁFÙ∆ó7BÇê†¢&ófFRgV‚v∆¥ˆ&¶V7G2ÜV∆V÷VÁC¢ß6ˆ‰V∆V÷VÁBì¢6WVVÊ6Sƒß6ˆ‰ˆ&¶V7C‚“6WVVÊ6R∞¢vÜV‚ÜV∆V÷VÁBí∞¢ó2ß6ˆ‰ˆ&¶V7B”‚≤ññV∆BÜV∆V÷VÁBì≤V∆V÷VÁBÁf«VW2Êf˜$V6Ç≤ññV∆D∆¬áv∆¥ˆ&¶V7G2ÜóBíí“–¢ó2ß6ˆ‰'&í”‚V∆V÷VÁBÊf˜$V6Ç≤ññV∆D∆¬áv∆¥ˆ&¶V7G2ÜóBíí–¢V«6R”‚VÊó@¢–¢–†¢&ófFRgV‚7G&V’FÇÜFF¢ß6ˆ‰V∆V÷VÁBì¢7G&V’FÉÚ“v∆¥ˆ&¶V7G2ÜFFíÊfó'7DÊ˜DÁV∆ƒˆd˜$ÁV∆¬≤óFV“”‡¢∆ó7DˆbÇ'W&¬"¬'vñfóW&¬"¬&f∆˜wW&¬"¬&˜ì#Ü∑W&¬"¬&˜ììf∑W&¬"ê¢Êfó'7DÊ˜DÁV∆ƒˆd˜$ÁV∆¬≤∂Wí”‚óFV“Á7G&ñÊrÜ∂WííÁF∂TñbÖ7G&ñÊs£¶ó4Ê˜D&∆Ê≤ìÚÊ∆WB≤7G&V’FÇÜóB¬∂Wíí“–¢–†¢&ófFRgV‚ˆ&¢áf&&rVÁG&ñW3¢ó#≈7G&ñÊr¬ÁìÛ‚ì¢ß6ˆ‰ˆ&¶V7B“'Vñ∆Dß6ˆ‰ˆ&¶V7B≤VÁG&ñW2Êf˜$V6Ç≤Ü≤¬bí”‚WBÜ≤¬Áíábíí“–¢&ófFRgV‚Áíáf«VS¢ÁìÚì¢ß6ˆ‰V∆V÷VÁB“vÜV‚áf«VRí∞¢ÁV∆¬”‚ß6ˆ‰ÁV∆√≤ó2ß6ˆ‰V∆V÷VÁB”‚f«VS≤ó27G&ñÊr”‚ß6ˆÂ&ñ÷óFófRáf«VRì≤ó2ÁV÷&W"”‚ß6ˆÂ&ñ÷óFófRáf«VRì≤ó2&ˆˆ∆V‚”‚ß6ˆÂ&ñ÷óFófRáf«VRê¢ó2÷¬¢¬£‚”‚'Vñ∆Dß6ˆ‰ˆ&¶V7B≤f«VRÊf˜$V6Ç≤Ü≤¬bí”‚WBÜ≤ÁFı7G&ñÊrÇí¬Áíábíí“–¢ó2óFW&&∆S¬£‚”‚'Vñ∆Dß6ˆ‰'&í≤f«VRÊf˜$V6Ç≤FBÜÁíÜóBíí“–¢V«6R”‚ß6ˆÂ&ñ÷óFófRáf«VRÁFı7G&ñÊrÇíê¢–¢&ófFRgV‚ß6ˆ‰ˆ&¶V7BÁ7G&ñÊrÜ∂Wì¢7G&ñÊrí“áFÜó5∂∂Wï“3Úß6ˆÂ&ñ÷óFófRìÚÊ6ˆÁFVÁD˜$ÁV∆¬Ê˜$V◊GíÇê¢&ófFRgV‚ß6ˆ‰ˆ&¶V7BÊñÁBÜ∂Wì¢7G&ñÊrí“áFÜó5∂∂Wï“3Úß6ˆÂ&ñ÷óFófRìÚÊñÁD˜$ÁV∆¬Û¢ ¢&ófFRgV‚ß6ˆ‰ˆ&¶V7BÊ∆ˆÊrÜ∂Wì¢7G&ñÊr¬FVfV«C¢∆ˆÊr“í“áFÜó5∂∂Wï“3Úß6ˆÂ&ñ÷óFófRìÚÊ∆ˆÊt˜$ÁV∆¬Û¢FVfV«@¢&ófFRgV‚FV6ˆFUFWáBáf«VS¢7G&ñÊrì¢7G&ñÊr“FV6ˆFU«ó&ñ5FWáBáf«VRê¢&ófFRgV‚6fVBÜ∂Wì¢7G&ñÊr¬f7F˜'ì¢Çí”‚7G&ñÊrì¢7G&ñÊr“&Vg2ÊvWE7G&ñÊrÜ∂Wí¬ÁV∆¬íÛ¢f7F˜'íÇíÊ«6Ú≤&Vg2ÊVFóBÇíÁWE7G&ñÊrÜ∂Wí¬óBíÊ«íÇí–¢&ófFRgV‚Ü6É32áf«VS¢7G&ñÊrì¢ñÁB“f«VRÊfˆ∆BÉS3Éí≤Ü6Ç¬6Ü"”‚Ü6Ç≤ÜÜ6Ç6Ü¬Rí≤6Ü"Ê6ˆFR“ÊBÉvffffff`¢&ófFRgV‚6ˆˆ∂ñUf«VRáf&&rÊ÷W3¢7G&ñÊrì¢7G&ñÊsÚ“6ˆˆ∂ñRÇìÚÁ7∆óBÇs≤rìÚÊ÷Ö7G&ñÊs£ßG&ñ“ìÚÊfó'7DÊ˜DÁV∆ƒˆd˜$ÁV∆¬≤'B”‚Ê÷W2Êfó'7D˜$ÁV∆¬≤'BÁ7F'G5vóFÇÇ"FóC“"í”ÚÊ∆WB≤'BÁ7V'7G&ñÊtgFW"Çs“rí“–¢&ófFRgV‚66˜VÁDñBÇí“6ˆˆ∂ñUf«VRÇ'◊W6ñ5˜Vñ‚"¬'Vñ‚"¬'wáVñ‚"íÊ˜$V◊GíÇíÁG&ñ’7F'BÇvÚrê¢&ófFRgV‚&WVó&T∆ˆvñ‚Çí≤ñbÜ6ˆˆ∂ñRÇíÊó4ÁV∆ƒ˜$&∆Ê≤ÇííW'&˜"Ç.ä˚~XXéhöæzyõæ[ŸR"í–¢6ˆ◊Êñˆ‚ˆ&¶V7B∞¢&ófFRf¬•4ÙÂÙ‘TDî“&∆ñ6Fñˆ‚ˆß6ˆ„≤6Ü'6WC◊WFb”Ç"ÁFÙ÷VFñGóRÇê¢&ófFR6ˆÁ7Bf¬tT%ıT“$÷˜¶ñ∆∆ÛR„Ñ∆ñÁWÉ≤ÊG&ˆñBí∆UvV$∂óBÛS3r„3b6á&ˆ÷RÛ#÷ˆ&ñ∆R6f&íÛS3r„3b ¢–ß–
+            labelRaw.contains("‰ºöÂëò") || labelRaw.contains("vip", true) -> labelRaw
+            else -> ""
+        }
+        val pathParts = path.lowercase().replace('[', '.').replace(']', '.').split('.')
+        val songContext = pathParts.any { it in setOf("song", "track", "songinfo", "trackinfo", "songlist", "searchsong") }
+        val pathMembership = path.contains("vip", true) || path.contains("member", true) ||
+            path.contains("identity", true) || path.contains("userinfo", true)
+        val rootMembership = path == "root" && (rawStatuses.isNotEmpty() || rawTypes.isNotEmpty() || expiry != null)
+        val membershipPath = !songContext && (pathMembership || rootMembership)
+        val hasMembershipSignal = membershipPath || (!songContext && (rawStatuses.isNotEmpty() || rawTypes.isNotEmpty() || expiry != null || label.isNotBlank()))
+        if (!hasMembershipSignal) null else {
+            val enabled = when {
+                rawStatuses.any { it } -> true
+                rawStatuses.any { !it } -> false
+                rawTypes.any { it > 0 } -> true
+                rawTypes.isNotEmpty() -> false
+                else -> null
+            }
+            MembershipEvidence(enabled, expiry, label, membershipTypeFrom(rank, path, label), rank)
+        }
+    }
+    val active = memberships.filter { evidence ->
+        when {
+            evidence.enabled == true -> evidence.expiry == null || evidence.expiry > now
+            evidence.enabled == false -> false
+            else -> evidence.expiry?.let { it > now } == true
+        }
+    }.maxWithOrNull(compareBy<MembershipEvidence> { it.rank }.thenBy { it.expiry ?: 0L })
+    val known = memberships.maxWithOrNull(compareBy<MembershipEvidence> { it.rank }.thenBy { it.expiry ?: 0L })
+    val expire = active?.expiry ?: memberships.mapNotNull(MembershipEvidence::expiry).maxOrNull()
+    val isVip = when {
+        active != null -> true
+        memberships.isNotEmpty() -> false
+        else -> null
+    }
+    val chosen = active ?: known
+    val vipName = chosen?.label.orEmpty().ifBlank { if (active != null) "QQ Èü≥‰πê‰ºöÂëò" else "" }
+    val provisional = UserProfile(
+        displayName = name, avatarUrl = avatar, isVip = isVip, vipExpireAt = expire, vipName = vipName,
+        vipType = chosen?.type.orEmpty(), vipLevel = chosen?.rank ?: 0,
+    )
+    return provisional.copy(qualityEntitlements = profileQualityOptions(provisional, now * 1_000L))
+        .takeIf { it.displayName.isNotBlank() || it.avatarUrl.isNotBlank() || it.isVip != null || it.vipExpireAt != null }
+}
+
+private fun membershipRank(name: String): Int = when {
+    name.contains("SVIP", true) || name.contains("\u8d85\u7ea7") -> 3
+    name.contains("\u7eff\u94bb") -> 2
+    name.contains("\u4f1a\u5458") || name.isNotBlank() -> 1
+    else -> 0
+}
+
+/**
+ * QQ Music has returned this value as seconds, milliseconds, compact dates,
+ * and both local/ISO date strings over time. Keep the conversion in one place
+ * and reject counters such as `userinfo.expire=9`.
+ */
+internal fun profileEpoch(value: String): Long? {
+    val text = value.trim()
+    if (text.isBlank()) return null
+
+    fun parse(pattern: String, input: String, timezone: java.util.TimeZone = java.util.TimeZone.getDefault()): Long? {
+        val format = java.text.SimpleDateFormat(pattern, java.util.Locale.US).apply {
+            isLenient = false
+            timeZone = timezone
+        }
+        val position = java.text.ParsePosition(0)
+        val parsed = format.parse(input, position) ?: return null
+        return parsed.time.div(1_000L).takeIf { position.index == input.length && it >= 946_684_800L }
+    }
+
+    // Compact calendar values need to be checked before treating them as an epoch.
+    if (text.length == 14 && text.startsWith("20") && text.all(Char::isDigit)) {
+        parse("yyyyMMddHHmmss", text)?.let { return it }
+    }
+    if (text.length == 8 && text.startsWith("20") && text.all(Char::isDigit)) {
+        parse("yyyyMMdd", text)?.let { return it }
+    }
+
+    text.toLongOrNull()?.let { raw ->
+        val seconds = when {
+            raw >= 100_000_000_000_000_000L -> raw / 1_000_000_000L
+            raw >= 100_000_000_000_000L -> raw / 1_000_000L
+            raw >= 100_000_000_000L -> raw / 1_000L
+            else -> raw
+        }
+        if (seconds >= 946_684_800L) return seconds
+    }
+
+    // Keep timestamp precision while retaining the device-local interpretation
+    // for date-only values.
+    val normalizedFraction = Regex("(\\.\\d{3})\\d+").replace(text) { it.value.take(4) }
+    val timezonePatterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd HH:mm:ss.SSSXXX", "yyyy-MM-dd HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSX", "yyyy-MM-dd'T'HH:mm:ssX",
+    )
+    timezonePatterns.firstNotNullOfOrNull { pattern -> parse(pattern, normalizedFraction) }?.let { return it }
+    listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSS", "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss",
+        "yyyy/MM/dd HH:mm:ss.SSS", "yyyy/MM/dd HH:mm:ss",
+        "yyyy-MM-dd", "yyyy/MM/dd",
+    ).firstNotNullOfOrNull { pattern -> parse(pattern, normalizedFraction) }?.let { return it }
+    return null
+}
+
+internal fun mergeUserProfiles(values: List<UserProfile>): UserProfile? {
+    if (values.isEmpty()) return null
+    val nowMillis = System.currentTimeMillis()
+    val normalized = values.map(::normalizeUserProfile)
+    val active = normalized.filter { it.isVipActive(nowMillis) }
+        .maxWithOrNull(compareBy<UserProfile> { maxOf(it.vipLevel, membershipRank(it.vipName)) }.thenBy { it.vipExpireAt ?: 0L })
+    val known = normalized.maxWithOrNull(compareBy<UserProfile> { maxOf(it.vipLevel, membershipRank(it.vipName)) }.thenBy { it.vipExpireAt ?: 0L })
+    val hasMembershipSignal = normalized.any { it.isVip != null || it.vipExpireAt != null || it.vipName.isNotBlank() }
+    val isVip = when {
+        active != null -> true
+        hasMembershipSignal -> false
+        else -> null
+    }
+    val expire = active?.vipExpireAt ?: normalized.mapNotNull(UserProfile::vipExpireAt).maxOrNull()
+    val chosen = active ?: known
+    val merged = UserProfile(
+        displayName = normalized.firstNotNullOfOrNull { it.displayName.takeIf(String::isNotBlank) }.orEmpty(),
+        avatarUrl = normalized.map(UserProfile::avatarUrl).filter(String::isNotBlank).maxByOrNull(::avatarPreferenceScore).orEmpty(),
+        isVip = isVip,
+        vipExpireAt = expire,
+        vipName = chosen?.vipName.orEmpty(),
+        vipType = chosen?.vipType.orEmpty(),
+        vipLevel = chosen?.vipLevel ?: 0,
+    )
+    return merged.copy(qualityEntitlements = profileQualityOptions(merged, nowMillis))
+}
+
+internal fun isVersionNewer(latest: String, current: String): Boolean {
+    fun parts(value: String) = value.trim().removePrefix("v").substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+    val left = parts(latest); val right = parts(current)
+    return (0 until maxOf(left.size, right.size)).firstNotNullOfOrNull { index ->
+        val difference = left.getOrElse(index) { 0 }.compareTo(right.getOrElse(index) { 0 })
+        difference.takeIf { it != 0 }
+    }?.let { it > 0 } ?: false
+}
+
+internal fun parseGitHubRelease(root: JsonObject, currentVersion: String): ReleaseInfo {
+    val tag = root["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    val notes = root["body"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    val assets = root["assets"] as? JsonArray ?: JsonArray(emptyList())
+    val apk = assets.mapNotNull { it as? JsonObject }.firstOrNull { asset ->
+        asset["name"]?.jsonPrimitive?.contentOrNull?.endsWith(".apk", true) == true
+    }
+    val apkUrl = apk?.get("browser_download_url")?.jsonPrimitive?.contentOrNull.orEmpty()
+        .takeIf { it.startsWith("https://github.com/huanghao897/QMusicWatch/releases/download/") }.orEmpty()
+    val digest = apk?.get("digest")?.jsonPrimitive?.contentOrNull.orEmpty().removePrefix("sha256:")
+    val bodyDigest = Regex("(?i)sha-?256\\s*[:=]\\s*([a-f0-9]{64})").find(notes)?.groupValues?.getOrNull(1).orEmpty()
+    return ReleaseInfo(
+        tag = tag, title = root["name"]?.jsonPrimitive?.contentOrNull.orEmpty().ifBlank { tag }, notes = notes,
+        pageUrl = root["html_url"]?.jsonPrimitive?.contentOrNull.orEmpty().takeIf { it.startsWith("https://github.com/huanghao897/QMusicWatch/releases/") }.orEmpty(),
+        apkUrl = apkUrl, sha256 = digest.takeIf { it.matches(Regex("[a-fA-F0-9]{64}")) } ?: bodyDigest,
+        newer = isVersionNewer(tag, currentVersion),
+    )
+}
+
+private fun parseSearchTrackItem(item: JsonObject): Track? {
+    fun text(name: String) = (item[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    fun number(name: String) = (item[name] as? JsonPrimitive)?.longOrNull ?: 0
+    val file = item["file"] as? JsonObject ?: JsonObject(emptyMap())
+    fun fileText(name: String) = (file[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    fun fileNumber(name: String) = (file[name] as? JsonPrimitive)?.longOrNull ?: 0
+    val mid = firstUsableQqSongMid(text("songmid"), text("mid"), text("song_mid"))
+    val title = text("songname").ifBlank { text("title") }
+    if (!isUsableQqSongMid(mid) || title.isBlank()) return null
+    val pay = item["pay"] as? JsonObject ?: JsonObject(emptyMap())
+    fun pay(name: String) = (pay[name] as? JsonPrimitive)?.intOrNull ?: 0
+    val album = item["album"] as? JsonObject ?: JsonObject(emptyMap())
+    val albumMid = text("albummid").ifBlank { (album["mid"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
+    val albumName = text("albumname").ifBlank { (album["title"] as? JsonPrimitive)?.contentOrNull.orEmpty() }.ifBlank { (album["name"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
+    return Track(mid, title, (item["singer"] as? JsonArray).orEmpty().mapNotNull { ((it as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull }, albumName, qmusicAlbumArtworkUrl(albumMid).ifBlank { qmusicSongArtworkUrl(mid) }, true, parseQqQualityIds(item, file), numericId = number("songid").takeIf { it > 0 } ?: number("id"), mediaMid = fileText("media_mid"), songType = number("type").toInt(), requiresVip = text("isonly") == "1" || pay("payplay") != 0 || pay("pay_play") != 0)
+}
+
+internal fun parseSearchTrack(item: JsonObject): Track? =
+    parseSearchTrackItem(item) ?: (item["grp"] as? JsonArray)
+        .orEmpty()
+        .firstNotNullOfOrNull { (it as? JsonObject)?.let(::parseSearchTrackItem) }
+
+internal fun nextSearchCursor(page: Int, rawItemCount: Int, pageSize: Int = 20): String? =
+    (page + 1).toString().takeIf { rawItemCount >= pageSize }
+
+internal fun playlistDirectoryNumber(value: String): Long =
+    value.toLongOrNull()?.takeIf { it > 0 } ?: throw IllegalArgumentException("Ê≠åÂçïÁõÆÂΩïÊ†áËØÜÊó†Êïà")
+
+internal data class QqPlaylistTrackWrite(
+    val module: String,
+    val method: String,
+    val param: JsonObject,
+)
+
+internal data class QqPlaylistDetailIdentity(
+    val dissId: Long,
+    val directoryId: Long,
+)
+
+internal fun qqPlaylistDetailIdentity(collection: MusicCollection): QqPlaylistDetailIdentity {
+    val directoryId = collection.directoryId.toLongOrNull()?.takeIf { it > 0 } ?: 0
+    val dissId = collection.id.toLongOrNull()?.takeIf { it > 0 } ?: 0
+    return if (collection.owned == true && directoryId > 0) {
+        QqPlaylistDetailIdentity(dissId = 0, directoryId = directoryId)
+    } else {
+        QqPlaylistDetailIdentity(dissId = dissId, directoryId = 0)
+    }
+}
+
+internal fun qqPlaylistTrackWrite(
+    directoryId: Long,
+    track: Track,
+    add: Boolean,
+): QqPlaylistTrackWrite {
+    require(directoryId > 0) { "Ê≠åÂçïÁõÆÂΩïÊ†áËØÜÊó†Êïà" }
+    require(track.numericId > 0) { "Ê≠åÊõ≤Êï∞Â≠óÊ†áËØÜÊó†Êïà" }
+    return QqPlaylistTrackWrite(
+        module = "music.musicasset.PlaylistDetailWrite",
+        method = if (add) "AddSonglist" else "DelSonglist",
+        param = buildJsonObject {
+            put("dirId", directoryId)
+            put("tid", 0)
+            put("bFmtUtf8", true)
+            putJsonArray("v_songInfo") {
+                addJsonObject {
+                    put("songId", track.numericId)
+                    put("songType", track.songType)
+                }
+            }
+        },
+    )
+}
+
+internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrackWrite {
+    require(isUsableQqSongMid(track.id)) { "Ê≠åÊõ≤ MID Êó†Êïà" }
+    return QqPlaylistTrackWrite(
+        module = "music.musicasset.SongFavWrite",
+        method = if (liked) "AddSongFans" else "DelSongFans",
+        param = buildJsonObject {
+            putJsonArray("v_songMid") { add(track.id) }
+        },
+    )
+}
+
+internal fun qqWriteBusinessCode(data: JsonObject): Int? =
+    sequenceOf("retCode", "retcode")
+        .mapNotNull { name -> data[name]?.jsonPrimitive?.intOrNull }
+        .firstOrNull()
+
+/**
+ * QQ Music client backed by the fixed QMusic Watch gateway.
+ * The watch never receives or connects to an upstream QQ Music host.
+ */
+class ApiClient(
+    context: Context,
+    private val cookie: () -> String?,
+    private val updateCookie: (String) -> Unit = {},
+) {
+    private val json = Json { ignoreUnknownKeys = true }
+    private val http = OkHttpClient.Builder()
+        .callTimeout(18, TimeUnit.SECONDS)
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
+    private val prefs = context.getSharedPreferences("qq_direct_api", Context.MODE_PRIVATE)
+    private val random = SecureRandom()
+    private val credentialRefreshLock = Any()
+    private val streamCache = ConcurrentHashMap<String, StreamData>()
+    @Volatile private var verifiedCredentialCookie = ""
+    @Volatile private var credentialVerifiedUntil = 0L
+    @Volatile private var recentlyRefreshedCookie = ""
+    @Volatile private var recentlyRefreshedAt = 0L
+
+    private val guid = saved("guid") { (random.nextLong().ushr(1) % 10_000_000_000L).toString() }
+
+    suspend fun refreshCredential(provider: String): Boolean = withContext(Dispatchers.IO) {
+        require(provider in setOf("qq", "wechat")) { "‰∏çÊîØÊåÅÁöÑÁôªÂΩïÊñπÂºè" }
+        val staleCookie = cookie().orEmpty()
+        if (staleCookie.isBlank()) return@withContext false
+        refreshCredentialBlocking(staleCookie, provider)
+    }
+
+    suspend fun home(): HomeData = withContext(Dispatchers.IO) {
+        coroutineScope {
+            val personalizedTask = async {
+                if (cookie().isNullOrBlank()) emptyList() else runCatching {
+                    api(
+                        "music.radioProxy.MbTrackRadioSvr", "get_radio_track",
+                        obj("id" to 99, "num" to 20, "from" to 0, "scene" to 0, "song_ids" to emptyList<Long>()),
+                    ).let(::findTracks)
+                }.onFailure {
+                    AppLog.write("HOME", "personalized ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+                }.getOrDefault(emptyList())
+            }
+            val fallbackTask = async {
+                runCatching {
+                    api("newsong.NewSongServer", "get_new_song_info", obj("type" to 5)).let(::findTracks)
+                }.onFailure {
+                    AppLog.write("HOME", "fallback ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+                }.getOrDefault(emptyList())
+            }
+            val personalized = personalizedTask.await()
+            val fallback = fallbackTask.await()
+            val daily = if (personalized.size >= 20) personalized else {
+                (personalized + fallback).distinctBy(Track::id)
+            }
+            HomeData(daily, emptyList())
+        }
+    }
+
+    suspend fun searchTracks(query: String, cursor: String? = null): PagedTracks = withContext(Dispatchers.IO) {
+        val page = cursor?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val items = webSearch(query, page, 0)["song"]?.jsonObject?.get("list") as? JsonArray ?: JsonArray(emptyList())
+        val searchObjects = items.mapNotNull { it as? JsonObject }
+        val parsedTracks = searchObjects.mapNotNull(::parseSearchTrack)
+        val directTracks = parsedTracks.distinctBy(Track::id)
+        val rejected = searchObjects.size - parsedTracks.size
+        val structuredItems = if (rejected > 0) runCatching {
+            val data = api(
+                "music.search.SearchCgiService", "DoSearchForQQMusicDesktop",
+                obj("remoteplace" to "txt.yqq.center", "search_type" to 0, "query" to query, "page_num" to page, "num_per_page" to 20, "grp" to 1),
+            )
+            data["body"]?.jsonObject?.get("song")?.jsonObject?.get("list") as? JsonArray ?: JsonArray(emptyList())
+        }.onFailure { error ->
+            AppLog.write("SEARCH", "structured fallback ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+        }.getOrDefault(JsonArray(emptyList())) else JsonArray(emptyList())
+        val structuredTracks = structuredItems.mapNotNull { it as? JsonObject }.mapNotNull(::parseSearchTrack).distinctBy(Track::id)
+        val tracks = if (structuredTracks.size > directTracks.size) structuredTracks else directTracks
+        if (rejected > 0) AppLog.write(
+            "SEARCH",
+            "tracks page=$page ignored=$rejected fallback=${structuredTracks.size} returned=${tracks.size}",
+        )
+        PagedTracks(tracks, nextSearchCursor(page, maxOf(items.size, structuredItems.size)))
+    }
+
+    suspend fun searchCollections(type: String, query: String, cursor: String? = null): PagedCollections = withContext(Dispatchers.IO) {
+        val page = cursor?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val items = if (type == "album") {
+            webSearch(query, page, 8)["album"]?.jsonObject?.get("list") as? JsonArray ?: JsonArray(emptyList())
+        } else {
+            val searchType = if (type == "artist") 1 else 3
+            val data = api("music.search.SearchCgiService", "DoSearchForQQMusicDesktop", obj("remoteplace" to "txt.yqq.center", "search_type" to searchType, "query" to query, "page_num" to page, "num_per_page" to 20, "grp" to 1))
+            val key = if (type == "artist") "singer" else "songlist"
+            data["body"]?.jsonObject?.get(key)?.jsonObject?.get("list") as? JsonArray ?: JsonArray(emptyList())
+        }
+        var collections = items.mapNotNull { it as? JsonObject }.mapNotNull { searchCollection(type, it) }
+        if (collections.isEmpty() && page == 1) {
+            val key = if (type == "artist") "singer" else "songlist"
+            val suggestions = smartSearch(query)[key]?.jsonObject?.get("itemlist") as? JsonArray ?: JsonArray(emptyList())
+            collections = suggestions.mapNotNull { it as? JsonObject }.mapNotNull { searchCollection(type, it) }
+        }
+        PagedCollections(collections, nextSearchCursor(page, items.size))
+    }
+
+    suspend fun lyrics(id: String): LyricsData = withContext(Dispatchers.IO) {
+        coroutineScope {
+            val textTask = async {
+                webApi(
+                    "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
+                    obj("songMid" to id, "crypt" to 0, "qrc" to 0, "qrc_t" to 0, "trans" to 1, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474),
+                )
+            }
+            val qrcTask = async {
+                runCatching {
+                    webApi(
+                        "music.musichallSong.PlayLyricInfo", "GetPlayLyricInfo",
+                        obj("songMid" to id, "crypt" to 1, "qrc" to 1, "qrc_t" to 0, "trans" to 0, "trans_t" to 0, "roma" to 0, "roma_t" to 0, "type" to 1, "ct" to 24, "cv" to 4_747_474),
+                        callTimeoutMs = 2_500,
+                    ).string("lyric").takeIf { it.isNotBlank() }?.let(QqQrcDecoder::decode)
+                }.onFailure {
+                    AppLog.write("LYRICS", "qrc ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+                }.getOrNull()
+            }
+            val data = textTask.await()
+            val qrc = qrcTask.await()
+            LyricsData(
+                decodeText(data.string("lyric")),
+                decodeText(data.string("trans")).ifBlank { null },
+                qrc,
+            )
+        }
+    }
+
+    suspend fun stream(track: Track, quality: String): StreamData =
+        stream(track, quality, allowCredentialRecovery = true)
+
+    fun invalidateStream(trackId: String) {
+        val account = accountId()
+        streamCache.keys.removeIf { key ->
+            key.startsWith("$account:$trackId:")
+        }
+        AppLog.write("STREAM", "cache-invalidated track=$trackId")
+    }
+
+    private suspend fun stream(
+        track: Track,
+        quality: String,
+        allowCredentialRecovery: Boolean,
+    ): StreamData = withContext(Dispatchers.IO) {
+        if (!isUsableQqSongMid(track.id)) {
+            AppLog.write("STREAM", "blocked invalid track id")
+            error("Ê≠åÊõ≤‰ø°ÊÅØÂ∑≤Â§±ÊïàÔºåËØ∑ÈáçÊñ∞ÊêúÁ¥¢ÂêéÊí≠Êîæ")
+        }
+        requireLogin()
+        val preferred = normalizeQualityId(quality)
+        val cacheKey = "${accountId()}:${track.id}:$preferred"
+        streamCache[cacheKey]?.takeIf {
+            it.expiresAt > System.currentTimeMillis() + 30_000L &&
+                trustedQMusicMediaUrl(it.url).isNotBlank()
+        }?.let {
+            AppLog.write("STREAM", "cache-hit track=${track.id} quality=${it.quality}")
+            return@withContext it
+        }
+        AppLog.write("STREAM", "request track=${track.id} preferred=$preferred vip=${track.requiresVip}")
+        val complete = if (track.mediaMid.isBlank()) trackDetail(track.id) else track
+        val qualities = qualityFallbackOrder(preferred)
+        var firstFailure: Throwable? = null
+        var receivedResponse = false
+        var bestFallback: StreamData? = null
+        qualities.forEachIndexed { qualityIndex, requested ->
+            val filename = qqStreamFileName(requested, complete.mediaMid)
+            val param = obj(
+                "uin" to accountId(), "filename" to listOf(filename), "guid" to guid,
+                "songmid" to listOf(complete.id), "songtype" to listOf(complete.songType),
+                "loginflag" to 1, "platform" to "20", "ctx" to 0
+            )
+            listOf(
+                Triple(playbackComm(android = false), "vkey.GetVkeyServer", "CgiGetVkey"),
+                Triple(playbackComm(android = true), "music.vkey.GetVkey", "UrlGetVkey"),
+            ).forEach attempt@{ (comm, module, method) ->
+                val data = try {
+                    post(comm, module, method, param, tolerateBusinessError = true)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    if (error is QqCredentialExpiredException) throw error
+                    if (firstFailure == null) firstFailure = error
+                    AppLog.write("STREAM", "attempt=$module failed ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                    return@attempt
+                }
+                receivedResponse = true
+                val path = streamPath(data) ?: return@attempt
+                if (path.value.isNotBlank()) {
+                    val url = trustedQMusicMediaUrl(path.value)
+                    if (url.isBlank()) error("Èü≥‰πêÊúçÂä°Âô®ËøîÂõû‰∫Ü‰∏çÂèó‰ø°‰ªªÁöÑÊí≠ÊîæÂú∞ÂùÄ")
+                    val actual = inferQqStreamQuality(path.value, path.sourceKey)
+                    val stream = StreamData(url, actual, System.currentTimeMillis() + data.long("expiration", 3600) * 1000)
+                    AppLog.write("STREAM", "issued requested=$requested actual=$actual via=$module")
+                    bestFallback = higherQualityStream(bestFallback, stream)
+                    if (actual == requested) {
+                        streamCache[cacheKey] = bestFallback!!
+                        return@withContext bestFallback!!
+                    }
+                }
+            }
+            if (
+                qualityIndex == 0 &&
+                bestFallback == null &&
+                complete.requiresVip &&
+                allowCredentialRecovery &&
+                probePlaybackCredential()
+            ) {
+                AppLog.write("STREAM", "credential refreshed; retry track=${track.id}")
+                return@withContext stream(track, quality, allowCredentialRecovery = false)
+            }
+        }
+        bestFallback?.let {
+            streamCache[cacheKey] = it
+            return@withContext it
+        }
+        if (!receivedResponse) firstFailure?.let { throw it }
+        AppLog.write("STREAM", "no-url track=${track.id} vip=${complete.requiresVip}")
+        error(if (complete.requiresVip) "ËøôÈ¶ñÊ≠åÈúÄË¶Å VIP ÊàñË¥≠‰π∞" else "QQ Èü≥‰πêÊú™Êèê‰æõÊí≠ÊîæÂú∞ÂùÄÔºåÂèØËÉΩÂ≠òÂú®ÁâàÊùÉ„ÄÅÂú∞Âå∫ÊàñË¥¶Âè∑ÊùÉÁõäÈôêÂà∂")
+    }
+
+    suspend fun library(): LibraryData = withContext(Dispatchers.IO) {
+        requireLogin()
+        coroutineScope {
+            val playlistsTask = async {
+                api("music.musicasset.PlaylistBaseRead", "GetPlaylistByUin", obj("uin" to accountId()))
+            }
+            val collectedTask = async {
+                runCatching { favoritePlaylists() }.onFailure { error ->
+                    val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
+                        ?: "${error.javaClass.simpleName}"
+                    AppLog.write("LIBRARY", "favorite playlists unavailable $detail")
+                }.getOrDefault(emptyList())
+            }
+            val likedTask = async { likedTracks() }
+            val playlists = playlistsTask.await()
+            val collectedPlaylists = collectedTask.await()
+            val likedTracks = likedTask.await()
+            val accountPlaylists = parseAccountPlaylists(playlists)
+            normalizeLibraryData(
+                LibraryData(likedTracks, mergeLibraryPlaylists(accountPlaylists, collectedPlaylists)),
+            )
+        }
+    }
+
+    private suspend fun likedTracks(): List<Track> {
+        val likedTracks = mutableListOf<Track>()
+        val likedIds = mutableSetOf<String>()
+        for (page in 0 until 20) {
+            val liked = api(
+                "music.srfDissInfo.DissInfo", "CgiGetDiss",
+                obj("disstid" to 0, "dirid" to 201, "tag" to true, "song_begin" to page * 100, "song_num" to 100, "userinfo" to true, "orderlist" to true),
+            )
+            val batch = findTracks(liked)
+            val previousSize = likedTracks.size
+            likedTracks += batch.filter { likedIds.add(it.id) }
+            if (batch.size < 100 || likedTracks.size == previousSize) break
+        }
+        return likedTracks
+    }
+
+    private suspend fun favoritePlaylists(): List<MusicCollection> {
+        val encryptedUin = cookieValue("euin").orEmpty()
+        if (encryptedUin.isBlank()) {
+            AppLog.write("LIBRARY", "favorite playlists encrypted_id=missing compatibility=unpaged")
+            return api(
+                "music.musicasset.PlaylistFavRead", "GetPlaylistFavInfo",
+                obj("uin" to accountId()),
+            ).let(::parseFavoritePlaylists)
+        }
+
+        val playlists = mutableListOf<MusicCollection>()
+        val directories = mutableSetOf<String>()
+        for (page in 0 until 20) {
+            val data = try {
+                api(
+                    "music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo",
+                    obj("uin" to encryptedUin, "offset" to page * 100, "size" to 100),
+                )
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                if (page == 0 && error is QqBusinessException && error.businessCode == 80050) {
+                    AppLog.write("LIBRARY", "favorite playlists compatibility=unpaged")
+                    return api(
+                        "music.musicasset.PlaylistFavRead", "GetPlaylistFavInfo",
+                        obj("uin" to accountId()),
+                    ).let(::parseFavoritePlaylists)
+                }
+                if (playlists.isNotEmpty()) {
+                    val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
+                        ?: error.javaClass.simpleName
+                    AppLog.write("LIBRARY", "favorite playlists partial $detail")
+                    return playlists
+                }
+                throw error
+            }
+            val batch = parseFavoritePlaylists(data)
+            val previousSize = playlists.size
+            playlists += batch.filter { directories.add(it.directoryId) }
+            if (batch.size < 100 || playlists.size == previousSize) break
+        }
+        return playlists
+    }
+
+    suspend fun profile(): UserProfile = withContext(Dispatchers.IO) {
+        requireLogin()
+        val id = accountId()
+        val roots = coroutineScope {
+            val profileTasks = listOf("GetLoginUserInfo", "GetUserInfo").map { method ->
+                async {
+                    runCatching {
+                        api(
+                            "music.UserInfo.userInfoServer",
+                            method,
+                            obj("user_uin" to id, "login_uin" to id, "uin" to id),
+                        )
+                    }.getOrNull()?.also { data ->
+                        AppLog.write("PROFILE", "$method keys=${data.keys.joinToString(",").take(300)}")
+                    }
+                }
+            }
+            val vipTask = async {
+                runCatching {
+                    api("VipLogin.VipLoginInter", "vip_login_base", obj())
+                }.getOrNull()?.let { data ->
+                    AppLog.write("PROFILE", "vip_login_base keys=${data.keys.joinToString(",").take(300)}")
+                    buildJsonObject { put("vip_response", data) }
+                }
+            }
+            val legacyTask = async { runCatching { gatewayLegacy("profile") }.getOrNull() }
+            (profileTasks + listOf(vipTask, legacyTask)).awaitAll().filterNotNull()
+        }
+        mergeUserProfiles(roots.mapNotNull(::parseUserProfile)) ?: error("QQ Èü≥‰πêÊú™ËøîÂõûË¥¶Âè∑ËµÑÊñô")
+    }
+
+    suspend fun latestRelease(currentVersion: String): ReleaseInfo = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url("https://api.github.com/repos/huanghao897/QMusicWatch/releases/latest")
+            .header("Accept", "application/vnd.github+json").header("User-Agent", "QMusicWatch/$currentVersion").build()
+        http.newCall(request).execute().use { response ->
+            if (response.code == 404) return@withContext ReleaseInfo(
+                tag = currentVersion, title = "ÊöÇÊó†Ê≠£ÂºèÂèëÂ∏ÉÁâàÊú¨", notes = "ÂΩìÂâç‰ªìÂ∫ìÂ∞öÊú™ÂàõÂª∫ GitHub Release„ÄÇ",
+                pageUrl = "https://github.com/huanghao897/QMusicWatch/releases", newer = false,
+            )
+            if (!response.isSuccessful) error("GitHub Release Ê£ÄÊü•Â§±Ë¥• ${response.code}")
+            parseGitHubRelease(json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject, currentVersion)
+        }
+    }
+
+    suspend fun recent(): List<Track> = emptyList() // QQ Music has no stable public recent-play contract.
+
+    suspend fun diagnose(): String = withContext(Dispatchers.IO) {
+        requireLogin()
+        val library = library()
+        val track = home().daily.firstOrNull { !it.requiresVip && it.playable }
+            ?: error("Ê≤°ÊúâÊâæÂà∞ÂèØÁî®‰∫éÊí≠ÊîæËØäÊñ≠ÁöÑÂÖçË¥πÊ≠åÊõ≤")
+        val stream = stream(track, QUALITY_STANDARD)
+        val request = Request.Builder().url(stream.url)
+            .header("Range", "bytes=0-0").header("User-Agent", WEB_UA).build()
+        http.newCall(request).execute().use { response ->
+            AppLog.write("DIAG", "cdn status=${response.code}")
+            if (response.code !in listOf(200, 206)) error("Êí≠Êîæ CDN ÂìçÂ∫î ${response.code}")
+            "ÁôªÂΩïÊúâÊïà ¬∑ ${library.playlists.size} ‰∏™Ê≠åÂçï ¬∑ Êí≠Êîæ CDN ${response.code}"
+        }
+    }
+
+    suspend fun like(track: Track, liked: Boolean): Ack = withContext(Dispatchers.IO) {
+        requireLogin()
+        val write = qqFavoriteTrackWrite(track, liked)
+        requireWriteAccepted(post(webComm(), write.module, write.method, write.param))
+        Ack(true)
+    }
+
+    suspend fun collection(type: String, collection: MusicCollection): CollectionDetail = withContext(Dispatchers.IO) {
+        val tracks = mutableListOf<Track>()
+        val ids = mutableSetOf<String>()
+        var title = collection.title.ifBlank { "ËØ¶ÊÉÖ" }
+        for (page in 0 until 20) {
+            val begin = page * 100
+            val data = when (type) {
+                "album" -> api("music.musichallAlbum.AlbumSongList", "GetAlbumSongList", obj("albumMid" to collection.id, "begin" to begin, "num" to 100, "order" to 2))
+                "artist" -> api("musichall.song_list_server", "GetSingerSongList", obj("singerMid" to collection.id, "begin" to begin, "num" to 100, "order" to 1))
+                else -> {
+                    val identity = qqPlaylistDetailIdentity(collection)
+                    if (identity.dissId <= 0 && identity.directoryId <= 0) error("Ê≠åÂçïÊ†áËØÜÊó†ÊïàÔºåËØ∑Âà∑Êñ∞Ê≠åÂçïÂêéÈáçËØï")
+                    api(
+                        "music.srfDissInfo.DissInfo", "CgiGetDiss",
+                        obj(
+                            "disstid" to identity.dissId, "dirid" to identity.directoryId,
+                            "tag" to true, "song_begin" to begin, "song_num" to 100,
+                            "userinfo" to true, "orderlist" to true,
+                        ),
+                    )
+                }
+            }
+            if (page == 0) title = walkObjects(data).firstNotNullOfOrNull { it.string("title").ifBlank { it.string("name") }.takeIf(String::isNotBlank) } ?: title
+            val batch = findTracks(data)
+            val previousSize = tracks.size
+            tracks += batch.filter { ids.add(it.id) }
+            if (batch.size < 100 || tracks.size == previousSize) break
+        }
+        CollectionDetail(title, tracks)
+    }
+
+    suspend fun createPlaylist(title: String): MusicCollection = withContext(Dispatchers.IO) {
+        requireLogin()
+        val data = api("music.musicasset.PlaylistBaseWrite", "AddPlaylist", obj("dirName" to title))
+        val item = walkObjects(data).firstOrNull { it["dirId"] != null || it["tid"] != null } ?: JsonObject(emptyMap())
+        val dirId = item.string("dirId")
+        playlistDirectoryNumber(dirId)
+        MusicCollection(item.string("tid").ifBlank { dirId }, title, directoryId = dirId)
+    }
+
+    suspend fun renamePlaylist(id: String, title: String): Ack = withContext(Dispatchers.IO) {
+        requireLogin()
+        api("music.musicasset.PlaylistBaseWrite", "ModifyPlaylist", obj("dirId" to playlistDirectoryNumber(id), "dirName" to title))
+        Ack(true)
+    }
+
+    suspend fun deletePlaylist(id: String): Ack = withContext(Dispatchers.IO) {
+        requireLogin()
+        api("music.musicasset.PlaylistBaseWrite", "DelPlaylist", obj("dirId" to playlistDirectoryNumber(id)))
+        Ack(true)
+    }
+
+    suspend fun changePlaylistTrack(id: String, track: Track, add: Boolean): Ack = withContext(Dispatchers.IO) {
+        requireLogin()
+        val complete = if (track.numericId > 0) track else trackDetail(track.id)
+        if (complete.numericId <= 0) error("QQ Èü≥‰πêÊú™ËøîÂõûÊ≠åÊõ≤Êï∞Â≠óÊ†áËØÜÔºåÊó†Ê≥ï‰øÆÊîπÊ≠åÂçï")
+        val write = qqPlaylistTrackWrite(playlistDirectoryNumber(id), complete, add)
+        requireWriteAccepted(post(webComm(), write.module, write.method, write.param))
+        Ack(true)
+    }
+
+    private fun smartSearch(query: String): JsonObject {
+        return gatewayLegacy("smartSearch", query = query)["data"]?.jsonObject
+            ?: error("QQ Èü≥‰πêÊêúÁ¥¢ÂìçÂ∫îÊó†Êïà")
+    }
+
+    private fun webSearch(query: String, page: Int, type: Int): JsonObject {
+        return gatewayLegacy("search", query = query, page = page, type = type)["data"]?.jsonObject
+            ?: error("QQ Èü≥‰πêÊêúÁ¥¢ÂìçÂ∫îÊó†Êïà")
+    }
+
+    private fun searchCollection(type: String, item: JsonObject): MusicCollection? {
+        val id = when (type) { "artist" -> item.string("singerMID").ifBlank { item.string("mid") }; "album" -> item.string("albumMID").ifBlank { item.string("mid") }; else -> item.string("dissid").ifBlank { item.string("id") }.ifBlank { item.string("mid") } }
+        val title = when (type) { "artist" -> item.string("singerName").ifBlank { item.string("name") }; "album" -> item.string("albumName").ifBlank { item.string("name") }; else -> item.string("dissname").ifBlank { item.string("name") } }
+        if (id.isBlank() || title.isBlank()) return null
+        val count = listOf("songNum", "song_count", "songnum", "total").firstNotNullOfOrNull { key -> item[key]?.jsonPrimitive?.intOrNull } ?: -1
+        return MusicCollection(id, title, normalizeHttpsUrl(item.string("singerPic").ifBlank { item.string("imgurl") }.ifBlank { item.string("pic") }), count)
+    }
+
+    private suspend fun trackDetail(mid: String): Track {
+        require(isUsableQqSongMid(mid)) { "Ê≠åÊõ≤‰ø°ÊÅØÂ∑≤Â§±ÊïàÔºåËØ∑ÈáçÊñ∞ÊêúÁ¥¢ÂêéÊí≠Êîæ" }
+        val data = webApi("music.pf_song_detail_svr", "get_song_detail_yqq", obj("song_mid" to mid))
+        return findTracks(data).firstOrNull() ?: error("Êó†Ê≥ïËØªÂèñÊ≠åÊõ≤ËØ¶ÊÉÖ")
+    }
+
+    private suspend fun api(module: String, method: String, param: JsonObject): JsonObject {
+        return post(webComm(), module, method, param)
+    }
+
+    private suspend fun webApi(
+        module: String,
+        method: String,
+        param: JsonObject,
+        callTimeoutMs: Long? = null,
+    ): JsonObject = post(webComm(), module, method, param, callTimeoutMs = callTimeoutMs)
+
+    private fun requireWriteAccepted(data: JsonObject) {
+        val code = qqWriteBusinessCode(data) ?: return
+        if (code != 0) throw QqBusinessException(
+            code,
+            "QQ Èü≥‰πêÊ≤°Êúâ‰øùÂ≠òËøôÊ¨°‰øÆÊîπ ($code)",
+        )
+    }
+
+    private fun post(
+        comm: JsonObject, module: String, method: String, param: JsonObject,
+        requestCookie: String? = cookie(), tolerateBusinessError: Boolean = false,
+        allowCredentialRefresh: Boolean = true,
+        callTimeoutMs: Long? = null,
+    ): JsonObject {
+        val payload = buildJsonObject {
+            requestCookie?.takeIf(String::isNotBlank)?.let { put("cookie", it) }
+            put("comm", comm)
+            put("module", module)
+            put("method", method)
+            put("param", param)
+        }
+        val started = System.currentTimeMillis()
+        val result = try {
+            gatewayRequest("musicu", payload, callTimeoutMs)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            AppLog.write("API", "$module/$method gateway_error=${error.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
+            throw error
+        }
+        val code = result.int("code")
+        AppLog.write("API", "$module/$method code=$code ms=${System.currentTimeMillis() - started}")
+        if (shouldRefreshCredential(module, method, code)) {
+            val staleCookie = requestCookie.orEmpty()
+            val refreshed = allowCredentialRefresh && staleCookie.isNotBlank() && runCatching {
+                refreshCredentialBlocking(staleCookie, MusicCookie.provider(staleCookie, "qq"))
+            }.onFailure { error ->
+                AppLog.write("AUTH", "credential refresh failed ${error.javaClass.simpleName}")
+            }.getOrDefault(false)
+            if (refreshed) {
+                return post(
+                    comm = requestCommAfterCredentialRefresh(module),
+                    module = module,
+                    method = method,
+                    param = param,
+                    requestCookie = cookie(),
+                    tolerateBusinessError = tolerateBusinessError,
+                    allowCredentialRefresh = false,
+                    callTimeoutMs = callTimeoutMs,
+                )
+            }
+            throw QqCredentialExpiredException("ÁôªÂΩïÁä∂ÊÄÅÂ∑≤Â§±ÊïàÔºåËØ∑ÈáçÊñ∞Êâ´Á†ÅÁôªÂΩï‰∏ÄÊ¨°")
+        }
+        if (code == 0 && isLoginCredentialProbe(module, method)) {
+            markCredentialVerified(requestCookie.orEmpty())
+        }
+        if (code != 0 && !tolerateBusinessError) throw QqBusinessException(
+            code,
+            result.string("message").ifBlank { "QQ Èü≥‰πêÊé•Âè£ÊãíÁªùËØ∑Ê±Ç ($code)" },
+        )
+        return result["data"]?.jsonObject ?: JsonObject(emptyMap())
+    }
+
+    private fun gatewayLegacy(
+        operation: String,
+        query: String = "",
+        page: Int = 1,
+        type: Int = 0,
+    ): JsonObject {
+        val payload = buildJsonObject {
+            put("operation", operation)
+            cookie()?.takeIf(String::isNotBlank)?.let { put("cookie", it) }
+            if (operation in setOf("search", "smartSearch")) put("query", query)
+            if (operation == "search") {
+                put("page", page)
+                put("type", type)
+            }
+        }
+        return gatewayRequest("legacy", payload)
+    }
+
+    private fun gatewayRequest(
+        route: String,
+        payload: JsonObject,
+        callTimeoutMs: Long? = null,
+    ): JsonObject {
+        return gatewayPost("api/qmusic-watch/gateway/$route", payload, callTimeoutMs)
+    }
+
+    private fun gatewayPost(
+        path: String,
+        payload: JsonObject,
+        callTimeoutMs: Long? = null,
+    ): JsonObject {
+        val request = Request.Builder()
+            .url(qmusicServerEndpoint(path))
+            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .header("Accept", "application/json")
+            .header("User-Agent", WEB_UA)
+            .build()
+        val call = http.newCall(request)
+        callTimeoutMs?.takeIf { it > 0 }?.let {
+            call.timeout().timeout(it, TimeUnit.MILLISECONDS)
+        }
+        call.execute().use { response ->
+            val text = response.body?.byteStream()?.use(::readGatewayBody).orEmpty()
+            val root = runCatching { json.parseToJsonElement(text).jsonObject }
+                .getOrElse { error("Èü≥‰πêÊúçÂä°Âô®ÂìçÂ∫îÊ†ºÂºèÊó†Êïà") }
+            if (!response.isSuccessful || root["ok"]?.jsonPrimitive?.booleanOrNull != true) {
+                val gatewayError = root["error"] as? JsonObject
+                val message = gatewayError?.string("message")
+                    .orEmpty().take(160).ifBlank { "Èü≥‰πêÊúçÂä°Âô®ÂìçÂ∫î ${response.code}" }
+                throw QMusicGatewayException(
+                    statusCode = response.code,
+                    errorCode = gatewayError?.string("code").orEmpty(),
+                    message = message,
+                )
+            }
+            return root["data"]?.jsonObject ?: error("Èü≥‰πêÊúçÂä°Âô®ÂìçÂ∫îÁº∫Â∞ëÊï∞ÊçÆ")
+        }
+    }
+
+    private fun requestCommAfterCredentialRefresh(module: String): JsonObject = when (module) {
+        "vkey.GetVkeyServer" -> playbackComm(android = false)
+        "music.vkey.GetVkey" -> playbackComm(android = true)
+        else -> webComm()
+    }
+
+    private fun probePlaybackCredential(): Boolean {
+        val staleCookie = cookie().orEmpty()
+        if (staleCookie.isBlank()) error("ËØ∑ÂÖàÁôªÂΩï")
+        val now = System.currentTimeMillis()
+        if (staleCookie == verifiedCredentialCookie && now < credentialVerifiedUntil) {
+            AppLog.write("AUTH", "playback credential probe cache-hit")
+            return false
+        }
+        post(
+            comm = webComm(),
+            module = LOGIN_USER_INFO_MODULE,
+            method = LOGIN_CREDENTIAL_PROBE_METHOD,
+            param = obj(),
+            requestCookie = staleCookie,
+        )
+        val currentCookie = cookie().orEmpty()
+        markCredentialVerified(currentCookie)
+        return currentCookie.isNotBlank() && currentCookie != staleCookie
+    }
+
+    private fun markCredentialVerified(value: String) {
+        if (value.isBlank()) return
+        verifiedCredentialCookie = value
+        credentialVerifiedUntil = System.currentTimeMillis() + 5 * 60_000L
+    }
+
+    private fun refreshCredentialBlocking(staleCookie: String, provider: String): Boolean =
+        synchronized(credentialRefreshLock) {
+            val currentCookie = cookie().orEmpty()
+            if (currentCookie.isNotBlank() && currentCookie != staleCookie) return@synchronized true
+            val now = System.currentTimeMillis()
+            if (staleCookie == recentlyRefreshedCookie && now - recentlyRefreshedAt < 60_000L) {
+                AppLog.write("AUTH", "credential refresh suppressed after recent rotation")
+                return@synchronized false
+            }
+            val payload = buildJsonObject {
+                put("provider", provider)
+                put("cookie", staleCookie)
+            }
+            val data = gatewayPost("api/qmusic-watch/auth/refresh", payload)
+            val refreshed = validateRefreshedCookie(staleCookie, data.string("cookie"))
+            updateCookie(refreshed)
+            streamCache.clear()
+            verifiedCredentialCookie = ""
+            credentialVerifiedUntil = 0L
+            recentlyRefreshedCookie = refreshed
+            recentlyRefreshedAt = System.currentTimeMillis()
+            AppLog.write("AUTH", "credential refreshed provider=$provider")
+            true
+        }
+
+    private fun readGatewayBody(input: java.io.InputStream): String {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8 * 1024)
+        var total = 0
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            total += read
+            require(total <= 4 * 1024 * 1024) { "Èü≥‰πêÊúçÂä°Âô®ÂìçÂ∫îËøáÂ§ß" }
+            output.write(buffer, 0, read)
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
+
+    private fun webComm() = buildJsonObject {
+        val gtk = hash33(cookieValue("qqmusic_key", "qm_keyst", "p_skey", "skey").orEmpty())
+        put("ct", 24); put("cv", 4_747_474); put("platform", "yqq.json"); put("uin", accountId().ifBlank { "0" })
+        put("g_tk", gtk); put("g_tk_new_20200303", gtk); put("format", "json"); put("inCharset", "utf-8"); put("outCharset", "utf-8"); put("notice", 0); put("need_new_code", 1)
+    }
+
+    private fun playbackComm(android: Boolean) = buildJsonObject {
+        val id = accountId()
+        val key = cookieValue("qqmusic_key", "qm_keyst").orEmpty()
+        if (android) {
+            put("ct", 11); put("cv", 20_030_508); put("v", 20_030_508)
+            put("tmeAppID", "qqmusic"); put("chid", "10003505")
+        } else {
+            webComm().forEach { (name, value) -> put(name, value) }
+            put("g_tk", hash33(key)); put("g_tk_new_20200303", hash33(key))
+        }
+        put("uin", id); put("qq", id); put("authst", key)
+        put("tmeLoginType", cookieValue("tmeLoginType") ?: "1")
+    }
+
+    private fun findTracks(root: JsonElement): List<Track> = walkObjects(root).mapNotNull { value ->
+        val mid = firstUsableQqSongMid(value.string("mid"), value.string("songmid"), value.string("song_mid"))
+        val singers = value["singer"] as? JsonArray
+        val album = value["album"] as? JsonObject
+        if (!isUsableQqSongMid(mid) || singers == null || album == null) return@mapNotNull null
+        val file = value["file"] as? JsonObject ?: JsonObject(emptyMap())
+        val pay = value["pay"] as? JsonObject ?: JsonObject(emptyMap())
+        val numericId = value.long("id")
+        Track(
+            id = mid, title = value.string("title").ifBlank { value.string("name") },
+            artists = singers.mapNotNull { (it as? JsonObject)?.string("name")?.takeIf(String::isNotBlank) },
+            album = album.string("title").ifBlank { album.string("name") },
+            artworkUrl = qmusicAlbumArtworkUrl(album.string("mid")).ifBlank { qmusicSongArtworkUrl(mid) },
+            playable = value.int("isonly") == 0 && pay.int("pay_play") == 0,
+            qualities = parseQqQualityIds(value, file),
+            numericId = numericId, mediaMid = file.string("media_mid"), songType = value.int("type"),
+            requiresVip = value.int("isonly") != 0 || pay.int("pay_play") != 0
+        )
+    }.distinctBy { it.id }.toList()
+
+    private fun findCollections(root: JsonElement, kind: String = "playlist"): List<MusicCollection> = walkObjects(root).mapNotNull { value ->
+        val title = value.string("title").ifBlank { value.string("name") }.ifBlank { value.string("dirName") }
+        val directoryId = value.string("dirId").ifBlank { value.string("dirid") }
+        val id = when (kind) {
+            "artist", "album" -> value.string("mid")
+            else -> value.string("tid").ifBlank { value.string("id") }.ifBlank { directoryId }
+        }
+        val looksRight = when (kind) {
+            "artist" -> value["singer"] == null && (value["uin"] != null || value["singerMid"] != null || value["mid"] != null)
+            "album" -> value["time_public"] != null || value["albumMid"] != null
+            else -> value["songNum"] != null || value["songnum"] != null || value["dirId"] != null || value["dirid"] != null
+        }
+        if (!looksRight || id.isBlank() || title.isBlank()) null else MusicCollection(
+            id, title,
+            normalizeHttpsUrl(value.string("picUrl").ifBlank { value.string("picurl") }.ifBlank { value.string("pic") }),
+            value.int("songNum").takeIf { it > 0 } ?: value.int("songnum"),
+            directoryId.ifBlank { id },
+        )
+    }.distinctBy { it.id }.toList()
+
+    private fun walkObjects(element: JsonElement): Sequence<JsonObject> = sequence {
+        when (element) {
+            is JsonObject -> { yield(element); element.values.forEach { yieldAll(walkObjects(it)) } }
+            is JsonArray -> element.forEach { yieldAll(walkObjects(it)) }
+            else -> Unit
+        }
+    }
+
+    private fun streamPath(data: JsonElement): QqStreamPath? = walkObjects(data).firstNotNullOfOrNull { item ->
+        listOf("purl", "wifiurl", "flowurl", "opi128kurl", "opi96kurl")
+            .firstNotNullOfOrNull { key -> item.string(key).takeIf(String::isNotBlank)?.let { QqStreamPath(it, key) } }
+    }
+
+    private fun obj(vararg entries: Pair<String, Any?>): JsonObject = buildJsonObject { entries.forEach { (k, v) -> put(k, any(v)) } }
+    private fun any(value: Any?): JsonElement = when (value) {
+        null -> JsonNull; is JsonElement -> value; is String -> JsonPrimitive(value); is Number -> JsonPrimitive(value); is Boolean -> JsonPrimitive(value)
+        is Map<*, *> -> buildJsonObject { value.forEach { (k, v) -> put(k.toString(), any(v)) } }
+        is Iterable<*> -> buildJsonArray { value.forEach { add(any(it)) } }
+        else -> JsonPrimitive(value.toString())
+    }
+    private fun JsonObject.string(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    private fun JsonObject.int(key: String) = (this[key] as? JsonPrimitive)?.intOrNull ?: 0
+    private fun JsonObject.long(key: String, default: Long = 0) = (this[key] as? JsonPrimitive)?.longOrNull ?: default
+    private fun decodeText(value: String): String = decodeQqLyricText(value)
+    private fun saved(key: String, factory: () -> String): String = prefs.getString(key, null) ?: factory().also { prefs.edit().putString(key, it).apply() }
+    private fun hash33(value: String): Int = value.fold(5381) { hash, char -> hash + (hash shl 5) + char.code } and 0x7fffffff
+    private fun cookieValue(vararg names: String): String? = cookie()?.split(';')?.map(String::trim)?.firstNotNullOfOrNull { part -> names.firstOrNull { part.startsWith("$it=") }?.let { part.substringAfter('=') } }
+    private fun accountId() = cookieValue("qqmusic_uin", "uin", "wxuin").orEmpty().trimStart('o')
+    private fun requireLogin() { if (cookie().isNullOrBlank()) error("ËØ∑ÂÖàÊâ´Á†ÅÁôªÂΩï") }
+    companion object {
+        private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+        private const val WEB_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
+    }
+}
