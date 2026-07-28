@@ -3,6 +3,7 @@ package com.ronan.qmusicwatch
 import com.ronan.qmusicwatch.network.QMusicGatewayException
 import com.ronan.qmusicwatch.network.qmusicAlbumArtworkUrl
 import com.ronan.qmusicwatch.network.qmusicAvatarUrl
+import com.ronan.qmusicwatch.network.qmusicSongArtworkUrl
 import com.ronan.qmusicwatch.network.requiresNewQrLogin
 import com.ronan.qmusicwatch.network.safeLocalOrGatewayUri
 import com.ronan.qmusicwatch.network.sessionNeedsGatewayCredentialRefresh
@@ -26,7 +27,12 @@ class QMusicGatewayTest {
             "https://203.160.55.168/api/qmusic-watch/gateway/avatar/qq/12345.jpg",
             qmusicAvatarUrl("o12345"),
         )
+        assertEquals(
+            "https://203.160.55.168/api/qmusic-watch/gateway/artwork/album/QMWTRACK00485V8K4InqbZ.jpg",
+            qmusicSongArtworkUrl("00485V8K4InqbZ"),
+        )
         assertEquals("", qmusicAlbumArtworkUrl("../unsafe"))
+        assertEquals("", qmusicSongArtworkUrl("../unsafe"))
         assertEquals("", qmusicAvatarUrl("not-a-uin"))
     }
 

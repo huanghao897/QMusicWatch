@@ -5,6 +5,7 @@ import com.ronan.qmusicwatch.network.qqFavoriteTrackWrite
 import com.ronan.qmusicwatch.network.qqPlaylistTrackWrite
 import com.ronan.qmusicwatch.network.qqWriteBusinessCode
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.buildJsonObject
@@ -20,22 +21,23 @@ class FavoriteWriteTest {
         songType = 0,
     )
 
-    @Test fun favoriteUsesCurrentSongMidContractInsteadOfRejectedCgiContract() {
+    @Test fun favoriteUsesLikedPlaylistDirectoryInsteadOfRejectedFavoriteContract() {
         val write = qqFavoriteTrackWrite(track, liked = true)
 
-        assertEquals("music.musicasset.SongFavWrite", write.module)
-        assertEquals("AddSongFans", write.method)
-        assertEquals(
-            track.id,
-            write.param.getValue("v_songMid").jsonArray.single().jsonPrimitive.content,
-        )
+        assertEquals("music.musicasset.PlaylistDetailWrite", write.module)
+        assertEquals("AddSonglist", write.method)
+        assertEquals(201L, write.param.getValue("dirId").jsonPrimitive.long)
+        val song = write.param.getValue("v_songInfo").jsonArray.single().jsonObject
+        assertEquals(track.numericId, song.getValue("songId").jsonPrimitive.long)
+        assertEquals(track.songType, song.getValue("songType").jsonPrimitive.content.toInt())
     }
 
-    @Test fun removingFavoriteAndEditingPlaylistKeepSeparateContracts() {
+    @Test fun removingFavoriteAndEditingPlaylistUseTheirOwnDirectories() {
         val favorite = qqFavoriteTrackWrite(track, liked = false)
         val playlist = qqPlaylistTrackWrite(directoryId = 5566L, track = track, add = false)
 
-        assertEquals("DelSongFans", favorite.method)
+        assertEquals("DelSonglist", favorite.method)
+        assertEquals(201L, favorite.param.getValue("dirId").jsonPrimitive.long)
         assertEquals("DelSonglist", playlist.method)
         assertEquals(5566L, playlist.param.getValue("dirId").jsonPrimitive.long)
     }

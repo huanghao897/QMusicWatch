@@ -8,6 +8,7 @@ import com.ronan.qmusicwatch.network.normalizeLibraryData
 import com.ronan.qmusicwatch.network.parseAccountPlaylists
 import com.ronan.qmusicwatch.network.playlistDirectoryNumber
 import com.ronan.qmusicwatch.network.parseFavoritePlaylists
+import com.ronan.qmusicwatch.network.qqPlaylistDetailIdentity
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -85,6 +86,35 @@ class PlaylistParserTest {
 
         assertEquals(liked, normalized.liked)
         assertEquals(listOf("travel"), normalized.playlists.map(MusicCollection::id))
+    }
+
+    @Test fun migratesExpiredTemporaryLikedArtworkToStableSongArtwork() {
+        val oldArtwork = "https://203.160.55.168/api/qmusic-watch/gateway/media/${"a".repeat(32)}/cover.jpg"
+        val cached = LibraryData(
+            liked = listOf(Track("00485V8K4InqbZ", "水星记", artworkUrl = oldArtwork)),
+            playlists = emptyList(),
+        )
+
+        val normalized = normalizeLibraryData(cached)
+
+        assertEquals(
+            "https://203.160.55.168/api/qmusic-watch/gateway/artwork/album/QMWTRACK00485V8K4InqbZ.jpg",
+            normalized.liked.single().artworkUrl,
+        )
+    }
+
+    @Test fun usesDirectoryOnlyForOwnedPlaylistAndDissIdOnlyForCollectedPlaylist() {
+        val owned = qqPlaylistDetailIdentity(
+            MusicCollection("987654", "我的歌单", directoryId = "202", owned = true),
+        )
+        val collected = qqPlaylistDetailIdentity(
+            MusicCollection("99887766", "收藏歌单", directoryId = "99887766", owned = false),
+        )
+
+        assertEquals(0L, owned.dissId)
+        assertEquals(202L, owned.directoryId)
+        assertEquals(99887766L, collected.dissId)
+        assertEquals(0L, collected.directoryId)
     }
 
     @Test fun dedicatedFavoriteWinsWhenSourcesUseDifferentIdsForTheSameDirectory() {

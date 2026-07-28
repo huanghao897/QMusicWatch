@@ -60,11 +60,26 @@ class PlaybackConnection(context: Context) {
         if (future.isDone) run() else future.addListener(run, mainExecutor)
     }
     fun play(id: String, uri: String, title: String, artist: String, artwork: String) {
+        replaceStream(id, uri, title, artist, artwork, startPositionMs = 0, playWhenReady = true)
+    }
+    fun replaceStream(
+        id: String,
+        uri: String,
+        title: String,
+        artist: String,
+        artwork: String,
+        startPositionMs: Long,
+        playWhenReady: Boolean,
+    ) {
         AppLog.write("PLAYER", "prepare track=$id scheme=${android.net.Uri.parse(uri).scheme.orEmpty()}")
-        withController {
-            it.apply {
-            setMediaItem(playbackMediaItem(id, uri, title, artist, artwork))
-            prepare(); play()
+        withController { controller ->
+            controller.apply {
+                setMediaItem(
+                    playbackMediaItem(id, uri, title, artist, artwork),
+                    startPositionMs.coerceAtLeast(0),
+                )
+                prepare()
+                if (playWhenReady) play() else pause()
             }
         }
     }
@@ -80,6 +95,7 @@ class PlaybackConnection(context: Context) {
     fun currentMediaId() = controllerOrNull()?.currentMediaItem?.mediaId.orEmpty()
     fun currentUri() = controllerOrNull()?.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
     fun isPlaying() = controllerOrNull()?.isPlaying == true
+    fun playWhenReady() = controllerOrNull()?.playWhenReady == true
     fun adjustVolume(direction: Int) = audio.adjustStreamVolume(
         AudioManager.STREAM_MUSIC,
         if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,

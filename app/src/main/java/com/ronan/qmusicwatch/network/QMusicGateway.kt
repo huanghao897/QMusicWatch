@@ -42,6 +42,17 @@ internal fun qmusicAlbumArtworkUrl(albumMid: String): String {
     return qmusicServerEndpoint("api/qmusic-watch/gateway/artwork/album/$id.jpg").toString()
 }
 
+/**
+ * Returns a restart-safe artwork URL when an old cached track does not contain
+ * its album MID. The gateway resolves the song MID and still proxies the image;
+ * the watch never connects to a QQ Music host.
+ */
+internal fun qmusicSongArtworkUrl(songMid: String): String {
+    val id = songMid.trim()
+    if (!id.matches(Regex("[A-Za-z0-9]{1,48}")) || !isUsableQqSongMid(id)) return ""
+    return qmusicAlbumArtworkUrl("QMWTRACK$id")
+}
+
 internal fun qmusicAvatarUrl(uin: String): String {
     val id = uin.trim().trimStart('o')
     if (!id.matches(Regex("\\d{1,24}"))) return ""
