@@ -1,0 +1,39 @@
+package com.ronan.qmusicwatch
+
+import androidx.compose.ui.unit.dp
+import com.ronan.qmusicwatch.ui.WatchUiSize
+import com.ronan.qmusicwatch.ui.WatchWindowClass
+import com.ronan.qmusicwatch.ui.resolveWatchDimensions
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class WatchDesignTest {
+    @Test fun compact480PixelWatchUses240DpTokens() {
+        val dimensions = resolveWatchDimensions(240.dp, WatchUiSize.Compact)
+
+        assertEquals(WatchWindowClass.Compact, dimensions.windowClass)
+        assertEquals(8.dp, dimensions.screenPadding)
+        assertEquals(44.dp, dimensions.trackRowHeight)
+        assertEquals(40.dp, dimensions.searchHeight)
+        assertEquals(50.dp, dimensions.miniPlayerHeight)
+        assertEquals(13f, dimensions.bodySp)
+    }
+
+    @Test fun largerUiModesScaleWithoutChangingWindowClass() {
+        val compact = resolveWatchDimensions(320.dp, WatchUiSize.Compact)
+        val large = resolveWatchDimensions(320.dp, WatchUiSize.Large)
+
+        assertEquals(WatchWindowClass.Medium, compact.windowClass)
+        assertEquals(WatchWindowClass.Medium, large.windowClass)
+        assertTrue(large.trackRowHeight > compact.trackRowHeight)
+        assertTrue(large.bodySp > compact.bodySp)
+    }
+
+    @Test fun storedUiSizeFallsBackToCompact() {
+        assertEquals(WatchUiSize.Compact, WatchUiSize.fromStored(null))
+        assertEquals(WatchUiSize.Compact, WatchUiSize.fromStored("phone"))
+        assertEquals(WatchUiSize.Standard, WatchUiSize.fromStored("standard"))
+        assertEquals(WatchUiSize.Large, WatchUiSize.fromStored("large"))
+    }
+}

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore by preferencesDataStore("settings")
 internal fun normalizeLyricAlignment(value: String?): String = if (value == "center") "center" else "left"
+internal fun normalizeUiSize(value: String?): String = value?.takeIf { it in setOf("compact", "standard", "large") } ?: "compact"
 
 class SettingsStore(private val context: Context) {
     private val qualityKey = stringPreferencesKey("quality")
@@ -35,6 +36,8 @@ class SettingsStore(private val context: Context) {
     private val controlPlaneCacheKey = stringPreferencesKey("control_plane_cache")
     private val seenAnnouncementsKey = stringPreferencesKey("seen_announcements")
     private val pendingUpdateReleaseKey = stringPreferencesKey("pending_update_release")
+    private val uiSizeKey = stringPreferencesKey("ui_size")
+    private val artworkAccentKey = stringPreferencesKey("artwork_accent")
     val quality = context.settingsDataStore.data.map { normalizeQualityId(it[qualityKey]) }
     val headphoneWarning = context.settingsDataStore.data.map { it[headphoneWarningKey] ?: true }
     val autoOpenPlayer = context.settingsDataStore.data.map { it[autoOpenPlayerKey] ?: true }
@@ -56,6 +59,8 @@ class SettingsStore(private val context: Context) {
     val accountSnapshots = context.settingsDataStore.data.map { it[accountSnapshotsKey].orEmpty() }
     val controlPlaneCache = context.settingsDataStore.data.map { it[controlPlaneCacheKey].orEmpty() }
     val pendingUpdateRelease = context.settingsDataStore.data.map { it[pendingUpdateReleaseKey].orEmpty() }
+    val uiSize = context.settingsDataStore.data.map { normalizeUiSize(it[uiSizeKey]) }
+    val artworkAccent = context.settingsDataStore.data.map { it[artworkAccentKey].orEmpty() }
     val seenAnnouncements = context.settingsDataStore.data.map {
         it[seenAnnouncementsKey].orEmpty().lineSequence().map(String::trim).filter(String::isNotBlank).take(100).toSet()
     }
@@ -85,6 +90,10 @@ class SettingsStore(private val context: Context) {
     suspend fun setControlPlaneCache(value: String) = context.settingsDataStore.edit { it[controlPlaneCacheKey] = value }
     suspend fun setPendingUpdateRelease(value: String?) = context.settingsDataStore.edit { preferences ->
         if (value.isNullOrBlank()) preferences.remove(pendingUpdateReleaseKey) else preferences[pendingUpdateReleaseKey] = value
+    }
+    suspend fun setUiSize(value: String) = context.settingsDataStore.edit { it[uiSizeKey] = normalizeUiSize(value) }
+    suspend fun setArtworkAccent(value: String) = context.settingsDataStore.edit {
+        it[artworkAccentKey] = value.replace('\n', ' ').take(500)
     }
     suspend fun markAnnouncementSeen(id: String) = context.settingsDataStore.edit { prefs ->
         val clean = id.replace('\n', ' ').trim().take(100)

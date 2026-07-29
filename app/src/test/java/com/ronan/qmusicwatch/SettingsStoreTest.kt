@@ -1,10 +1,19 @@
 package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.data.normalizeLyricAlignment
+import com.ronan.qmusicwatch.data.normalizeUiSize
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SettingsStoreTest {
+    @Test fun uiSizeDefaultsToCompactAndAcceptsOnlySupportedModes() {
+        assertEquals("compact", normalizeUiSize(null))
+        assertEquals("compact", normalizeUiSize("compact"))
+        assertEquals("standard", normalizeUiSize("standard"))
+        assertEquals("large", normalizeUiSize("large"))
+        assertEquals("compact", normalizeUiSize("phone"))
+    }
+
     @Test fun lyricAlignmentAcceptsOnlySupportedModes() {
         assertEquals("left", normalizeLyricAlignment(null))
         assertEquals("left", normalizeLyricAlignment("left"))

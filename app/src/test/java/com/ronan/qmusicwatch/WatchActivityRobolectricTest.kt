@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [24, 36], qualifiers = "w480dp-h480dp-mdpi")
+@Config(sdk = [24, 36], qualifiers = "w240dp-h240dp-xhdpi")
 @LooperMode(LooperMode.Mode.PAUSED)
 class WatchActivityRobolectricTest {
     @Test fun manifestDeclaresNotificationPermissionForMediaControls() {
@@ -35,6 +35,18 @@ class WatchActivityRobolectricTest {
             assertTrue("Compose root was not attached", content.childCount > 0)
             assertEquals(480, activity.resources.displayMetrics.widthPixels)
             assertEquals(480, activity.resources.displayMetrics.heightPixels)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h320dp-mdpi")
+    fun mainActivityAlsoLaysOutOnA320DpSquareDisplay() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).create().start().resume()
+        try {
+            assertEquals(320, controller.get().resources.displayMetrics.widthPixels)
+            assertEquals(320, controller.get().resources.displayMetrics.heightPixels)
         } finally {
             controller.pause().stop().destroy()
         }

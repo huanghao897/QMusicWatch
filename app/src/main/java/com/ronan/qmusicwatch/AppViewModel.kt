@@ -55,6 +55,16 @@ data class AppUiState(
     val queueImportTitle: String = "", val queueImportTracks: List<Track> = emptyList(), val queueImportLoading: Boolean = false,
 )
 
+data class AppChromeUiState(
+    val message: String? = null,
+    val playEvent: Long = 0,
+    val currentTrack: Track? = null,
+    val lyrics: List<com.ronan.qmusicwatch.lyrics.LyricLine> = emptyList(),
+    val pendingSpeakerTrack: Track? = null,
+    val announcements: List<ControlAnnouncement> = emptyList(),
+    val updateState: UpdateUiState = UpdateUiState.Idle,
+)
+
 internal fun insertNext(queue: List<Track>, currentId: String?, track: Track): List<Track> {
     val items = queue.filterNot { it.id == track.id }.toMutableList()
     val current = items.indexOfFirst { it.id == currentId }
@@ -125,6 +135,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = application as QMusicApplication
     private val _state = MutableStateFlow(AppUiState())
     val state = _state.asStateFlow()
+    val chromeState = state.map {
+        AppChromeUiState(
+            message = it.message,
+            playEvent = it.playEvent,
+            currentTrack = it.currentTrack,
+            lyrics = it.lyrics,
+            pendingSpeakerTrack = it.pendingSpeakerTrack,
+            announcements = it.announcements,
+            updateState = it.updateState,
+        )
+    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, AppChromeUiState())
     val downloads = graph.downloads.downloads.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val quality = graph.settings.quality.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QUALITY_STANDARD)
     /** Account-level options for the compact watch quality picker. */
@@ -146,6 +167,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val dailyCount = graph.settings.dailyCount.stateIn(viewModelScope, SharingStarted.Eagerly, 5)
     val searchHistory = graph.settings.searchHistory.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val seenAnnouncements = graph.settings.seenAnnouncements.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+    val uiSize = graph.settings.uiSize.stateIn(viewModelScope, SharingStarted.Eagerly, "compact")
+    val artworkAccent = graph.settings.artworkAccent.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue = _queue.asStateFlow()
     private val _queueIndex = MutableStateFlow(-1)
@@ -1002,6 +1025,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setLowPowerPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setLowPowerPlayer(value) }
     fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch { graph.settings.setWifiOnlyDownload(value) }
     fun setDailyCount(value: Int) = viewModelScope.launch { graph.settings.setDailyCount(value) }
+    fun setUiSize(value: String) = viewModelScope.launch { graph.settings.setUiSize(value) }
+    fun cacheArtworkAccent(artworkUrl: String, argb: Long) = viewModelScope.launch {
+        graph.settings.setArtworkAccent("${artworkUrl.take(400)}|$argb")
+    }
     fun addToQueue(track: Track) { if (_queue.value.none { it.id == track.id }) _queue.value = _queue.value + track; persistSnapshot(); _state.update { it.copy(message = "已加入播放列表") } }
     fun enqueueNext(track: Track) {
         val items = insertNext(_queue.value, _state.value.currentTrack?.id, track)
