@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -1054,12 +1055,15 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), userScrollEnabled = !locked) { page ->
             if (page == 1) {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
+                BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
                         LazyColumn(
-                            Modifier.fillMaxSize().padding(start = if (centerLyrics) 8.dp else 12.dp, end = 8.dp),
+                            Modifier.fillMaxSize()
+                                .clipToBounds()
+                                .padding(start = if (centerLyrics) 8.dp else 12.dp, end = 8.dp),
                             state = listState,
                             contentPadding = PaddingValues(vertical = (maxHeight / 2 - 22.dp).coerceAtLeast(0.dp)),
                             horizontalAlignment = if (centerLyrics) Alignment.CenterHorizontally else Alignment.Start,
+                            overscrollEffect = null,
                         ) {
                             if (lyrics.isEmpty()) item {
                                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {

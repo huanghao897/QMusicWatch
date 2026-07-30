@@ -1,6 +1,11 @@
 package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.network.QMusicGatewayException
+import com.ronan.qmusicwatch.network.QMusicGatewayResponseException
+import com.ronan.qmusicwatch.network.isCurrentStreamGeneration
+import com.ronan.qmusicwatch.network.isIdempotentQqReadMethod
+import com.ronan.qmusicwatch.network.isRecoverableGatewayReadFailure
+import com.ronan.qmusicwatch.network.gatewayReadRetryDelayMs
 import com.ronan.qmusicwatch.network.qmusicAlbumArtworkUrl
 import com.ronan.qmusicwatch.network.qmusicAvatarUrl
 import com.ronan.qmusicwatch.network.qmusicSongArtworkUrl
@@ -11,6 +16,7 @@ import com.ronan.qmusicwatch.network.shouldRefreshCredential
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import com.ronan.qmusicwatch.network.validateRefreshedCookie
 import com.ronan.qmusicwatch.model.SessionTokens
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -20,15 +26,15 @@ import org.junit.Test
 class QMusicGatewayTest {
     @Test fun stableMediaUrlsUseTheNewServer() {
         assertEquals(
-            "https://203.160.55.168/api/qmusic-watch/gateway/artwork/album/albumMID123.jpg",
+            "https://heyboxlite.xyz/api/qmusic-watch/gateway/artwork/album/albumMID123.jpg",
             qmusicAlbumArtworkUrl("albumMID123"),
         )
         assertEquals(
-            "https://203.160.55.168/api/qmusic-watch/gateway/avatar/qq/12345.jpg",
+            "https://heyboxlite.xyz/api/qmusic-watch/gateway/avatar/qq/12345.jpg",
             qmusicAvatarUrl("o12345"),
         )
         assertEquals(
-            "https://203.160.55.168/api/qmusic-watch/gateway/artwork/album/QMWTRACK00485V8K4InqbZ.jpg",
+            "https://heyboxlite.xyz/api/qmusic-watch/gateway/artwork/album/QMWTRACK00485V8K4InqbZ.jpg",
             qmusicSongArtworkUrl("00485V8K4InqbZ"),
         )
         assertEquals("", qmusicAlbumArtworkUrl("../unsafe"))
@@ -37,10 +43,11 @@ class QMusicGatewayTest {
     }
 
     @Test fun onlyIssuedGatewayMediaPathsAreTrusted() {
-        val issued = "https://203.160.55.168/api/qmusic-watch/gateway/media/${"t".repeat(32)}/M500song.mp3"
+        val issued = "https://heyboxlite.xyz/api/qmusic-watch/gateway/media/${"t".repeat(32)}/M500song.mp3"
         assertEquals(issued, trustedQMusicMediaUrl(issued))
+        assertEquals("", trustedQMusicMediaUrl("https://203.160.55.168/api/qmusic-watch/gateway/media/${"t".repeat(32)}/M500song.mp3"))
         assertEquals("", trustedQMusicMediaUrl("https://8.138.134.236/api/qmusic-watch/gateway/media/${"t".repeat(32)}/song.mp3"))
-        assertEquals("", trustedQMusicMediaUrl("https://203.160.55.168/api/qmusic-watch/gateway/media/short/song.mp3"))
+        assertEquals("", trustedQMusicMediaUrl("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/short/song.mp3"))
         assertEquals("", trustedQMusicMediaUrl("$issued?redirect=https://example.com"))
         assertEquals("", trustedQMusicMediaUrl("https://isure.stream.qqmusic.qq.com/M500song.mp3"))
     }
@@ -57,7 +64,8 @@ class QMusicGatewayTest {
             upstreamCookie = "qqmusic_uin=12345; qm_keyst=old",
         )
         assertTrue(sessionNeedsGatewayCredentialRefresh(old))
-        assertFalse(sessionNeedsGatewayCredentialRefresh(old.copy(gatewayHost = "203.160.55.168")))
+        assertTrue(sessionNeedsGatewayCredentialRefresh(old.copy(gatewayHost = "203.160.55.168")))
+        assertFalse(sessionNeedsGatewayCredentialRefresh(old.copy(gatewayHost = "heyboxlite.xyz")))
         assertFalse(sessionNeedsGatewayCredentialRefresh(null))
     }
 
@@ -86,5 +94,32 @@ class QMusicGatewayTest {
         assertTrue(requiresNewQrLogin(QMusicGatewayException(409, "RELOGIN_REQUIRED", "relogin")))
         assertFalse(requiresNewQrLogin(QMusicGatewayException(503, "UPSTREAM_TIMEOUT", "retry")))
         assertFalse(requiresNewQrLogin(java.io.IOException("offline")))
+    }
+
+    @Test fun transientGatewayFailuresRetryOnlySafeReadMethods() {
+        assertTrue(isIdempotentQqReadMethod("CgiGetDiss"))
+        assertTrue(isIdempotentQqReadMethod("GetPlaylistByUin"))
+        assertTrue(isIdempotentQqReadMethod("UrlGetVkey"))
+        assertTrue(isIdempotentQqReadMethod("DoSearchForQQMusicDesktop"))
+        assertFalse(isIdempotentQqReadMethod("AddSonglist"))
+        assertFalse(isIdempotentQqReadMethod("DelSonglist"))
+        assertFalse(isIdempotentQqReadMethod("AddPlaylist"))
+
+        assertTrue(isRecoverableGatewayReadFailure(QMusicGatewayResponseException("invalid json")))
+        assertTrue(isRecoverableGatewayReadFailure(QMusicGatewayException(503, "UPSTREAM_TIMEOUT", "retry")))
+        assertTrue(isRecoverableGatewayReadFailure(QMusicGatewayException(429, "RATE_LIMITED", "retry", 1_500L)))
+        assertTrue(isRecoverableGatewayReadFailure(IOException("connection reset")))
+        assertFalse(isRecoverableGatewayReadFailure(QMusicGatewayException(409, "RELOGIN_REQUIRED", "relogin")))
+        assertFalse(isRecoverableGatewayReadFailure(IllegalStateException("business failure")))
+
+        assertEquals(1_500L, gatewayReadRetryDelayMs(QMusicGatewayException(429, "RATE_LIMITED", "retry", 1_500L)))
+        assertEquals(500L, gatewayReadRetryDelayMs(QMusicGatewayException(429, "RATE_LIMITED", "retry")))
+        assertEquals(250L, gatewayReadRetryDelayMs(QMusicGatewayResponseException("invalid json")))
+    }
+
+    @Test fun invalidatedStreamRequestsCannotReturnTheirOldResult() {
+        assertTrue(isCurrentStreamGeneration(captured = 4L, current = 4L))
+        assertFalse(isCurrentStreamGeneration(captured = 4L, current = 5L))
+        assertFalse(isCurrentStreamGeneration(captured = 4L, current = null))
     }
 }

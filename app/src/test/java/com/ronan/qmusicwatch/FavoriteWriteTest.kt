@@ -1,6 +1,7 @@
 package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.model.Track
+import com.ronan.qmusicwatch.network.qqFavoriteComm
 import com.ronan.qmusicwatch.network.qqFavoriteTrackWrite
 import com.ronan.qmusicwatch.network.qqPlaylistTrackWrite
 import com.ronan.qmusicwatch.network.qqWriteBusinessCode
@@ -19,8 +20,8 @@ class FavoriteWriteTest {
         songType = 0,
     )
 
-    @Test fun favoriteSendsStableMidForServerSideIdentityResolution() {
-        val write = qqFavoriteTrackWrite(track, liked = true)
+    @Test fun favoriteUsesTheDedicatedMidContract() {
+        val write = qqFavoriteTrackWrite(track.copy(id = "  ${track.id}  "), liked = true)
 
         assertEquals("music.musicasset.SongFavWrite", write.module)
         assertEquals("AddSongFans", write.method)
@@ -37,6 +38,23 @@ class FavoriteWriteTest {
         assertEquals("DelSongFans", favorite.method)
         assertEquals("DelSonglist", playlist.method)
         assertEquals("5566", playlist.param.getValue("dirId").jsonPrimitive.content)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun favoriteRejectsTracksWithoutAUsableMid() {
+        qqFavoriteTrackWrite(track.copy(id = " null "), liked = true)
+    }
+
+    @Test fun favoriteUsesTheRequiredClientContext() {
+        val comm = qqFavoriteComm(buildJsonObject {
+            put("ct", 24)
+            put("cv", 4_747_474)
+            put("uin", "12345")
+        })
+
+        assertEquals("20", comm.getValue("ct").jsonPrimitive.content)
+        assertEquals("0", comm.getValue("cv").jsonPrimitive.content)
+        assertEquals("12345", comm.getValue("uin").jsonPrimitive.content)
     }
 
     @Test fun nestedWriteFailureIsNotTreatedAsSuccess() {

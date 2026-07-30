@@ -17,6 +17,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -41,7 +42,40 @@ internal class QMusicGatewayException(
     val statusCode: Int,
     val errorCode: String,
     message: String,
+    val retryAfterMs: Long = 0L,
 ) : IllegalStateException(message)
+internal class QMusicGatewayResponseException(
+    message: String,
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)
+
+internal fun isIdempotentQqReadMethod(method: String): Boolean =
+    method.startsWith("Get") ||
+        method.startsWith("CgiGet") ||
+        method.startsWith("UrlGet") ||
+        method.startsWith("DoSearch") ||
+        method.startsWith("get_") ||
+        method.startsWith("query", ignoreCase = true) ||
+        method == "vip_login_base"
+
+internal fun isRecoverableGatewayReadFailure(error: Throwable): Boolean = when (error) {
+    is QMusicGatewayResponseException -> true
+    is QMusicGatewayException -> error.statusCode in setOf(429, 502, 503, 504)
+    is IOException -> true
+    else -> false
+}
+
+internal fun gatewayReadRetryDelayMs(error: Throwable): Long = when (error) {
+    is QMusicGatewayException -> when (error.statusCode) {
+        429 -> error.retryAfterMs.coerceIn(500L, 2_000L)
+        else -> 350L
+    }
+    is QMusicGatewayResponseException -> 250L
+    else -> 300L
+}
+
+internal fun isCurrentStreamGeneration(captured: Long, current: Long?): Boolean =
+    current == captured
 
 private const val LOGIN_USER_INFO_MODULE = "music.UserInfo.userInfoServer"
 private const val LOGIN_CREDENTIAL_PROBE_METHOD = "GetLoginUserInfo"
@@ -535,14 +569,21 @@ internal fun qqPlaylistTrackWrite(
 }
 
 internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrackWrite {
-    require(isUsableQqSongMid(track.id)) { "歌曲 MID 无效" }
+    val songMid = track.id.trim()
+    require(isUsableQqSongMid(songMid)) { "歌曲 MID 无效" }
     return QqPlaylistTrackWrite(
         module = "music.musicasset.SongFavWrite",
         method = if (liked) "AddSongFans" else "DelSongFans",
         param = buildJsonObject {
-            putJsonArray("v_songMid") { add(track.id) }
+            putJsonArray("v_songMid") { add(songMid) }
         },
     )
+}
+
+internal fun qqFavoriteComm(base: JsonObject): JsonObject = buildJsonObject {
+    base.forEach { (name, value) -> put(name, value) }
+    put("ct", 20)
+    put("cv", 0)
 }
 
 internal fun qqWriteBusinessCode(data: JsonObject): Int? =
@@ -568,7 +609,9 @@ class ApiClient(
     private val prefs = context.getSharedPreferences("qq_direct_api", Context.MODE_PRIVATE)
     private val random = SecureRandom()
     private val credentialRefreshLock = Any()
-    private val streamCache = ConcurrentHashMap<String, StreamData>()
+    private data class CachedStream(val data: StreamData, val generation: Long)
+    private val streamCache = ConcurrentHashMap<String, CachedStream>()
+    private val streamGenerations = ConcurrentHashMap<String, Long>()
     @Volatile private var verifiedCredentialCookie = ""
     @Volatile private var credentialVerifiedUntil = 0L
     @Volatile private var recentlyRefreshedCookie = ""
@@ -685,20 +728,28 @@ class ApiClient(
     }
 
     suspend fun stream(track: Track, quality: String): StreamData =
-        stream(track, quality, allowCredentialRecovery = true)
+        stream(track, quality, allowCredentialRecovery = true, allowCached = true)
 
     fun invalidateStream(trackId: String) {
         val account = accountId()
+        val scopeKey = "$account:$trackId"
+        streamGenerations.merge(scopeKey, 1L, Long::plus)
         streamCache.keys.removeIf { key ->
-            key.startsWith("$account:$trackId:")
+            key.startsWith("$scopeKey:")
         }
         AppLog.write("STREAM", "cache-invalidated track=$trackId")
+    }
+
+    suspend fun refreshStream(track: Track, quality: String): StreamData {
+        invalidateStream(track.id)
+        return stream(track, quality, allowCredentialRecovery = true, allowCached = false)
     }
 
     private suspend fun stream(
         track: Track,
         quality: String,
         allowCredentialRecovery: Boolean,
+        allowCached: Boolean,
     ): StreamData = withContext(Dispatchers.IO) {
         if (!isUsableQqSongMid(track.id)) {
             AppLog.write("STREAM", "blocked invalid track id")
@@ -706,11 +757,15 @@ class ApiClient(
         }
         requireLogin()
         val preferred = normalizeQualityId(quality)
-        val cacheKey = "${accountId()}:${track.id}:$preferred"
+        val scopeKey = "${accountId()}:${track.id}"
+        val generation = streamGenerations.getOrPut(scopeKey) { 0L }
+        val cacheKey = "$scopeKey:$preferred"
         streamCache[cacheKey]?.takeIf {
-            it.expiresAt > System.currentTimeMillis() + 30_000L &&
-                trustedQMusicMediaUrl(it.url).isNotBlank()
-        }?.let {
+            allowCached &&
+                it.generation == generation &&
+                it.data.expiresAt > System.currentTimeMillis() + 30_000L &&
+                trustedQMusicMediaUrl(it.data.url).isNotBlank()
+        }?.data?.let {
             AppLog.write("STREAM", "cache-hit track=${track.id} quality=${it.quality}")
             return@withContext it
         }
@@ -751,7 +806,8 @@ class ApiClient(
                     AppLog.write("STREAM", "issued requested=$requested actual=$actual via=$module")
                     bestFallback = higherQualityStream(bestFallback, stream)
                     if (actual == requested) {
-                        streamCache[cacheKey] = bestFallback!!
+                        ensureCurrentStreamGeneration(scopeKey, generation)
+                        cacheStream(cacheKey, scopeKey, generation, bestFallback!!)
                         return@withContext bestFallback!!
                     }
                 }
@@ -764,16 +820,39 @@ class ApiClient(
                 probePlaybackCredential()
             ) {
                 AppLog.write("STREAM", "credential refreshed; retry track=${track.id}")
-                return@withContext stream(track, quality, allowCredentialRecovery = false)
+                return@withContext stream(
+                    track,
+                    quality,
+                    allowCredentialRecovery = false,
+                    allowCached = allowCached,
+                )
             }
         }
         bestFallback?.let {
-            streamCache[cacheKey] = it
+            ensureCurrentStreamGeneration(scopeKey, generation)
+            cacheStream(cacheKey, scopeKey, generation, it)
             return@withContext it
         }
         if (!receivedResponse) firstFailure?.let { throw it }
         AppLog.write("STREAM", "no-url track=${track.id} vip=${complete.requiresVip}")
         error(if (complete.requiresVip) "这首歌需要 VIP 或购买" else "QQ 音乐未提供播放地址，可能存在版权、地区或账号权益限制")
+    }
+
+    private fun ensureCurrentStreamGeneration(scopeKey: String, generation: Long) {
+        if (!isCurrentStreamGeneration(generation, streamGenerations[scopeKey])) {
+            throw CancellationException("stream request superseded")
+        }
+    }
+
+    private fun cacheStream(
+        cacheKey: String,
+        scopeKey: String,
+        generation: Long,
+        stream: StreamData,
+    ) {
+        if (streamGenerations[scopeKey] == generation) {
+            streamCache[cacheKey] = CachedStream(stream, generation)
+        }
     }
 
     suspend fun library(): LibraryData = withContext(Dispatchers.IO) {
@@ -923,7 +1002,14 @@ class ApiClient(
     suspend fun like(track: Track, liked: Boolean): Ack = withContext(Dispatchers.IO) {
         requireLogin()
         val write = qqFavoriteTrackWrite(track, liked)
-        requireWriteAccepted(post(webComm(), write.module, write.method, write.param))
+        try {
+            requireWriteAccepted(post(favoriteComm(), write.module, write.method, write.param))
+        } catch (error: QqBusinessException) {
+            if (error.businessCode == 80105) {
+                throw IllegalStateException("QQ 音乐拒绝了收藏操作，请稍后重试", error)
+            }
+            throw error
+        }
         Ack(true)
     }
 
@@ -1050,8 +1136,22 @@ class ApiClient(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            AppLog.write("API", "$module/$method gateway_error=${error.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
-            throw error
+            if (isIdempotentQqReadMethod(method) && isRecoverableGatewayReadFailure(error)) {
+                val delayMs = gatewayReadRetryDelayMs(error)
+                AppLog.write("API", "$module/$method transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
+                Thread.sleep(delayMs)
+                try {
+                    gatewayRequest("musicu", payload, callTimeoutMs)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (retryError: Throwable) {
+                    AppLog.write("API", "$module/$method gateway_error=${retryError.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
+                    throw retryError
+                }
+            } else {
+                AppLog.write("API", "$module/$method gateway_error=${error.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
+                throw error
+            }
         }
         val code = result.int("code")
         AppLog.write("API", "$module/$method code=$code ms=${System.currentTimeMillis() - started}")
@@ -1101,7 +1201,17 @@ class ApiClient(
                 put("type", type)
             }
         }
-        return gatewayRequest("legacy", payload)
+        return try {
+            gatewayRequest("legacy", payload)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            if (!isRecoverableGatewayReadFailure(error)) throw error
+            val delayMs = gatewayReadRetryDelayMs(error)
+            AppLog.write("API", "legacy/$operation transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
+            Thread.sleep(delayMs)
+            gatewayRequest("legacy", payload)
+        }
     }
 
     private fun gatewayRequest(
@@ -1129,8 +1239,25 @@ class ApiClient(
         }
         call.execute().use { response ->
             val text = response.body?.byteStream()?.use(::readGatewayBody).orEmpty()
-            val root = runCatching { json.parseToJsonElement(text).jsonObject }
-                .getOrElse { error("音乐服务器响应格式无效") }
+            val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrElse { parseError ->
+                if (!response.isSuccessful) {
+                    val retryAfterMs = response.header("Retry-After")
+                        ?.toLongOrNull()
+                        ?.times(1_000L)
+                        ?: 0L
+                    throw QMusicGatewayException(
+                        statusCode = response.code,
+                        errorCode = if (response.code == 429) "RATE_LIMITED" else "HTTP_${response.code}",
+                        message = if (response.code == 429) {
+                            "音乐服务器请求较多，正在稍后重试"
+                        } else {
+                            "音乐服务器响应 ${response.code}"
+                        },
+                        retryAfterMs = retryAfterMs,
+                    )
+                }
+                throw QMusicGatewayResponseException("音乐服务器响应格式无效", parseError)
+            }
             if (!response.isSuccessful || root["ok"]?.jsonPrimitive?.booleanOrNull != true) {
                 val gatewayError = root["error"] as? JsonObject
                 val message = gatewayError?.string("message")
@@ -1139,9 +1266,14 @@ class ApiClient(
                     statusCode = response.code,
                     errorCode = gatewayError?.string("code").orEmpty(),
                     message = message,
+                    retryAfterMs = response.header("Retry-After")
+                        ?.toLongOrNull()
+                        ?.times(1_000L)
+                        ?: 0L,
                 )
             }
-            return root["data"]?.jsonObject ?: error("音乐服务器响应缺少数据")
+            return root["data"]?.jsonObject
+                ?: throw QMusicGatewayResponseException("音乐服务器响应缺少数据")
         }
     }
 
@@ -1221,6 +1353,8 @@ class ApiClient(
         put("ct", 24); put("cv", 4_747_474); put("platform", "yqq.json"); put("uin", accountId().ifBlank { "0" })
         put("g_tk", gtk); put("g_tk_new_20200303", gtk); put("format", "json"); put("inCharset", "utf-8"); put("outCharset", "utf-8"); put("notice", 0); put("need_new_code", 1)
     }
+
+    private fun favoriteComm() = qqFavoriteComm(webComm())
 
     private fun playbackComm(android: Boolean) = buildJsonObject {
         val id = accountId()

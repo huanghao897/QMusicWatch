@@ -1,4 +1,5 @@
 .gradle/
+gradle-agent-home/
 .kotlin/
 .idea/
 local.properties

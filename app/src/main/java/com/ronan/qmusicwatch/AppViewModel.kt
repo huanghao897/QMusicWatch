@@ -33,6 +33,9 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.math.roundToInt
 
+private const val PLAYBACK_RECOVERY_WINDOW_MS = 15_000L
+private const val MAX_PLAYBACK_RECOVERY_ATTEMPTS = 3
+
 data class AppUiState(
     val loading: Boolean = false, val message: String? = null, val home: HomeData? = null,
     val library: LibraryData? = null, val recent: List<Track> = emptyList(), val recentLoaded: Boolean = false,
@@ -183,6 +186,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var lastStreamQuality = QUALITY_STANDARD
     private var retryingTrackId: String? = null
     private var recoveryJob: Job? = null
+    private var recoveryAttemptTrackId: String? = null
+    private var recoveryAttemptCount = 0
+    private var lastRecoveryAttemptAt = 0L
+    private var recoveryResumePositionMs = 0L
     private var playJob: Job? = null
     private var qualitySwitchJob: Job? = null
     private var searchJob: Job? = null
@@ -310,17 +317,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun handlePlaybackError(event: PlaybackErrorEvent) {
         val track = _state.value.currentTrack
         val failure = classifyPlaybackFailure(event.error)
-        if (track == null || track.id != event.mediaId || event.isLocalFile || !failure.retryable || retryingTrackId == track.id) {
+        if (track == null || track.id != event.mediaId || event.isLocalFile || !failure.retryable) {
             _state.update { it.copy(message = failure.message) }
             return
         }
+        if (retryingTrackId == track.id) return
+        val now = System.currentTimeMillis()
+        if (recoveryAttemptTrackId != track.id || now - lastRecoveryAttemptAt > PLAYBACK_RECOVERY_WINDOW_MS) {
+            recoveryAttemptTrackId = track.id
+            recoveryAttemptCount = 0
+        }
+        recoveryResumePositionMs = event.positionMs.coerceAtLeast(0L)
+        if (recoveryAttemptCount >= MAX_PLAYBACK_RECOVERY_ATTEMPTS) {
+            _state.update { it.copy(message = "播放地址连续失效，请稍后重试") }
+            return
+        }
+        recoveryAttemptCount++
+        lastRecoveryAttemptAt = now
+        val resumePositionMs = recoveryResumePositionMs
         retryingTrackId = track.id
         recoveryJob?.cancel()
         recoveryJob = viewModelScope.launch {
             _state.update { it.copy(message = "播放连接中断，正在自动恢复…") }
             runCatching {
-                graph.api.invalidateStream(track.id)
-                val stream = graph.api.stream(track, preferredQuality(track))
+                val stream = graph.api.refreshStream(track, preferredQuality(track))
                 if (_state.value.currentTrack?.id != track.id) throw CancellationException("歌曲已切换")
                 graph.playback.replaceStream(
                     id = track.id,
@@ -328,27 +348,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     title = track.title,
                     artist = track.artists.joinToString(" / "),
                     artwork = track.artworkUrl,
-                    startPositionMs = event.positionMs,
+                    startPositionMs = resumePositionMs,
                     playWhenReady = true,
                 )
                 lastStreamUrl = stream.url
                 lastStreamExpiresAt = stream.expiresAt
                 lastStreamQuality = stream.quality
                 _state.update { it.copy(activeStreamQuality = stream.quality) }
-                persistSnapshot(event.positionMs)
+                persistSnapshot(resumePositionMs)
             }.onSuccess {
+                retryingTrackId = null
                 val qualityNote = qualityFallbackMessage(quality.value, lastStreamQuality, track, _state.value.profile)
-                _state.update { it.copy(message = "已从 ${lyricTimeForMessage(event.positionMs)} 自动恢复播放" + qualityNote?.let { note -> " · $note" }.orEmpty()) }
-                delay(10_000)
-                if (_state.value.currentTrack?.id == track.id) retryingTrackId = null
+                _state.update { it.copy(message = "已从 ${lyricTimeForMessage(resumePositionMs)} 自动恢复播放" + qualityNote?.let { note -> " · $note" }.orEmpty()) }
             }.onFailure { error -> retryingTrackId = null; if (error !is CancellationException) failPlayback(error) }
         }
+    }
+
+    private fun resetPlaybackRecovery() {
+        recoveryJob?.cancel()
+        recoveryJob = null
+        retryingTrackId = null
+        recoveryAttemptTrackId = null
+        recoveryAttemptCount = 0
+        lastRecoveryAttemptAt = 0L
+        recoveryResumePositionMs = 0L
     }
 
     private fun handleMediaItemChanged(mediaId: String, uri: String) {
         if (mediaId.isBlank() || _state.value.currentTrack?.id == mediaId || playJob?.isActive == true) return
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
-        recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
+        resetPlaybackRecovery()
         viewModelScope.launch {
             val snapshot = runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()
             val snapshotQueue = snapshot?.takeIf { it.belongsToAccount(accountId) }?.queue.orEmpty().distinctBy(Track::id)
@@ -460,7 +489,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }.onSuccess { session ->
             runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "account switch ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
             playJob?.cancel(); playJob = null
-            recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
+            resetPlaybackRecovery()
             graph.playback.stopAndClear()
             pendingQueue = null
             _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
@@ -487,14 +516,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "logout ${it.javaClass.simpleName}:${it.message.orEmpty()}") } }
         playJob?.cancel(); playJob = null
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
-        recoveryJob?.cancel(); recoveryJob = null
+        resetPlaybackRecovery()
         searchJob?.cancel(); searchJob = null; sessionGeneration++
         qrLoginJob?.cancel(); qrLoginJob = null
         detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
         graph.playback.stopAndClear(); graph.vault.clear(); currentSession = null
         pendingQueue = null
         _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
-        restoredPosition = 0; lastStreamUrl = ""; lastStreamExpiresAt = 0; retryingTrackId = null
+        restoredPosition = 0; lastStreamUrl = ""; lastStreamExpiresAt = 0
         viewModelScope.launch { graph.settings.setPlaybackSnapshot(""); graph.settings.setProfileCache("") }
         _state.update { it.copy(
             home = null, library = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
@@ -781,7 +810,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onFailure { error -> _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "安装包校验失败", release)) } }
     }
     fun requestPlay(track: Track, allowSpeaker: Boolean = false, sourceQueue: List<Track>? = null) {
-        recoveryJob?.cancel(); recoveryJob = null; retryingTrackId = null
+        resetPlaybackRecovery()
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
         playJob?.cancel()
         playJob = viewModelScope.launch {
@@ -806,11 +835,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             issuedExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE
             issuedQuality = stream?.quality ?: local?.quality ?: preferredQuality(track)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), resolvedTrack.artworkUrl)
-            if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
-            graph.db.recent().upsert(RecentEntity(track.id, owner, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
-            runCatching { loadLyrics(track, local?.filePath) }.onFailure { AppLog.write("LYRICS", "track=${track.id} ${it.javaClass.simpleName}:${it.message.orEmpty()}") }.getOrDefault(emptyList())
-        }.onSuccess { parsedLyrics ->
             sourceQueue?.takeIf(List<Track>::isNotEmpty)?.let { source ->
                 _queue.value = source.distinctBy(Track::id)
                 _queueReversed.value = false
@@ -818,8 +842,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (_queue.value.none { it.id == track.id }) _queue.value = _queue.value + track
             _queueIndex.value = _queue.value.indexOfFirst { it.id == track.id }
             pendingQueue = null
-            restoredPosition = 0
-            retryingTrackId = null
             lastStreamUrl = issuedUrl
             lastStreamExpiresAt = issuedExpiresAt
             lastStreamQuality = issuedQuality
@@ -827,11 +849,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 it.copy(
                     currentTrack = resolvedTrack,
                     activeStreamQuality = reportedQualityId(issuedQuality),
-                    lyrics = parsedLyrics,
+                    lyrics = emptyList(),
                     pendingSpeakerTrack = null,
                     playEvent = System.nanoTime(),
                     message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile),
                 )
+            }
+            graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), resolvedTrack.artworkUrl)
+            if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
+            graph.db.recent().upsert(RecentEntity(track.id, owner, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
+            try {
+                loadLyrics(track, local?.filePath)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                AppLog.write("LYRICS", "track=${track.id} ${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                emptyList()
+            }
+        }.onSuccess { parsedLyrics ->
+            restoredPosition = 0
+            _state.update {
+                if (it.currentTrack?.id == track.id) it.copy(lyrics = parsedLyrics) else it
             }
             persistSnapshot()
         }.onFailure { error -> if (error !is CancellationException) failPlayback(error) }

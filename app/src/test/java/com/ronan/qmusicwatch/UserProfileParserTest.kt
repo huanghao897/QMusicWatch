@@ -10,28 +10,28 @@ import org.junit.Test
 
 class UserProfileParserTest {
     @Test fun parsesNicknameAndProtocolRelativeAvatar() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"creator":{"nick":"Ronan","logo":"https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"greenVip":{"isVip":0},"superVip":{"isSVip":1,"vipEndTime":1893456000}}"""))!!
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"creator":{"nick":"Ronan","logo":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"greenVip":{"isVip":0},"superVip":{"isSVip":1,"vipEndTime":1893456000}}"""))!!
         assertEquals("Ronan", profile.displayName)
-        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png", profile.avatarUrl)
+        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png", profile.avatarUrl)
         assertEquals(true, profile.isVip)
         assertEquals(1893456000L, profile.vipExpireAt)
         assertEquals("超级会员（SVIP）", profile.vipName)
     }
 
     @Test fun ignoresSongVipFlagsWhenParsingAccount() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"info":{"nick":"Ronan","logo":"https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"song":{"title":"测试歌曲","isVip":0}}"""))!!
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"info":{"nick":"Ronan","logo":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"song":{"title":"测试歌曲","isVip":0}}"""))!!
         assertEquals(null, profile.isVip)
     }
 
     @Test fun readsWechatAvatarFieldsAndPrefersAccountAvatarOverPlaceholder() {
-        val wechat = parseUserProfile(Json.parseToJsonElement("""{"profile":{"nickname":"Ronan","headimgurl":"https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png"}}"""))!!
-        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", wechat.avatarUrl)
+        val wechat = parseUserProfile(Json.parseToJsonElement("""{"profile":{"nickname":"Ronan","headimgurl":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png"}}"""))!!
+        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", wechat.avatarUrl)
 
         val merged = mergeUserProfiles(listOf(
             UserProfile(displayName = "Ronan"),
             wechat,
         ))!!
-        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", merged.avatarUrl)
+        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", merged.avatarUrl)
     }
 
     @Test fun parsesDedicatedVipResponse() {

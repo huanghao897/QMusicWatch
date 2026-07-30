@@ -6,7 +6,7 @@ import com.ronan.qmusicwatch.model.SessionTokens
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-internal const val QMUSIC_SERVER_HOST = "203.160.55.168"
+internal const val QMUSIC_SERVER_HOST = "heyboxlite.xyz"
 
 internal fun sessionNeedsGatewayCredentialRefresh(
     session: SessionTokens?,

@@ -61,7 +61,7 @@ android {
         versionName = "0.9.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartext"] = "false"
-        buildConfigField("String", "QMUSIC_SERVER_BASE_URL", "\"https://203.160.55.168/\"")
+        buildConfigField("String", "QMUSIC_SERVER_BASE_URL", "\"https://heyboxlite.xyz/\"")
         buildConfigField("String", "QMUSIC_RELEASE_CERT_SHA256", "\"$expectedReleaseCertificateSha256\"")
     }
 

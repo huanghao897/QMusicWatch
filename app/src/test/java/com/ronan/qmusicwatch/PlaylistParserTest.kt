@@ -20,13 +20,13 @@ class PlaylistParserTest {
         org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { playlistDirectoryNumber("not-a-number") }
     }
     @Test fun parsesAccountPlaylistIdsWithoutMixingTidAndDirId() {
-        val root = Json.parseToJsonElement("""{"data":{"v_playlist":[{"dirId":202,"dirName":"通勤","tid":987654,"songNum":12,"picUrl":"https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/list.jpg"}]}}""")
+        val root = Json.parseToJsonElement("""{"data":{"v_playlist":[{"dirId":202,"dirName":"通勤","tid":987654,"songNum":12,"picUrl":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/list.jpg"}]}}""")
         val item = parseAccountPlaylists(root).single()
         assertEquals("987654", item.id)
         assertEquals("202", item.directoryId)
         assertEquals("通勤", item.title)
         assertEquals(12, item.trackCount)
-        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/list.jpg", item.artworkUrl)
+        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/list.jpg", item.artworkUrl)
         assertEquals(true, item.owned)
     }
 
@@ -38,13 +38,13 @@ class PlaylistParserTest {
     }
 
     @Test fun parsesDedicatedFavoritePlaylistResponseAsReadOnly() {
-        val root = Json.parseToJsonElement("""{"v_list":[{"tid":"9988","dissname":"收藏的歌单","songnum":42,"picurl":"https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/list.jpg"}]}""")
+        val root = Json.parseToJsonElement("""{"v_list":[{"tid":"9988","dissname":"收藏的歌单","songnum":42,"picurl":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/list.jpg"}]}""")
         val item = parseFavoritePlaylists(root).single()
         assertEquals("9988", item.id)
         assertEquals("收藏的歌单", item.title)
         assertEquals(42, item.trackCount)
         assertEquals(false, item.owned)
-        assertEquals("https://203.160.55.168/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/list.jpg", item.artworkUrl)
+        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/list.jpg", item.artworkUrl)
     }
 
     @Test fun removesSystemLikedPlaylistButKeepsOwnedPlaylistWithSameTitle() {
@@ -89,7 +89,7 @@ class PlaylistParserTest {
     }
 
     @Test fun migratesExpiredTemporaryLikedArtworkToStableSongArtwork() {
-        val oldArtwork = "https://203.160.55.168/api/qmusic-watch/gateway/media/${"a".repeat(32)}/cover.jpg"
+        val oldArtwork = "https://heyboxlite.xyz/api/qmusic-watch/gateway/media/${"a".repeat(32)}/cover.jpg"
         val cached = LibraryData(
             liked = listOf(Track("00485V8K4InqbZ", "水星记", artworkUrl = oldArtwork)),
             playlists = emptyList(),
@@ -98,7 +98,7 @@ class PlaylistParserTest {
         val normalized = normalizeLibraryData(cached)
 
         assertEquals(
-            "https://203.160.55.168/api/qmusic-watch/gateway/artwork/album/QMWTRACK00485V8K4InqbZ.jpg",
+            "https://heyboxlite.xyz/api/qmusic-watch/gateway/artwork/album/QMWTRACK00485V8K4InqbZ.jpg",
             normalized.liked.single().artworkUrl,
         )
     }

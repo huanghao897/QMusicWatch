@@ -12,17 +12,19 @@ import org.junit.Test
 
 class ControlPlaneTest {
     private val certificate = "f".repeat(64)
-    private val base = "https://203.160.55.168/".toHttpUrl()
+    private val base = "https://heyboxlite.xyz/".toHttpUrl()
 
     @Test fun releaseBaseAndApkUrlsAreStrictlyScoped() {
         assertEquals(base, requireControlPlaneBaseUrl(base.toString()))
-        assertThrows(IllegalArgumentException::class.java) { requireControlPlaneBaseUrl("https://203.160.55.168:8443/") }
-        assertTrue(isTrustedControlDownloadUrl("https://203.160.55.168/download/qmusic-watch/QMusic.apk", base))
-        assertFalse(isTrustedControlDownloadUrl("http://203.160.55.168/download/qmusic-watch/QMusic.apk", base))
-        assertFalse(isTrustedControlDownloadUrl("https://203.160.55.168:8443/download/qmusic-watch/QMusic.apk", base))
+        assertThrows(IllegalArgumentException::class.java) { requireControlPlaneBaseUrl("https://203.160.55.168/") }
+        assertThrows(IllegalArgumentException::class.java) { requireControlPlaneBaseUrl("https://heyboxlite.xyz:8443/") }
+        assertTrue(isTrustedControlDownloadUrl("https://heyboxlite.xyz/download/qmusic-watch/QMusic.apk", base))
+        assertFalse(isTrustedControlDownloadUrl("https://203.160.55.168/download/qmusic-watch/QMusic.apk", base))
+        assertFalse(isTrustedControlDownloadUrl("http://heyboxlite.xyz/download/qmusic-watch/QMusic.apk", base))
+        assertFalse(isTrustedControlDownloadUrl("https://heyboxlite.xyz:8443/download/qmusic-watch/QMusic.apk", base))
         assertFalse(isTrustedControlDownloadUrl("https://example.com/download/qmusic-watch/QMusic.apk", base))
-        assertFalse(isTrustedControlDownloadUrl("https://203.160.55.168/download/qmusic-watch/QMusic.apk?token=x", base))
-        assertFalse(isTrustedControlDownloadUrl("https://203.160.55.168/download/other/QMusic.apk", base))
+        assertFalse(isTrustedControlDownloadUrl("https://heyboxlite.xyz/download/qmusic-watch/QMusic.apk?token=x", base))
+        assertFalse(isTrustedControlDownloadUrl("https://heyboxlite.xyz/download/other/QMusic.apk", base))
     }
 
     @Test fun representativeApiEnvelopeDecodesWithForwardCompatibleFields() {
@@ -38,7 +40,7 @@ class ControlPlaneTest {
         val valid = ControlUpdate(
             hasUpdate = true, releaseId = 1, versionName = "0.9.6", versionCode = 36,
             apk = ControlApk(
-                "https://203.160.55.168/download/qmusic-watch/QMusic.apk",
+                "https://heyboxlite.xyz/download/qmusic-watch/QMusic.apk",
                 MIN_UPDATE_APK_BYTES, "a".repeat(64), certificate, "com.ronan.qmusicwatch",
             ),
         )
