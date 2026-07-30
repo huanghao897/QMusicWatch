@@ -59,6 +59,11 @@ data class WatchDimensions(
     val touchTarget: Dp,
     val iconSize: Dp,
     val cornerRadius: Dp,
+    val rowCornerRadius: Dp,
+    val searchCornerRadius: Dp,
+    val controlCornerRadius: Dp,
+    val playerActionSize: Dp,
+    val lyricRowHeight: Dp,
     val playerArtworkSize: Dp,
 )
 
@@ -81,8 +86,8 @@ internal fun resolveWatchDimensions(
         windowClass = windowClass,
         uiSize = uiSize,
         screenPadding = 8.dp.scaled(),
-        verticalPadding = 6.dp.scaled(),
-        itemSpacing = 4.dp.scaled(),
+        verticalPadding = 5.dp.scaled(),
+        itemSpacing = 2.dp.scaled(),
         titleSp = 18f * scale,
         bodySp = 13f * scale,
         secondarySp = 10.5f * scale,
@@ -92,7 +97,12 @@ internal fun resolveWatchDimensions(
         miniPlayerHeight = 50.dp.scaled(),
         touchTarget = 40.dp.scaled(),
         iconSize = 19.dp.scaled(),
-        cornerRadius = 12.dp.scaled(),
+        cornerRadius = 8.dp.scaled(),
+        rowCornerRadius = 8.dp.scaled(),
+        searchCornerRadius = 12.dp.scaled(),
+        controlCornerRadius = 8.dp.scaled(),
+        playerActionSize = 36.dp.scaled(),
+        lyricRowHeight = 36.dp.scaled(),
         playerArtworkSize = when (windowClass) {
             WatchWindowClass.Compact -> 76.dp
             WatchWindowClass.Medium -> 96.dp

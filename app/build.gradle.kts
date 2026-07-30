@@ -132,6 +132,7 @@ dependencies {
     implementation("androidx.media3:media3-session:1.10.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.10.1")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")
     debugImplementation("androidx.compose.ui:ui-tooling:1.11.4")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.11.4")
     testImplementation("junit:junit:4.13.2")

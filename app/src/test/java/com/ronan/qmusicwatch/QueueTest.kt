@@ -12,6 +12,8 @@ import com.ronan.qmusicwatch.playback.mediaButtonSkipDelta
 import com.ronan.qmusicwatch.download.canResumePartialDownload
 import com.ronan.qmusicwatch.model.QUALITY_LEGACY_UNKNOWN
 import com.ronan.qmusicwatch.model.qualityShortLabel
+import com.ronan.qmusicwatch.ui.moveQueueEntry
+import com.ronan.qmusicwatch.ui.stableQueueEntries
 
 class QueueTest {
     @Test fun partialDownloadCannotMixDifferentQualityFiles() {
@@ -44,6 +46,15 @@ class QueueTest {
         queue = moveQueuePreview(queue, 1, 2)
         queue = moveQueuePreview(queue, 2, 3)
         assertEquals(listOf("b", "c", "d", "a"), queue.map(Track::id))
+    }
+
+    @Test fun queueUiKeysStayUniqueWhenTheSameTrackAppearsTwice() {
+        val entries = stableQueueEntries(listOf(Track("a", "A"), Track("a", "A again"), Track("b", "B")))
+        assertEquals(listOf("a#0", "a#1", "b#0"), entries.map { it.stableKey })
+        assertEquals(
+            listOf("a#1", "b#0", "a#0"),
+            moveQueueEntry(entries, 0, 2).map { it.stableKey },
+        )
     }
 
     @Test fun selectedImportAddsOnlyCheckedTracksWithoutDuplicates() {

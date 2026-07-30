@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -64,7 +65,7 @@ fun WatchIconButton(
     Box(
         modifier = modifier
             .size(dimensions.touchTarget)
-            .clip(RoundedCornerShape(dimensions.cornerRadius))
+            .clip(RoundedCornerShape(dimensions.controlCornerRadius))
             .combinedClickable(
                 role = Role.Button,
                 onClick = onClick,
@@ -87,12 +88,13 @@ fun WatchSearchField(
     modifier: Modifier = Modifier,
     leadingIcon: ImageVector? = null,
     trailingIcon: ImageVector? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     onSearch: () -> Unit = {},
 ) {
     val dimensions = LocalWatchDimensions.current
     Surface(
         modifier = modifier.height(dimensions.searchHeight),
-        shape = RoundedCornerShape(dimensions.cornerRadius),
+        shape = RoundedCornerShape(dimensions.searchCornerRadius),
         color = WatchSurface,
     ) {
         BasicTextField(
@@ -105,6 +107,7 @@ fun WatchSearchField(
                 fontSize = dimensions.bodySp.sp,
             ),
             cursorBrush = SolidColor(WatchAccent),
+            keyboardOptions = keyboardOptions,
             keyboardActions = KeyboardActions(onDone = { onSearch() }),
             visualTransformation = VisualTransformation.None,
             decorationBox = { innerField ->
@@ -186,7 +189,7 @@ fun WatchListRow(
     val rowModifier = modifier
         .fillMaxWidth()
         .height(dimensions.trackRowHeight)
-        .clip(RoundedCornerShape(dimensions.cornerRadius))
+        .clip(RoundedCornerShape(dimensions.rowCornerRadius))
         .then(if (onClick != null) Modifier.combinedClickable(onClick = onClick) else Modifier)
         .padding(horizontal = 7.dp)
     Row(rowModifier, verticalAlignment = Alignment.CenterVertically) {
@@ -226,7 +229,7 @@ fun WatchPrimaryButton(
     Surface(
         onClick = onClick,
         modifier = modifier.height(dimensions.touchTarget),
-        shape = RoundedCornerShape(dimensions.cornerRadius),
+        shape = RoundedCornerShape(dimensions.controlCornerRadius),
         color = if (outlined) WatchSurface else WatchAccent,
         contentColor = if (outlined) WatchTextPrimary else Color(0xFF06131B),
         border = if (outlined) androidx.compose.foundation.BorderStroke(1.dp, WatchDivider) else null,
@@ -257,9 +260,9 @@ fun WatchDialog(
             contentAlignment = Alignment.BottomCenter,
         ) {
             Surface(
-                modifier = modifier.fillMaxWidth().heightIn(max = maxHeight * .78f)
+                modifier = modifier.fillMaxWidth().heightIn(max = maxHeight * .75f)
                     .navigationBarsPadding().imePadding(),
-                shape = RoundedCornerShape(dimensions.cornerRadius + 2.dp),
+                shape = RoundedCornerShape(dimensions.controlCornerRadius + 2.dp),
                 color = WatchSurfaceRaised,
                 tonalElevation = 0.dp,
             ) {
