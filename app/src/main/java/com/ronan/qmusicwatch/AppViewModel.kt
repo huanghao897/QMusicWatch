@@ -26,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -33,8 +34,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.math.roundToInt
 
-private const val PLAYBACK_RECOVERY_WINDOW_MS = 15_000L
-private const val MAX_PLAYBACK_RECOVERY_ATTEMPTS = 3
+private const val PLAYBACK_RECOVERY_NOTICE_TIMEOUT_MS = 65_000L
 
 data class AppUiState(
     val loading: Boolean = false, val message: String? = null, val home: HomeData? = null,
@@ -184,16 +184,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var lastStreamUrl = ""
     private var lastStreamExpiresAt = 0L
     private var lastStreamQuality = QUALITY_STANDARD
-    private var retryingTrackId: String? = null
-    private var recoveryJob: Job? = null
-    private var recoveryAttemptTrackId: String? = null
-    private var recoveryAttemptCount = 0
-    private var lastRecoveryAttemptAt = 0L
-    private var recoveryResumePositionMs = 0L
+    private var awaitingServiceRecoveryMediaId: String? = null
+    private var recoveryNoticeJob: Job? = null
     private var playJob: Job? = null
     private var qualitySwitchJob: Job? = null
     private var searchJob: Job? = null
     private var detailJob: Job? = null
+    private var detailRequest: Triple<String, MusicCollection, Boolean>? = null
     private var queueImportJob: Job? = null
     private var updateJob: Job? = null
     private var qrLoginJob: Job? = null
@@ -201,6 +198,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionReady = CompletableDeferred<Unit>()
     private val profileCacheReady = CompletableDeferred<Unit>()
     private val snapshotMutex = Mutex()
+    private val playbackSnapshotMutex = Mutex()
     private var currentSession = graph.vault.load()
     private var sessionGeneration = 0L
     val signedIn get() = currentSession != null
@@ -317,67 +315,84 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun handlePlaybackError(event: PlaybackErrorEvent) {
         val track = _state.value.currentTrack
         val failure = classifyPlaybackFailure(event.error)
-        if (track == null || track.id != event.mediaId || event.isLocalFile || !failure.retryable) {
-            _state.update { it.copy(message = failure.message) }
-            return
+        val currentMatches = track != null && track.id == event.mediaId
+        val serviceWillRecover = currentMatches && !event.isLocalFile && failure.retryable
+        clearServiceRecovery()
+        awaitingServiceRecoveryMediaId = event.mediaId.takeIf { serviceWillRecover }
+        val message = if (serviceWillRecover) {
+            "播放连接中断，正在自动恢复"
+        } else {
+            failure.message
         }
-        if (retryingTrackId == track.id) return
-        val now = System.currentTimeMillis()
-        if (recoveryAttemptTrackId != track.id || now - lastRecoveryAttemptAt > PLAYBACK_RECOVERY_WINDOW_MS) {
-            recoveryAttemptTrackId = track.id
-            recoveryAttemptCount = 0
-        }
-        recoveryResumePositionMs = event.positionMs.coerceAtLeast(0L)
-        if (recoveryAttemptCount >= MAX_PLAYBACK_RECOVERY_ATTEMPTS) {
-            _state.update { it.copy(message = "播放地址连续失效，请稍后重试") }
-            return
-        }
-        recoveryAttemptCount++
-        lastRecoveryAttemptAt = now
-        val resumePositionMs = recoveryResumePositionMs
-        retryingTrackId = track.id
-        recoveryJob?.cancel()
-        recoveryJob = viewModelScope.launch {
-            _state.update { it.copy(message = "播放连接中断，正在自动恢复…") }
-            runCatching {
-                val stream = graph.api.refreshStream(track, preferredQuality(track))
-                if (_state.value.currentTrack?.id != track.id) throw CancellationException("歌曲已切换")
-                graph.playback.replaceStream(
-                    id = track.id,
-                    uri = stream.url,
-                    title = track.title,
-                    artist = track.artists.joinToString(" / "),
-                    artwork = track.artworkUrl,
-                    startPositionMs = resumePositionMs,
-                    playWhenReady = true,
-                )
-                lastStreamUrl = stream.url
-                lastStreamExpiresAt = stream.expiresAt
-                lastStreamQuality = stream.quality
-                _state.update { it.copy(activeStreamQuality = stream.quality) }
-                persistSnapshot(resumePositionMs)
-            }.onSuccess {
-                retryingTrackId = null
-                val qualityNote = qualityFallbackMessage(quality.value, lastStreamQuality, track, _state.value.profile)
-                _state.update { it.copy(message = "已从 ${lyricTimeForMessage(resumePositionMs)} 自动恢复播放" + qualityNote?.let { note -> " · $note" }.orEmpty()) }
-            }.onFailure { error -> retryingTrackId = null; if (error !is CancellationException) failPlayback(error) }
+        _state.update { it.copy(message = message) }
+        if (serviceWillRecover) {
+            recoveryNoticeJob = viewModelScope.launch {
+                delay(PLAYBACK_RECOVERY_NOTICE_TIMEOUT_MS)
+                if (awaitingServiceRecoveryMediaId != event.mediaId ||
+                    _state.value.currentTrack?.id != event.mediaId
+                ) return@launch
+                awaitingServiceRecoveryMediaId = null
+                recoveryNoticeJob = null
+                if (graph.playback.isPlaying()) return@launch
+                _state.update {
+                    if (it.message?.contains("自动恢复") == true) {
+                        it.copy(message = "自动恢复未成功，请检查网络后重试")
+                    } else {
+                        it
+                    }
+                }
+            }
         }
     }
 
-    private fun resetPlaybackRecovery() {
-        recoveryJob?.cancel()
-        recoveryJob = null
-        retryingTrackId = null
-        recoveryAttemptTrackId = null
-        recoveryAttemptCount = 0
-        lastRecoveryAttemptAt = 0L
-        recoveryResumePositionMs = 0L
+    private fun clearServiceRecovery() {
+        recoveryNoticeJob?.cancel()
+        recoveryNoticeJob = null
+        awaitingServiceRecoveryMediaId = null
     }
 
     private fun handleMediaItemChanged(mediaId: String, uri: String) {
-        if (mediaId.isBlank() || _state.value.currentTrack?.id == mediaId || playJob?.isActive == true) return
+        if (mediaId.isBlank() || uri.isBlank()) return
+        if (_state.value.currentTrack?.id == mediaId) {
+            val recovered = awaitingServiceRecoveryMediaId == mediaId
+            if (!recovered && uri == lastStreamUrl) return
+            viewModelScope.launch {
+                val snapshot = withTimeoutOrNull(2_000L) {
+                    graph.settings.playbackSnapshot.mapNotNull { value ->
+                        runCatching {
+                            json.decodeFromString<PlaybackSnapshot>(value)
+                        }.getOrNull()?.takeIf {
+                            it.belongsToAccount(accountId) &&
+                                it.track?.id == mediaId &&
+                                it.streamUrl == uri &&
+                                (uri.startsWith("file:") || it.streamExpiresAt > 0L)
+                        }
+                    }.first()
+                } ?: runCatching {
+                    json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first())
+                }.getOrNull()?.takeIf { it.belongsToAccount(accountId) && it.track?.id == mediaId }
+                if (graph.playback.currentMediaId() != mediaId || graph.playback.currentUri() != uri) return@launch
+                val previousUri = lastStreamUrl
+                val matchingSnapshot = snapshot?.takeIf { it.streamUrl == uri }
+                lastStreamUrl = uri
+                lastStreamExpiresAt = when {
+                    uri.startsWith("file:") -> Long.MAX_VALUE
+                    matchingSnapshot != null -> matchingSnapshot.streamExpiresAt
+                    previousUri == uri -> lastStreamExpiresAt
+                    else -> 0L
+                }
+                lastStreamQuality = reportedQualityId(matchingSnapshot?.quality ?: lastStreamQuality)
+                if (recovered) clearServiceRecovery()
+                _state.update {
+                    it.copy(
+                        activeStreamQuality = lastStreamQuality,
+                        message = if (recovered) "播放已自动恢复" else it.message,
+                    )
+                }
+            }
+            return
+        }
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
-        resetPlaybackRecovery()
         viewModelScope.launch {
             val snapshot = runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()
             val snapshotQueue = snapshot?.takeIf { it.belongsToAccount(accountId) }?.queue.orEmpty().distinctBy(Track::id)
@@ -385,23 +400,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 ?: snapshot?.track?.takeIf { it.id == mediaId }
                 ?: snapshotQueue.firstOrNull { it.id == mediaId }
                 ?: return@launch
-            if (graph.playback.currentMediaId() != mediaId) return@launch
+            if (graph.playback.currentMediaId() != mediaId || graph.playback.currentUri() != uri) return@launch
             if (snapshotQueue.isNotEmpty()) _queue.value = snapshotQueue
             _queueIndex.value = _queue.value.indexOfFirst { it.id == mediaId }
-            lastStreamUrl = snapshot?.streamUrl?.takeIf { snapshot.track?.id == mediaId }.orEmpty().ifBlank { uri }
-            lastStreamExpiresAt = snapshot?.streamExpiresAt?.takeIf { snapshot.track?.id == mediaId } ?: if (uri.startsWith("file:")) Long.MAX_VALUE else 0
-            lastStreamQuality = reportedQualityId(snapshot?.quality?.takeIf { snapshot.track?.id == mediaId } ?: preferredQuality(track))
+            val matchingSnapshot = snapshot?.takeIf { it.track?.id == mediaId && it.streamUrl == uri }
+            lastStreamUrl = uri
+            lastStreamExpiresAt = matchingSnapshot?.streamExpiresAt
+                ?: if (uri.startsWith("file:")) Long.MAX_VALUE else 0L
+            lastStreamQuality = reportedQualityId(matchingSnapshot?.quality ?: preferredQuality(track))
             _state.update { it.copy(currentTrack = track, activeStreamQuality = lastStreamQuality, lyrics = emptyList(), message = "已通过耳机或系统媒体控制切换歌曲") }
             val localPath = android.net.Uri.parse(uri).takeIf { it.scheme == "file" }?.path
             val lines = runCatching { loadLyrics(track, localPath) }
                 .onFailure { AppLog.write("LYRICS", "media key ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
                 .getOrDefault(emptyList())
-            if (graph.playback.currentMediaId() == mediaId) _state.update { it.copy(lyrics = lines) }
+            if (graph.playback.currentMediaId() == mediaId && graph.playback.currentUri() == uri) {
+                _state.update { it.copy(lyrics = lines) }
+            }
         }
     }
-
-    private fun lyricTimeForMessage(positionMs: Long): String =
-        "${positionMs.coerceAtLeast(0) / 60_000}:${((positionMs.coerceAtLeast(0) / 1000) % 60).toString().padStart(2, '0')}"
 
     fun loadHome() = viewModelScope.launch {
         sessionReady.await()
@@ -489,7 +505,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }.onSuccess { session ->
             runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "account switch ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
             playJob?.cancel(); playJob = null
-            resetPlaybackRecovery()
+            clearServiceRecovery()
             graph.playback.stopAndClear()
             pendingQueue = null
             _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
@@ -516,7 +532,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "logout ${it.javaClass.simpleName}:${it.message.orEmpty()}") } }
         playJob?.cancel(); playJob = null
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
-        resetPlaybackRecovery()
+        clearServiceRecovery()
         searchJob?.cancel(); searchJob = null; sessionGeneration++
         qrLoginJob?.cancel(); qrLoginJob = null
         detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
@@ -810,7 +826,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onFailure { error -> _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "安装包校验失败", release)) } }
     }
     fun requestPlay(track: Track, allowSpeaker: Boolean = false, sourceQueue: List<Track>? = null) {
-        resetPlaybackRecovery()
+        clearServiceRecovery()
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
         playJob?.cancel()
         playJob = viewModelScope.launch {
@@ -855,8 +871,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile),
                 )
             }
+            val initialPosition = restoredPosition.coerceAtLeast(0L)
+            // The service can receive a load error immediately after prepare,
+            // so make the new stream recoverable before handing it to Media3.
+            persistSnapshotNow(initialPosition, allowMediaMismatch = true)
             graph.playback.play(track.id, uri, track.title, track.artists.joinToString(" / "), resolvedTrack.artworkUrl)
-            if (restoredPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(restoredPosition)
+            if (initialPosition > 0 && _state.value.currentTrack?.id == track.id) graph.playback.seek(initialPosition)
             graph.db.recent().upsert(RecentEntity(track.id, owner, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
             try {
                 loadLyrics(track, local?.filePath)
@@ -867,11 +887,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 emptyList()
             }
         }.onSuccess { parsedLyrics ->
-            restoredPosition = 0
-            _state.update {
-                if (it.currentTrack?.id == track.id) it.copy(lyrics = parsedLyrics) else it
+            if (_state.value.currentTrack?.id == track.id && graph.playback.currentMediaId() == track.id) {
+                restoredPosition = 0
+                _state.update { it.copy(lyrics = parsedLyrics) }
             }
-            persistSnapshot()
         }.onFailure { error -> if (error !is CancellationException) failPlayback(error) }
         }
     }
@@ -952,6 +971,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun loadDetail(type: String, collection: MusicCollection, editable: Boolean = false) {
         detailJob?.cancel()
+        detailRequest = Triple(type, collection, editable)
         val generation = sessionGeneration
         _state.update { it.copy(detail = null, detailDirectoryId = null, detailLoading = true, detailError = null) }
         detailJob = viewModelScope.launch {
@@ -975,9 +995,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             detailError = error.message?.takeIf(String::isNotBlank) ?: "歌单读取失败",
                         )
                     }
-                    fail(error)
+                    AppLog.write(
+                        "DETAIL",
+                        "${error.javaClass.simpleName}:${error.message.orEmpty()}",
+                    )
                 }
             }
+        }
+    }
+    fun retryDetail() {
+        detailRequest?.let { (type, collection, editable) ->
+            loadDetail(type, collection, editable)
         }
     }
     fun createPlaylist(title: String) = viewModelScope.launch { if (requirePlaylistWrites()) runCatching { graph.api.createPlaylist(title) }.onSuccess { loadLibrary() }.onFailure(::fail) }
@@ -1158,13 +1186,62 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun adjustVolume(direction: Int) = graph.playback.adjustVolume(direction)
     fun savePlaybackState() = persistSnapshot()
     private fun persistSnapshot(position: Long = graph.playback.position()) = viewModelScope.launch {
-        val owner = accountId ?: return@launch
-        graph.settings.setPlaybackSnapshot(json.encodeToString(PlaybackSnapshot(
-            _state.value.currentTrack, _queue.value, position, _queueReversed.value,
-            lastStreamUrl, lastStreamExpiresAt, lastStreamQuality, owner,
-        )))
+        persistSnapshotNow(position)
+    }
+    private suspend fun persistSnapshotNow(
+        position: Long,
+        allowMediaMismatch: Boolean = false,
+    ) = playbackSnapshotMutex.withLock {
+        val owner = accountId ?: return@withLock
+        val track = _state.value.currentTrack
+        val activeMediaId = graph.playback.currentMediaId()
+        if (!allowMediaMismatch && activeMediaId.isNotBlank() && track?.id != activeMediaId) return@withLock
+        val activeUri = graph.playback.currentUri()
+            .takeIf { activeMediaId == track?.id && it.isNotBlank() }
+            .orEmpty()
+        graph.settings.updatePlaybackSnapshot { currentValue ->
+            val current = runCatching {
+                json.decodeFromString<PlaybackSnapshot>(currentValue)
+            }.getOrNull()
+            val streamUrl = activeUri.ifBlank { lastStreamUrl }
+            val matchingStream = current?.takeIf {
+                it.belongsToAccount(owner) &&
+                    it.track?.id == track?.id &&
+                    it.streamUrl == streamUrl
+            }
+            val streamExpiresAt = when {
+                streamUrl.startsWith("file:") -> Long.MAX_VALUE
+                matchingStream != null -> maxOf(lastStreamExpiresAt, matchingStream.streamExpiresAt)
+                streamUrl == lastStreamUrl -> lastStreamExpiresAt
+                else -> 0L
+            }
+            val streamQuality = matchingStream
+                ?.takeIf { it.streamExpiresAt >= lastStreamExpiresAt }
+                ?.quality
+                ?: lastStreamQuality
+            lastStreamUrl = streamUrl
+            lastStreamExpiresAt = streamExpiresAt
+            lastStreamQuality = streamQuality
+            json.encodeToString(
+                PlaybackSnapshot(
+                    track,
+                    _queue.value,
+                    position,
+                    _queueReversed.value,
+                    streamUrl,
+                    streamExpiresAt,
+                    streamQuality,
+                    owner,
+                ),
+            )
+        }
     }
     private fun preferredQuality(track: Track): String =
         resolveQuality(quality.value, track, _state.value.profile).resolved
-    override fun onCleared() { graph.playback.onError = null; graph.playback.onMediaItemChanged = null; super.onCleared() }
+    override fun onCleared() {
+        clearServiceRecovery()
+        graph.playback.onError = null
+        graph.playback.onMediaItemChanged = null
+        super.onCleared()
+    }
 }

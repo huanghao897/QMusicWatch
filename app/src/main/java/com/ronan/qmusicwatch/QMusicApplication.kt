@@ -1,8 +1,10 @@
 package com.ronan.qmusicwatch
 
 import android.app.Application
+import android.content.Context
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import coil.disk.DiskCache
 import com.ronan.qmusicwatch.data.AppDatabase
 import com.ronan.qmusicwatch.data.SessionVault
 import com.ronan.qmusicwatch.data.SettingsStore
@@ -15,6 +17,50 @@ import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import com.ronan.qmusicwatch.playback.PlaybackConnection
 import com.ronan.qmusicwatch.update.UpdateManager
 import okhttp3.OkHttpClient
+import java.io.File
+
+private const val IMAGE_CACHE_DIRECTORY = "qmusic_image_cache"
+internal const val IMAGE_CACHE_MAX_SIZE_BYTES = 64L * 1024L * 1024L
+
+internal fun isPersistentQMusicArtworkUrl(value: String): Boolean =
+    trustedQMusicMediaUrl(value).contains("/api/qmusic-watch/gateway/artwork/album/")
+
+private fun qMusicImageHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    .followRedirects(false)
+    .followSslRedirects(false)
+    .addInterceptor { chain ->
+        val request = chain.request()
+        require(trustedQMusicMediaUrl(request.url.toString()).isNotBlank()) {
+            "image host rejected"
+        }
+        val response = chain.proceed(request)
+        if (!isPersistentQMusicArtworkUrl(request.url.toString())) {
+            response
+        } else {
+            // Stable album-art URLs identify immutable images. Override the
+            // gateway's API no-store header for artwork only, not avatars.
+            response.newBuilder()
+                .removeHeader("Pragma")
+                .header("Cache-Control", "public, max-age=31536000, immutable")
+                .build()
+        }
+    }
+    .build()
+
+internal fun persistentQMusicImageDiskCache(cacheDirectory: File): DiskCache =
+    DiskCache.Builder()
+        .directory(cacheDirectory)
+        .maxSizeBytes(IMAGE_CACHE_MAX_SIZE_BYTES)
+        .build()
+
+internal fun persistentQMusicImageLoader(
+    context: Context,
+    okHttpClient: OkHttpClient = qMusicImageHttpClient(),
+    cacheDirectory: File = File(context.filesDir, IMAGE_CACHE_DIRECTORY),
+): ImageLoader = ImageLoader.Builder(context.applicationContext)
+    .okHttpClient(okHttpClient)
+    .diskCache { persistentQMusicImageDiskCache(cacheDirectory) }
+    .build()
 
 class QMusicApplication : Application(), ImageLoaderFactory {
     companion object { val processStartedAt: Long = android.os.SystemClock.elapsedRealtime() }
@@ -47,18 +93,5 @@ class QMusicApplication : Application(), ImageLoaderFactory {
         playback = PlaybackConnection(this)
     }
 
-    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
-        .okHttpClient {
-            OkHttpClient.Builder()
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .addInterceptor { chain ->
-                    require(trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank()) {
-                        "image host rejected"
-                    }
-                    chain.proceed(chain.request())
-                }
-                .build()
-        }
-        .build()
+    override fun newImageLoader(): ImageLoader = persistentQMusicImageLoader(this)
 }

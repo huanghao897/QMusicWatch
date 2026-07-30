@@ -46,6 +46,13 @@ class SettingsStoreTest {
         assertEquals(0, lyricCenterScrollOffset(viewportStart = 0, viewportEnd = 0, itemSize = 60))
     }
 
+    @Test fun lyricProgressUsesAClampedFeatheredBand() {
+        assertEquals(0f to .018f, lyricProgressBand(0f))
+        assertEquals(.482f to .518f, lyricProgressBand(.5f))
+        assertEquals(.982f to 1f, lyricProgressBand(1f))
+        assertEquals(0f to .1f, lyricProgressBand(-2f, feather = .5f))
+    }
+
     @Test fun lyricTimeUsesOfficialTwoDigitMinuteFormat() {
         assertEquals("00:03", lyricTime(3_000))
         assertEquals("12:05", lyricTime(725_000))

@@ -79,6 +79,10 @@ class SettingsStore(private val context: Context) {
     suspend fun setWifiOnlyDownload(value: Boolean) = context.settingsDataStore.edit { it[wifiOnlyDownloadKey] = value }
     suspend fun setLastSleepMinutes(value: Int) = context.settingsDataStore.edit { it[lastSleepMinutesKey] = value.coerceIn(1, 1440).toString() }
     suspend fun setPlaybackSnapshot(value: String) = context.settingsDataStore.edit { it[playbackSnapshotKey] = value }
+    suspend fun updatePlaybackSnapshot(transform: (String) -> String) =
+        context.settingsDataStore.edit { preferences ->
+            preferences[playbackSnapshotKey] = transform(preferences[playbackSnapshotKey].orEmpty())
+        }
     suspend fun setDailyCount(value: Int) = context.settingsDataStore.edit { it[dailyCountKey] = if (value == 10) "10" else "5" }
     suspend fun addSearchHistory(value: String) = context.settingsDataStore.edit { prefs ->
         val query = value.replace('\n', ' ').trim().take(80)

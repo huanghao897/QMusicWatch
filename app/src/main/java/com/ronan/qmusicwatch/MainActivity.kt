@@ -50,15 +50,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
@@ -155,6 +154,12 @@ internal fun lyricCenterScrollOffset(viewportStart: Int, viewportEnd: Int, itemS
 internal fun showLyricTimePill(index: Int, focusedIndex: Int, manualSelection: Boolean, timeMs: Long): Boolean =
     manualSelection && index == focusedIndex && timeMs >= 0
 
+internal fun lyricProgressBand(progress: Float, feather: Float = .018f): Pair<Float, Float> {
+    val value = progress.coerceIn(0f, 1f)
+    val width = feather.coerceIn(0f, .1f)
+    return (value - width).coerceAtLeast(0f) to (value + width).coerceAtMost(1f)
+}
+
 @Composable private fun SingleLineLyricText(
     text: String,
     modifier: Modifier = Modifier,
@@ -194,6 +199,23 @@ internal fun showLyricTimePill(index: Int, focusedIndex: Int, manualSelection: B
     val horizontalScale = if (measuredWidthPx > 0f && measuredWidthPx <= availableWidthPx) {
         minOf(smoothScale, availableWidthPx / measuredWidthPx)
     } else 1f
+    val renderBrush = renderProgress?.let {
+        when {
+            smoothProgress <= .001f -> Brush.horizontalGradient(listOf(color, color))
+            smoothProgress >= .999f -> Brush.horizontalGradient(listOf(accent, accent))
+            else -> {
+                val (fadeStart, fadeEnd) = lyricProgressBand(smoothProgress)
+                Brush.horizontalGradient(
+                    colorStops = arrayOf(
+                        0f to accent,
+                        fadeStart to accent,
+                        fadeEnd to color,
+                        1f to color,
+                    ),
+                )
+            }
+        }
+    }
     Box(
         Modifier.wrapContentWidth().graphicsLayer {
             scaleX = horizontalScale
@@ -201,15 +223,12 @@ internal fun showLyricTimePill(index: Int, focusedIndex: Int, manualSelection: B
         },
     ) {
         Text(
-            text, color = color, fontSize = fontSizeSp.sp, fontWeight = fontWeight,
+            text,
+            color = if (renderBrush == null) color else Color.Unspecified,
+            style = if (renderBrush == null) TextStyle.Default else TextStyle(brush = renderBrush),
+            fontSize = fontSizeSp.sp,
+            fontWeight = fontWeight,
             maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
-        )
-        if (renderProgress != null) Text(
-            text, color = accent, fontSize = fontSizeSp.sp, fontWeight = fontWeight,
-            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
-            modifier = Modifier.drawWithContent {
-                clipRect(right = size.width * smoothProgress) { this@drawWithContent.drawContent() }
-            },
         )
     }
 }
@@ -240,6 +259,23 @@ private fun vipSummary(profile: UserProfile?, loaded: Boolean, error: String?): 
     }
     profile?.isVip == false -> "未检测到会员播放权益"
     else -> "暂无法确认会员权益，点检查登录重试"
+}
+
+@Composable
+private fun rememberArtworkImageRequest(value: String?, sizePx: Int): ImageRequest? {
+    val context = LocalContext.current
+    val artworkUrl = remember(value) {
+        safeLocalOrGatewayUri(value.orEmpty()).ifBlank { null }
+    }
+    return remember(context, artworkUrl, sizePx) {
+        artworkUrl?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(sizePx)
+                .crossfade(false)
+                .build()
+        }
+    }
 }
 
 @Composable private fun AccountAvatar(
@@ -414,7 +450,34 @@ class MainActivity : ComponentActivity() {
     LaunchedEffect(chrome.playEvent, autoOpenPlayer) {
         if (chrome.playEvent != 0L && autoOpenPlayer && chrome.currentTrack != null && backStack?.destination?.route != "player") nav.navigate("player") { launchSingleTop = true }
     }
-    Scaffold(containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom), snackbarHost = { SnackbarHost(snackbar) }, bottomBar = { if (backStack?.destination?.route != "player") MiniPlayer(chrome.currentTrack, chrome.lyrics, vm) { nav.navigate("player") } }) { padding ->
+    Scaffold(
+        containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.safeDrawing.only(
+            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+        ),
+        snackbarHost = {
+            SnackbarHost(snackbar) { data ->
+                Snackbar(
+                    modifier = Modifier.padding(4.dp).widthIn(max = 224.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    containerColor = WatchSurfaceRaised,
+                    contentColor = WatchTextPrimary,
+                ) {
+                    Text(
+                        data.visuals.message,
+                        fontSize = 11.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        },
+        bottomBar = {
+            if (backStack?.destination?.route != "player") {
+                MiniPlayer(chrome.currentTrack, chrome.lyrics, vm) { nav.navigate("player") }
+            }
+        },
+    ) { padding ->
         NavHost(
             navController = nav,
             startDestination = "home",
@@ -968,6 +1031,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     var showModeDialog by remember(track.id) { mutableStateOf(false) }
     val effectiveLiked = selectedLike ?: liked
     val playerArtwork = safeLocalOrGatewayUri(track.artworkUrl)
+    val playerArtworkRequest = rememberArtworkImageRequest(playerArtwork, 256)
     val playerAccent = rememberArtworkAccent(playerArtwork, cachedArtworkAccent, vm::cacheArtworkAccent)
     val centeredLyricIndex by remember(listState) {
         derivedStateOf {
@@ -1127,7 +1191,11 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                             text = line.text,
                                             modifier = Modifier.fillMaxWidth(),
                                             requestedFontSp = lineFontSize,
-                                            color = if (isFocused) Color.White else Color.White.copy(alpha = .72f),
+                                            color = when {
+                                                isPlaybackLine -> WatchTextSecondary.copy(alpha = .82f)
+                                                isFocused -> Color.White
+                                                else -> Color.White.copy(alpha = .72f)
+                                            },
                                             fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal,
                                             renderProgress = karaokeProgress,
                                             lowPower = lowPowerPlayer,
@@ -1167,11 +1235,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     val coverSize = dimensions.playerArtworkSize.coerceAtMost((maxHeight * .34f))
                     if (!lowPowerPlayer && playerArtwork.isNotBlank()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(playerArtwork)
-                                .size(256)
-                                .crossfade(false)
-                                .build(),
+                            model = playerArtworkRequest,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize().alpha(.14f),
                             contentScale = ContentScale.Crop,
@@ -1191,11 +1255,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     ) {
                         var dragY by remember { mutableFloatStateOf(0f) }
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(playerArtwork.ifBlank { null })
-                                .size(256)
-                                .crossfade(false)
-                                .build(),
+                            model = playerArtworkRequest,
                             contentDescription = "歌曲封面",
                             modifier = Modifier.size(coverSize).background(WatchSurface, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
                                 .pointerInput(track.id) { detectTapGestures(onDoubleTap = { if (vm.isPlaying()) vm.pausePlayback() else vm.resumePlayback() }) }
@@ -1453,7 +1513,25 @@ private fun decodeServerQrImage(value: String) = runCatching {
         }
     }
     if (loading) item { Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp) } }
-    if (!loading && error != null) item { Text(error, Modifier.fillMaxWidth().padding(16.dp), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) }
+    if (!loading && error != null) item {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                error,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+            )
+            WatchPrimaryButton(
+                "重试",
+                Modifier.widthIn(max = 128.dp),
+                onClick = vm::retryDetail,
+            )
+        }
+    }
     if (!loading && error == null && detail != null && detail.tracks.isEmpty()) item { Text("这个歌单暂时没有可显示的歌曲", Modifier.fillMaxWidth().padding(16.dp), color = Color.Gray, textAlign = TextAlign.Center) }
     items(detail?.tracks.orEmpty(), key = { it.id }) { TrackRow(it, vm, playlistId = editableDirectoryId, removeFromPlaylist = editableDirectoryId != null, queue = detail?.tracks.orEmpty(), playlists = playlists) }
 }
@@ -1779,7 +1857,7 @@ private fun formatFileSize(bytes: Long): String = when {
 
 @Composable private fun TrackRow(track: Track, vm: AppViewModel, liked: Boolean = false, playlistId: String? = null, removeFromPlaylist: Boolean = false, queue: List<Track> = listOf(track), playlists: List<MusicCollection> = emptyList()) {
     val dimensions = LocalWatchDimensions.current
-    val context = LocalContext.current
+    val artworkRequest = rememberArtworkImageRequest(track.artworkUrl, 96)
     var menu by remember { mutableStateOf(false) }
     var choosePlaylist by remember { mutableStateOf(false) }
     var selectedLike by remember(track.id) { mutableStateOf<Boolean?>(null) }
@@ -1793,11 +1871,7 @@ private fun formatFileSize(bytes: Long): String = when {
     ) {
         Row(Modifier.fillMaxSize().padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null })
-                    .size(96)
-                    .crossfade(false)
-                    .build(),
+                model = artworkRequest,
                 contentDescription = null,
                 modifier = Modifier.size(dimensions.artworkSize).clip(RoundedCornerShape(8.dp)).background(WatchSurfaceRaised),
                 contentScale = ContentScale.Crop,
@@ -2114,7 +2188,7 @@ private fun formatFileSize(bytes: Long): String = when {
 @Composable private fun MiniPlayer(track: Track?, lyrics: List<LyricLine>, vm: AppViewModel, open: () -> Unit) {
     if (track == null) return
     val dimensions = LocalWatchDimensions.current
-    val context = LocalContext.current
+    val artworkRequest = rememberArtworkImageRequest(track.artworkUrl, 96)
     var position by remember(track.id) { mutableLongStateOf(0L) }
     var duration by remember(track.id) { mutableLongStateOf(0L) }
     var playing by remember(track.id) { mutableStateOf(false) }
@@ -2142,11 +2216,7 @@ private fun formatFileSize(bytes: Long): String = when {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(safeLocalOrGatewayUri(track.artworkUrl).ifBlank { null })
-                        .size(96)
-                        .crossfade(false)
-                        .build(),
+                    model = artworkRequest,
                     contentDescription = "当前歌曲封面",
                     modifier = Modifier.size(dimensions.artworkSize).clip(RoundedCornerShape(8.dp)).background(WatchSurfaceRaised),
                     contentScale = ContentScale.Crop,

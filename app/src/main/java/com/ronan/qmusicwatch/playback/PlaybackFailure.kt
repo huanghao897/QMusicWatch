@@ -19,11 +19,27 @@ data class PlaybackErrorEvent(
     val isLocalFile: Boolean,
 )
 
+internal const val PLAYBACK_RECOVERY_EXHAUSTED_MESSAGE = "自动恢复失败，请重新播放"
+
+internal fun playbackHttpStatus(error: Throwable): Int? =
+    generateSequence(error) { it.cause }
+        .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
+        .firstOrNull()
+        ?.responseCode
+
+internal fun requiresImmediateStreamRefreshStatus(status: Int?): Boolean =
+    status in setOf(401, 403, 404, 410)
+
+internal fun requiresImmediateStreamRefresh(error: Throwable): Boolean =
+    requiresImmediateStreamRefreshStatus(playbackHttpStatus(error))
+
 internal fun classifyPlaybackFailure(error: Throwable): PlaybackFailure {
     val chain = generateSequence(error) { it.cause }.toList()
     val text = chain.joinToString(" ") { it.message.orEmpty() }.lowercase()
-    val status = chain.filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()?.responseCode
+    val status = playbackHttpStatus(error)
     return when {
+        text.contains("自动恢复失败") ->
+            PlaybackFailure(PlaybackFailureType.UNKNOWN, PLAYBACK_RECOVERY_EXHAUSTED_MESSAGE)
         status in setOf(401, 403, 404, 410) -> PlaybackFailure(PlaybackFailureType.ADDRESS_EXPIRED, "播放地址已失效", true)
         text.contains("登录凭据已失效") || text.contains("请重新登录") -> PlaybackFailure(PlaybackFailureType.SESSION_EXPIRED, "登录状态已失效，请重新登录")
         text.contains("歌曲信息已失效") || text.contains("歌曲标识无效") ->

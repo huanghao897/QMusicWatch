@@ -1,17 +1,36 @@
 package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.playback.PlaybackFailureType
+import com.ronan.qmusicwatch.playback.PLAYBACK_RECOVERY_EXHAUSTED_MESSAGE
 import com.ronan.qmusicwatch.playback.classifyPlaybackFailure
+import com.ronan.qmusicwatch.playback.requiresImmediateStreamRefreshStatus
 import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaybackFailureTest {
+    @Test fun expiredGatewayUrlsSkipRetriesAndRefreshImmediately() {
+        listOf(401, 403, 404, 410).forEach { status ->
+            assertTrue(requiresImmediateStreamRefreshStatus(status))
+        }
+        assertEquals(false, requiresImmediateStreamRefreshStatus(500))
+        assertEquals(false, requiresImmediateStreamRefreshStatus(null))
+    }
+
     @Test fun networkErrorsCanRetry() {
         val failure = classifyPlaybackFailure(IOException("connection reset"))
         assertEquals(PlaybackFailureType.NETWORK, failure.type)
         assertTrue(failure.retryable)
+    }
+
+    @Test fun exhaustedAutomaticRecoveryIsTerminal() {
+        val failure = classifyPlaybackFailure(
+            IllegalStateException(PLAYBACK_RECOVERY_EXHAUSTED_MESSAGE),
+        )
+        assertEquals(PlaybackFailureType.UNKNOWN, failure.type)
+        assertEquals(PLAYBACK_RECOVERY_EXHAUSTED_MESSAGE, failure.message)
+        assertEquals(false, failure.retryable)
     }
 
     @Test fun entitlementErrorsAreExplained() {
