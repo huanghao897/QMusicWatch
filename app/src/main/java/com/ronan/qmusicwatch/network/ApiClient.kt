@@ -576,6 +576,10 @@ internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrack
         method = if (liked) "AddSongFans" else "DelSongFans",
         param = buildJsonObject {
             putJsonArray("v_songMid") { add(songMid) }
+            if (track.numericId > 0) {
+                putJsonArray("v_songId") { add(track.numericId) }
+                putJsonArray("v_songType") { add(track.songType) }
+            }
         },
     )
 }

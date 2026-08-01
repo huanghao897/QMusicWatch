@@ -29,6 +29,20 @@ class FavoriteWriteTest {
             track.id,
             write.param.getValue("v_songMid").jsonArray.single().jsonPrimitive.content,
         )
+        assertEquals(
+            track.numericId.toString(),
+            write.param.getValue("v_songId").jsonArray.single().jsonPrimitive.content,
+        )
+        assertEquals(
+            track.songType.toString(),
+            write.param.getValue("v_songType").jsonArray.single().jsonPrimitive.content,
+        )
+    }
+
+    @Test fun favoriteWithoutNumericIdKeepsTheReleasedMidOnlyContract() {
+        val write = qqFavoriteTrackWrite(track.copy(numericId = 0), liked = true)
+
+        assertEquals(setOf("v_songMid"), write.param.keys)
     }
 
     @Test fun removingFavoriteAndEditingPlaylistKeepSeparateContracts() {
