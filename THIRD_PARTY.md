@@ -6,7 +6,7 @@ These projects informed behavior, product research, or compatible protocol imple
 |---|---|---|
 | [jsososo/QQMusicApi](https://github.com/jsososo/QQMusicApi) | GPL-3.0 | Research into public response shapes and feature vocabulary only |
 | [luchfilip/Tides-WearOS](https://github.com/luchfilip/Tides-WearOS) | GPL-3.0 | Product-flow research for a watch music client only |
-| [google/horologist](https://github.com/google/horologist) | Apache-2.0 | Media interaction guidance only; no library dependency |
+| [google/horologist](https://github.com/google/horologist) | Apache-2.0 | The Material 3 media layout, three-button interaction, and scalloped play-button shape were adapted for API 24 square watches; modified source retains its copyright header |
 | [Calvin-LL/Reorderable](https://github.com/Calvin-LL/Reorderable) | Apache-2.0 | Runtime dependency for stable queue drag-and-drop, animated placement, and edge auto-scroll |
 | [alexzhirkevich/KLyrics](https://github.com/alexzhirkevich/KLyrics) | MIT | Lyrics rendering and auto-centering behavior research only; no source code copied |
 | [gabrielluizone/Svartifoss](https://github.com/gabrielluizone/Svartifoss) | GPL-3.0 | Immersive watch-player visual research only; no source code copied |

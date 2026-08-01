@@ -14,12 +14,12 @@ class WatchDesignTest {
 
         assertEquals(WatchWindowClass.Compact, dimensions.windowClass)
         assertEquals(8.dp, dimensions.screenPadding)
-        assertEquals(44.dp, dimensions.trackRowHeight)
+        assertEquals(46.dp, dimensions.trackRowHeight)
         assertEquals(40.dp, dimensions.searchHeight)
         assertEquals(50.dp, dimensions.miniPlayerHeight)
         assertEquals(13f, dimensions.bodySp)
-        assertEquals(8.dp, dimensions.rowCornerRadius)
-        assertEquals(12.dp, dimensions.searchCornerRadius)
+        assertEquals(23.dp, dimensions.rowCornerRadius)
+        assertEquals(20.dp, dimensions.searchCornerRadius)
         assertEquals(36.dp, dimensions.playerActionSize)
     }
 

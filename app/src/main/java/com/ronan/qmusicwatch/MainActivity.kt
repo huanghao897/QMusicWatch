@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -237,7 +238,7 @@ internal fun lyricProgressBand(progress: Float, feather: Float = .018f): Pair<Fl
     Surface(
         onClick = onSeek,
         modifier = Modifier.height(28.dp),
-        shape = RoundedCornerShape(9.dp),
+        shape = RoundedCornerShape(50),
         color = Green.copy(alpha = .12f),
         contentColor = Green,
     ) {
@@ -297,7 +298,7 @@ private fun rememberArtworkImageRequest(value: String?, sizePx: Int): ImageReque
     AsyncImage(
         model = request,
         contentDescription = "账号头像",
-        modifier = modifier.size(size).clip(RoundedCornerShape(50)).background(Color.Transparent),
+        modifier = modifier.size(size).clip(CircleShape).background(Color.Transparent),
         contentScale = ContentScale.Crop,
         placeholder = fallback,
         error = fallback,
@@ -459,7 +460,7 @@ class MainActivity : ComponentActivity() {
             SnackbarHost(snackbar) { data ->
                 Snackbar(
                     modifier = Modifier.padding(4.dp).widthIn(max = 224.dp),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(20.dp),
                     containerColor = WatchSurfaceRaised,
                     contentColor = WatchTextPrimary,
                 ) {
@@ -673,13 +674,7 @@ class MainActivity : ComponentActivity() {
                 contentPadding = PaddingValues(top = 4.dp, bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(dimensions.itemSpacing),
             ) {
-                item {
-                    Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("QMusic", fontSize = dimensions.titleSp.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(6.dp))
-                        Text("非官方", color = WatchTextSecondary, fontSize = 9.sp)
-                    }
-                }
+                item { WatchSectionHeader("QMusic") }
                 item {
                     Surface(
                         onClick = { nav.navigate("search") },
@@ -756,8 +751,8 @@ class MainActivity : ComponentActivity() {
     Surface(
         onClick = onClick,
         modifier = Modifier.weight(1f).fillMaxHeight(),
-        shape = RoundedCornerShape(10.dp),
-        color = WatchSurface,
+        shape = RoundedCornerShape(50),
+        color = WatchSurfaceRaised,
     ) {
         Column(Modifier.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -841,7 +836,7 @@ private fun ServerQrLogin(imageBase64: String, modifier: Modifier = Modifier) {
                     filterQuality = FilterQuality.None,
                 )
             } else {
-                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = Color(0xFF28312D))
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = WatchAccent)
             }
         }
     }
@@ -868,7 +863,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) { Text("最近搜索", Modifier.weight(1f), color = WatchTextSecondary, fontSize = 11.sp); TextButton(vm::clearSearchHistory, contentPadding = PaddingValues(horizontal = 6.dp)) { Text("清空", fontSize = 11.sp) } }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 history.forEach { value ->
-                    Surface(onClick = { query = value; vm.search(value, type) }, shape = RoundedCornerShape(9.dp), color = WatchSurface) {
+                    Surface(onClick = { query = value; vm.search(value, type) }, shape = RoundedCornerShape(50), color = WatchSurface) {
                         Text(value, Modifier.padding(horizontal = 7.dp, vertical = 4.dp), color = WatchTextSecondary, maxLines = 1, fontSize = 11.sp)
                     }
                 }
@@ -879,7 +874,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 Surface(
                     onClick = { type = key; if (query.isNotBlank()) vm.search(query, key) },
                     modifier = Modifier.weight(1f).fillMaxHeight(),
-                    shape = RoundedCornerShape(9.dp),
+                    shape = RoundedCornerShape(50),
                     color = if (type == key) WatchSurfaceRaised else Color.Transparent,
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -915,10 +910,21 @@ private fun decodeServerQrImage(value: String) = runCatching {
             LibrarySection.Created -> {
                 item { SectionTitle("我创建的歌单", "新建") { title = ""; creating = true } }
                 items(created, key = { "${it.directoryId}:${it.id}" }) { item ->
+                    val artwork = rememberArtworkImageRequest(item.artworkUrl, 96)
                     WatchListRow(
                         title = item.title,
                         subtitle = "${item.trackCount} 首",
-                        leading = { Box(Modifier.fillMaxSize().background(WatchSurfaceRaised, RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.size(18.dp), tint = WatchAccent) } },
+                        leading = {
+                            if (artwork != null) AsyncImage(
+                                model = artwork,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape).background(WatchSurfaceRaised),
+                                contentScale = ContentScale.Crop,
+                            ) else Box(
+                                Modifier.fillMaxSize().background(WatchSurfaceRaised, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.size(18.dp), tint = WatchAccent) }
+                        },
                         trailing = { WatchIconButton(Icons.Default.MoreVert, "歌单操作") { actionPlaylist = item } },
                         onClick = { vm.loadDetail("playlist", item, editable = true); nav.navigate("detail") },
                     )
@@ -1232,37 +1238,28 @@ private fun decodeServerQrImage(value: String) = runCatching {
             } else {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val compactPlayer = maxHeight <= 320.dp
-                    val coverSize = dimensions.playerArtworkSize.coerceAtMost((maxHeight * .34f))
                     if (!lowPowerPlayer && playerArtwork.isNotBlank()) {
                         AsyncImage(
                             model = playerArtworkRequest,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize().alpha(.14f),
+                            modifier = Modifier.fillMaxSize().alpha(.1f),
                             contentScale = ContentScale.Crop,
                             filterQuality = FilterQuality.Low,
                         )
-                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .42f)))
+                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .72f)))
                     }
                     Column(
                         Modifier.fillMaxSize().padding(
                             start = dimensions.screenPadding,
                             end = dimensions.screenPadding,
-                            top = 4.dp,
-                            bottom = 4.dp,
+                            top = 26.dp,
+                            bottom = 12.dp,
                         ),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        var dragY by remember { mutableFloatStateOf(0f) }
-                        AsyncImage(
-                            model = playerArtworkRequest,
-                            contentDescription = "歌曲封面",
-                            modifier = Modifier.size(coverSize).background(WatchSurface, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
-                                .pointerInput(track.id) { detectTapGestures(onDoubleTap = { if (vm.isPlaying()) vm.pausePlayback() else vm.resumePlayback() }) }
-                                .pointerInput(track.id) { detectVerticalDragGestures(onDragStart = { dragY = 0f }, onDragEnd = { if (abs(dragY) > 60) vm.adjustVolume(if (dragY < 0) 1 else -1) }) { change, amount -> change.consume(); dragY += amount } },
-                        )
-                        Text(track.title, fontSize = if (compactPlayer) 14.sp else 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                        Text(track.artists.joinToString(" / "), color = WatchTextSecondary, fontSize = if (compactPlayer) 10.sp else 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                        Text(track.title, fontSize = if (compactPlayer) 16.sp else 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 44.dp), textAlign = TextAlign.Center)
+                        Text(track.artists.joinToString(" / "), color = WatchTextSecondary, fontSize = if (compactPlayer) 12.sp else 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), textAlign = TextAlign.Center)
                         val previewIndex = active.takeIf { it >= 0 }
                             ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
                             ?: lyrics.indexOfFirst { it.text.isNotBlank() }
@@ -1275,11 +1272,11 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         ) { line ->
                             if (line.isNotBlank()) SingleLineLyricText(line, Modifier.fillMaxWidth(), if (compactPlayer) 11.5f else 13f, WatchTextPrimary.copy(alpha = .82f), centered = true) else Spacer(Modifier.height(1.dp))
                         }
-                        Row(Modifier.fillMaxWidth().height(if (compactPlayer) 20.dp else 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val safeDuration = duration.coerceAtLeast(1L)
+                        val safePosition = position.coerceIn(0L, safeDuration)
+                        val sliderFraction = (safePosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+                        Row(Modifier.fillMaxWidth().height(if (compactPlayer) 18.dp else 22.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(lyricTime(position), color = WatchTextSecondary, fontSize = 9.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
-                            val safeDuration = duration.coerceAtLeast(1L)
-                            val safePosition = position.coerceIn(0L, safeDuration)
-                            val sliderFraction = (safePosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
                             Slider(
                                 value = safePosition.toFloat(),
                                 onValueChange = { vm.seek(it.toLong()); position = it.toLong() },
@@ -1288,7 +1285,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                 colors = SliderDefaults.colors(
                                     thumbColor = playerAccent,
                                     activeTrackColor = playerAccent,
-                                    inactiveTrackColor = Color(0xFF343B38),
+                                    inactiveTrackColor = WatchDivider,
                                 ),
                                 thumb = {
                                     Box(Modifier.width(10.dp).height(14.dp), contentAlignment = Alignment.Center) {
@@ -1296,28 +1293,23 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                     }
                                 },
                                 track = {
-                                    Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(50)).background(Color(0xFF343B38))) {
+                                    Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(50)).background(WatchDivider)) {
                                         Box(Modifier.fillMaxHeight().fillMaxWidth(sliderFraction).background(playerAccent))
                                     }
                                 },
                             )
                             Text(lyricTime(duration), color = WatchTextSecondary, fontSize = 9.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
                         }
-                        Row(Modifier.height(if (compactPlayer) 42.dp else 48.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            WatchIconButton(Icons.Default.SkipPrevious, "上一首", onClick = vm::skipPrevious)
-                            Surface(
-                                onClick = { if (playing) vm.pausePlayback() else vm.resumePlayback() },
-                                modifier = Modifier.size(if (compactPlayer) 42.dp else 46.dp),
-                                shape = RoundedCornerShape(50),
-                                color = WatchTextPrimary,
-                                contentColor = Color.Black,
-                            ) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "暂停" else "播放", Modifier.size(24.dp))
-                                }
-                            }
-                            WatchIconButton(Icons.Default.SkipNext, "下一首", onClick = vm::skipNext)
-                        }
+                        ExpressivePlayerControls(
+                            playing = playing,
+                            progress = sliderFraction,
+                            accent = playerAccent,
+                            animateShape = !lowPowerPlayer,
+                            modifier = Modifier.height(if (compactPlayer) 66.dp else 72.dp),
+                            onPrevious = vm::skipPrevious,
+                            onPlayPause = { if (playing) vm.pausePlayback() else vm.resumePlayback() },
+                            onNext = vm::skipNext,
+                        )
                         Row(Modifier.fillMaxWidth().height(if (compactPlayer) 34.dp else 40.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                             PlayerActionButton(Icons.Default.Favorite.takeIf { effectiveLiked } ?: Icons.Default.FavoriteBorder, if (effectiveLiked) "已喜欢" else "喜欢", tint = if (effectiveLiked) WatchLike else WatchTextPrimary, compact = compactPlayer) {
                                 if (!likePending) {
@@ -1398,7 +1390,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     Surface(
                         onClick = { if (enabled) { vm.setQuality(option.id); onDismiss() } },
                         enabled = enabled,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(50),
                         color = if (normalizeQualityId(selectedQuality) == option.id) Green.copy(alpha = .14f) else Surface,
                     ) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1438,7 +1430,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 modes.forEach { value ->
                     Surface(
                         onClick = { vm.setPlayMode(value); onDismiss() },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(50),
                         color = if (mode == value) Green.copy(alpha = .14f) else Surface,
                     ) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1468,7 +1460,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     items(candidates, key = { "player:${it.directoryId}" }) { playlist ->
                         Surface(
                             onClick = { vm.addToPlaylist(track, playlist.directoryId); onDismiss() },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(50),
                             color = Surface,
                         ) {
                             Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1496,7 +1488,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             AsyncImage(
                 model = detail?.tracks?.firstOrNull()?.artworkUrl?.let(::safeLocalOrGatewayUri)?.ifBlank { null },
                 contentDescription = null,
-                modifier = Modifier.size(50.dp).clip(RoundedCornerShape(10.dp)).background(WatchSurface),
+                modifier = Modifier.size(50.dp).clip(CircleShape).background(WatchSurface),
                 contentScale = ContentScale.Crop,
             )
             Spacer(Modifier.width(7.dp))
@@ -1541,7 +1533,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         title = title,
         subtitle = subtitle,
         leading = {
-            Box(Modifier.fillMaxSize().background(WatchSurface, RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(WatchSurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
                 Icon(icon, null, Modifier.size(18.dp), tint = WatchAccent)
             }
         },
@@ -1589,7 +1581,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             Surface(
                 onClick = { onSelect(value) },
                 modifier = Modifier.weight(1f).height(32.dp),
-                shape = RoundedCornerShape(9.dp),
+                shape = RoundedCornerShape(50),
                 color = if (selected == value) WatchAccent.copy(alpha = .18f) else WatchSurface,
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1600,10 +1592,25 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
 }
 
-@Composable private fun SettingsHeader(title: String, onBack: () -> Unit) = Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
-    WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.size(34.dp), onClick = onBack)
-    Spacer(Modifier.width(2.dp))
-    Text(title, fontSize = LocalWatchDimensions.current.titleSp.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+@Composable private fun SettingsHeader(title: String, onBack: () -> Unit) = Box(
+    Modifier.fillMaxWidth().height(42.dp),
+    contentAlignment = Alignment.Center,
+) {
+    WatchIconButton(
+        Icons.AutoMirrored.Filled.ArrowBack,
+        "返回",
+        Modifier.align(Alignment.CenterStart).size(34.dp),
+        onClick = onBack,
+    )
+    Text(
+        title,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 42.dp),
+        fontSize = LocalWatchDimensions.current.titleSp.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
+    )
 }
 
 @Composable private fun SettingsCenter(nav: NavHostController, onBack: () -> Unit) = LazyColumn(
@@ -1627,7 +1634,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     Surface(
                         onClick = { vm.setUiSize(value) },
                         modifier = Modifier.weight(1f).height(32.dp),
-                        shape = RoundedCornerShape(9.dp),
+                        shape = RoundedCornerShape(50),
                         color = if (uiSize == value) WatchAccent.copy(alpha = .18f) else WatchSurface,
                     ) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1779,7 +1786,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         item { SettingsHeader("公告", onBack) }
         if (items.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("暂无公告", color = Color.Gray) } }
         items(items, key = ControlAnnouncement::id) { announcement ->
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = WatchSurface) {
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = WatchSurface) {
                 Column(Modifier.padding(8.dp, 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) { Text(announcement.title.take(80), Modifier.weight(1f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (announcement.pinned) Icon(Icons.Default.PushPin, "置顶", Modifier.size(16.dp), tint = Green) }
                     Text(announcement.content.take(2000), color = WatchTextSecondary, fontSize = 11.sp)
@@ -1846,8 +1853,8 @@ private fun formatFileSize(bytes: Long): String = when {
     tint: Color = WatchTextPrimary,
     onClick: () -> Unit,
 ) {
-    Surface(onClick = onClick, color = Color.Transparent, shape = RoundedCornerShape(9.dp)) {
-        Row(Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Surface(onClick = onClick, color = WatchSurface, shape = RoundedCornerShape(50)) {
+        Row(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, Modifier.size(18.dp), tint = tint)
             Spacer(Modifier.width(8.dp))
             Text(label, color = tint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1867,13 +1874,13 @@ private fun formatFileSize(bytes: Long): String = when {
         onClick = { vm.requestPlay(track, sourceQueue = queue) },
         modifier = Modifier.fillMaxWidth().height(dimensions.trackRowHeight),
         shape = RoundedCornerShape(dimensions.cornerRadius),
-        color = Color.Transparent,
+        color = WatchSurface,
     ) {
         Row(Modifier.fillMaxSize().padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = artworkRequest,
                 contentDescription = null,
-                modifier = Modifier.size(dimensions.artworkSize).clip(RoundedCornerShape(8.dp)).background(WatchSurfaceRaised),
+                modifier = Modifier.size(dimensions.artworkSize).clip(CircleShape).background(WatchSurfaceRaised),
                 contentScale = ContentScale.Crop,
             )
             Spacer(Modifier.width(7.dp))
@@ -2177,13 +2184,32 @@ private fun formatFileSize(bytes: Long): String = when {
     )
 }
 
-@Composable private fun CollectionRow(value: MusicCollection, open: () -> Unit = {}) = WatchListRow(
-    title = value.title,
-    subtitle = if (value.trackCount >= 0) "${value.trackCount} 首" else "点击查看",
-    leading = { Box(Modifier.fillMaxSize().background(WatchSurface, RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.size(18.dp), tint = WatchAccent) } },
-    trailing = { Icon(Icons.Default.ChevronRight, null, Modifier.size(17.dp), tint = WatchTextSecondary) },
-    onClick = open,
-)
+@Composable private fun CollectionRow(value: MusicCollection, open: () -> Unit = {}) {
+    val artwork = rememberArtworkImageRequest(value.artworkUrl, 96)
+    WatchListRow(
+        title = value.title,
+        subtitle = if (value.trackCount >= 0) "${value.trackCount} 首" else "点击查看",
+        leading = {
+            if (artwork != null) {
+                AsyncImage(
+                    model = artwork,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape).background(WatchSurfaceRaised),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Box(
+                    Modifier.fillMaxSize().background(WatchSurfaceRaised, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.size(18.dp), tint = WatchAccent)
+                }
+            }
+        },
+        trailing = { Icon(Icons.Default.ChevronRight, null, Modifier.size(17.dp), tint = WatchTextSecondary) },
+        onClick = open,
+    )
+}
 @Composable private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) = WatchSectionHeader(text, action = action, onAction = onAction)
 @Composable private fun MiniPlayer(track: Track?, lyrics: List<LyricLine>, vm: AppViewModel, open: () -> Unit) {
     if (track == null) return
@@ -2209,7 +2235,12 @@ private fun formatFileSize(bytes: Long): String = when {
     } else {
         0f
     }
-    Surface(color = WatchSurface, tonalElevation = 0.dp, border = BorderStroke(1.dp, WatchDivider)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp),
+        shape = RoundedCornerShape(50),
+        color = WatchSurfaceRaised,
+        tonalElevation = 0.dp,
+    ) {
         Box(Modifier.fillMaxWidth().height(dimensions.miniPlayerHeight)) {
             Row(
                 Modifier.fillMaxSize().padding(start = 6.dp, end = 2.dp, bottom = 2.dp).clickable(onClick = open),
@@ -2218,7 +2249,7 @@ private fun formatFileSize(bytes: Long): String = when {
                 AsyncImage(
                     model = artworkRequest,
                     contentDescription = "当前歌曲封面",
-                    modifier = Modifier.size(dimensions.artworkSize).clip(RoundedCornerShape(8.dp)).background(WatchSurfaceRaised),
+                    modifier = Modifier.size(dimensions.artworkSize).clip(CircleShape).background(WatchSurface),
                     contentScale = ContentScale.Crop,
                 )
                 Spacer(Modifier.width(7.dp))
