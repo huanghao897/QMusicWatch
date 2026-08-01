@@ -578,7 +578,7 @@ internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrack
             putJsonArray("v_songMid") { add(songMid) }
             if (track.numericId > 0) {
                 putJsonArray("v_songId") { add(track.numericId) }
-                putJsonArray("v_songType") { add(track.songType) }
+                putJsonArray("v_songType") { add(0) }
             }
         },
     )

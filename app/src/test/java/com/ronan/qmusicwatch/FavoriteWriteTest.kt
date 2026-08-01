@@ -34,7 +34,7 @@ class FavoriteWriteTest {
             write.param.getValue("v_songId").jsonArray.single().jsonPrimitive.content,
         )
         assertEquals(
-            track.songType.toString(),
+            "0",
             write.param.getValue("v_songType").jsonArray.single().jsonPrimitive.content,
         )
     }
