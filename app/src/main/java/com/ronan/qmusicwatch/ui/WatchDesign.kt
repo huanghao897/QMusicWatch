@@ -12,6 +12,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -48,7 +49,9 @@ enum class WatchWindowClass {
 data class WatchDimensions(
     val windowClass: WatchWindowClass,
     val uiSize: WatchUiSize,
+    val isRound: Boolean,
     val screenPadding: Dp,
+    val topSafeInset: Dp,
     val verticalPadding: Dp,
     val itemSpacing: Dp,
     val titleSp: Float,
@@ -72,6 +75,7 @@ data class WatchDimensions(
 internal fun resolveWatchDimensions(
     width: Dp,
     uiSize: WatchUiSize,
+    isRound: Boolean = false,
 ): WatchDimensions {
     val windowClass = when {
         width <= 280.dp -> WatchWindowClass.Compact
@@ -87,7 +91,9 @@ internal fun resolveWatchDimensions(
     return WatchDimensions(
         windowClass = windowClass,
         uiSize = uiSize,
-        screenPadding = 8.dp.scaled(),
+        isRound = isRound,
+        screenPadding = (if (isRound) 14.dp else 8.dp).scaled(),
+        topSafeInset = (if (isRound) 12.dp else 8.dp).scaled(),
         verticalPadding = 5.dp.scaled(),
         itemSpacing = 4.dp.scaled(),
         titleSp = 18f * scale,
@@ -124,6 +130,7 @@ fun QMusicWatchTheme(
     content: @Composable () -> Unit,
 ) {
     val selectedSize = WatchUiSize.fromStored(uiSize)
+    val isRound = LocalConfiguration.current.isScreenRound
     val colors = darkColorScheme(
         primary = WatchAccent,
         secondary = WatchLike,
@@ -155,7 +162,7 @@ fun QMusicWatchTheme(
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             androidx.compose.runtime.CompositionLocalProvider(
-                LocalWatchDimensions provides resolveWatchDimensions(maxWidth, selectedSize),
+                LocalWatchDimensions provides resolveWatchDimensions(maxWidth, selectedSize, isRound),
                 content = content,
             )
         }

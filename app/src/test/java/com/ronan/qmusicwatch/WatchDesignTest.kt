@@ -33,6 +33,16 @@ class WatchDesignTest {
         assertTrue(large.bodySp > compact.bodySp)
     }
 
+    @Test fun roundWatchUsesInsetAwareTokens() {
+        val square = resolveWatchDimensions(240.dp, WatchUiSize.Compact, isRound = false)
+        val round = resolveWatchDimensions(240.dp, WatchUiSize.Compact, isRound = true)
+
+        assertTrue(round.isRound)
+        assertTrue(round.screenPadding > square.screenPadding)
+        assertTrue(round.topSafeInset > square.topSafeInset)
+        assertEquals(square.trackRowHeight, round.trackRowHeight)
+    }
+
     @Test fun storedUiSizeFallsBackToCompact() {
         assertEquals(WatchUiSize.Compact, WatchUiSize.fromStored(null))
         assertEquals(WatchUiSize.Compact, WatchUiSize.fromStored("phone"))

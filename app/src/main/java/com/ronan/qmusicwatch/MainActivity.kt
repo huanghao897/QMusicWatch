@@ -44,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material3.*
@@ -383,6 +384,7 @@ class MainActivity : ComponentActivity() {
     val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
     val artworkAccent by vm.artworkAccent.collectAsStateWithLifecycle()
     QMusicWatchTheme(uiSize = uiSize, pureBlack = pureBlack) {
+    val appDimensions = LocalWatchDimensions.current
     var dismissedAnnouncements by remember { mutableStateOf(emptySet<String>()) }
     var dismissedUpdateId by remember { mutableLongStateOf(0L) }
     var pendingAutomaticInstallId by rememberSaveable { mutableLongStateOf(0L) }
@@ -482,7 +484,7 @@ class MainActivity : ComponentActivity() {
         NavHost(
             navController = nav,
             startDestination = "home",
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.padding(padding).padding(top = appDimensions.topSafeInset),
             enterTransition = {
                 fadeIn(tween(180)) + slideInHorizontally(tween(180)) { it / 12 }
             },
@@ -1038,7 +1040,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
     val effectiveLiked = selectedLike ?: liked
     val playerArtwork = safeLocalOrGatewayUri(track.artworkUrl)
     val playerArtworkRequest = rememberArtworkImageRequest(playerArtwork, 256)
-    val playerAccent = rememberArtworkAccent(playerArtwork, cachedArtworkAccent, vm::cacheArtworkAccent)
+    val artworkAccent = rememberArtworkAccent(playerArtwork, cachedArtworkAccent, vm::cacheArtworkAccent)
+    val playerAccent = WatchAccent
     val centeredLyricIndex by remember(listState) {
         derivedStateOf {
             val layout = listState.layoutInfo
@@ -1112,7 +1115,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             centerLyric(active)
         }
     }
-    Box(Modifier.fillMaxSize().focusRequester(focusRequester).focusable().onRotaryScrollEvent { event ->
+    BoxWithConstraints(Modifier.fillMaxSize().focusRequester(focusRequester).focusable().onRotaryScrollEvent { event ->
         if (!locked) {
             if (pager.currentPage == 0) vm.adjustVolume(if (event.verticalScrollPixels < 0) 1 else -1)
             else {
@@ -1123,6 +1126,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
         }
         true
     }) {
+        val viewportSide = minOf(maxWidth, maxHeight)
+        Box(Modifier.size(viewportSide).align(Alignment.Center)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), userScrollEnabled = !locked) { page ->
             if (page == 1) {
                 BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
@@ -1236,8 +1241,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         }
                 }
             } else {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val compactPlayer = maxHeight <= 320.dp
+                BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
+                    val compactPlayer = maxWidth <= 280.dp
                     if (!lowPowerPlayer && playerArtwork.isNotBlank()) {
                         AsyncImage(
                             model = playerArtworkRequest,
@@ -1247,70 +1252,75 @@ private fun decodeServerQrImage(value: String) = runCatching {
                             filterQuality = FilterQuality.Low,
                         )
                         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .72f)))
+                        Box(Modifier.fillMaxSize().background(artworkAccent.copy(alpha = .05f)))
                     }
                     Column(
                         Modifier.fillMaxSize().padding(
-                            start = dimensions.screenPadding,
-                            end = dimensions.screenPadding,
-                            top = 26.dp,
-                            bottom = 12.dp,
+                            horizontal = if (dimensions.isRound) 16.dp else 9.dp,
+                            vertical = 8.dp,
                         ),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.Center,
                     ) {
-                        Text(track.title, fontSize = if (compactPlayer) 16.sp else 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 44.dp), textAlign = TextAlign.Center)
-                        Text(track.artists.joinToString(" / "), color = WatchTextSecondary, fontSize = if (compactPlayer) 12.sp else 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), textAlign = TextAlign.Center)
-                        val previewIndex = active.takeIf { it >= 0 }
-                            ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
-                            ?: lyrics.indexOfFirst { it.text.isNotBlank() }
-                        val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() }
-                        AnimatedContent(
-                            targetState = preview.orEmpty(),
-                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
-                            modifier = Modifier.fillMaxWidth().height(if (compactPlayer) 17.dp else 22.dp),
-                            label = "playerLyricPreview",
-                        ) { line ->
-                            if (line.isNotBlank()) SingleLineLyricText(line, Modifier.fillMaxWidth(), if (compactPlayer) 11.5f else 13f, WatchTextPrimary.copy(alpha = .82f), centered = true) else Spacer(Modifier.height(1.dp))
+                        Column(
+                            Modifier.fillMaxWidth().height(if (compactPlayer) 58.dp else 66.dp)
+                                .padding(horizontal = 34.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                track.title,
+                                fontSize = if (compactPlayer) 15.sp else 17.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                            )
+                            Text(
+                                track.artists.joinToString(" / "),
+                                color = WatchTextSecondary,
+                                fontSize = if (compactPlayer) 10.5.sp else 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                            )
+                            val previewIndex = active.takeIf { it >= 0 }
+                                ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
+                                ?: lyrics.indexOfFirst { it.text.isNotBlank() }
+                            val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() }
+                            AnimatedContent(
+                                targetState = preview.orEmpty(),
+                                transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+                                modifier = Modifier.fillMaxWidth().height(16.dp),
+                                label = "playerLyricPreview",
+                            ) { line ->
+                                if (line.isNotBlank()) SingleLineLyricText(
+                                    line,
+                                    Modifier.fillMaxWidth(),
+                                    if (compactPlayer) 9.5f else 10.5f,
+                                    WatchTextPrimary.copy(alpha = .7f),
+                                    centered = true,
+                                ) else Spacer(Modifier.height(1.dp))
+                            }
                         }
                         val safeDuration = duration.coerceAtLeast(1L)
                         val safePosition = position.coerceIn(0L, safeDuration)
                         val sliderFraction = (safePosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
-                        Row(Modifier.fillMaxWidth().height(if (compactPlayer) 18.dp else 22.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(lyricTime(position), color = WatchTextSecondary, fontSize = 9.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
-                            Slider(
-                                value = safePosition.toFloat(),
-                                onValueChange = { vm.seek(it.toLong()); position = it.toLong() },
-                                valueRange = 0f..safeDuration.toFloat(),
-                                modifier = Modifier.weight(1f).height(if (compactPlayer) 20.dp else 24.dp),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = playerAccent,
-                                    activeTrackColor = playerAccent,
-                                    inactiveTrackColor = WatchDivider,
-                                ),
-                                thumb = {
-                                    Box(Modifier.width(10.dp).height(14.dp), contentAlignment = Alignment.Center) {
-                                        Box(Modifier.size(10.dp).background(playerAccent, RoundedCornerShape(50)))
-                                    }
-                                },
-                                track = {
-                                    Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(50)).background(WatchDivider)) {
-                                        Box(Modifier.fillMaxHeight().fillMaxWidth(sliderFraction).background(playerAccent))
-                                    }
-                                },
-                            )
-                            Text(lyricTime(duration), color = WatchTextSecondary, fontSize = 9.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
-                        }
+                        Spacer(Modifier.height(3.dp))
                         ExpressivePlayerControls(
                             playing = playing,
                             progress = sliderFraction,
                             accent = playerAccent,
                             animateShape = !lowPowerPlayer,
-                            modifier = Modifier.height(if (compactPlayer) 66.dp else 72.dp),
+                            modifier = Modifier.height(72.dp),
                             onPrevious = vm::skipPrevious,
                             onPlayPause = { if (playing) vm.pausePlayback() else vm.resumePlayback() },
                             onNext = vm::skipNext,
                         )
-                        Row(Modifier.fillMaxWidth().height(if (compactPlayer) 34.dp else 40.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.height(if (compactPlayer) 7.dp else 10.dp))
+                        Row(Modifier.fillMaxWidth().height(36.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                             PlayerActionButton(Icons.Default.Favorite.takeIf { effectiveLiked } ?: Icons.Default.FavoriteBorder, if (effectiveLiked) "已喜欢" else "喜欢", tint = if (effectiveLiked) WatchLike else WatchTextPrimary, compact = compactPlayer) {
                                 if (!likePending) {
                                     val target = !effectiveLiked
@@ -1331,14 +1341,15 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 }
             }
         }
-        WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.align(Alignment.TopStart).padding(2.dp), onClick = onBack)
-        if (!locked) WatchIconButton(Icons.Default.LockOpen, "锁定触控", Modifier.align(Alignment.TopEnd).padding(2.dp)) { locked = true }
-        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.align(Alignment.TopStart).padding(3.dp).size(32.dp), onClick = onBack)
+        if (!locked) WatchIconButton(Icons.Default.LockOpen, "锁定触控", Modifier.align(Alignment.TopEnd).padding(3.dp).size(32.dp)) { locked = true }
+        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(2) { page -> Box(Modifier.size(if (pager.currentPage == page) 6.dp else 4.dp).background(if (pager.currentPage == page) playerAccent else WatchDivider, RoundedCornerShape(50))) }
         }
         if (locked) {
             Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures {} })
-            WatchIconButton(Icons.Default.Lock, "解除锁定", Modifier.align(Alignment.TopEnd).padding(2.dp), tint = playerAccent) { locked = false }
+            WatchIconButton(Icons.Default.Lock, "解除锁定", Modifier.align(Alignment.TopEnd).padding(3.dp).size(32.dp), tint = playerAccent) { locked = false }
+        }
         }
     }
     if (showPlaylistDialog) PlayerPlaylistDialog(track, playlists, vm) { showPlaylistDialog = false }
@@ -1541,71 +1552,156 @@ private fun decodeServerQrImage(value: String) = runCatching {
         onClick = open,
     )
 
-@Composable private fun SettingsGroup(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp)) {
-            Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = WatchTextPrimary)
-            subtitle?.let { Text(it, color = WatchTextSecondary, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+@Composable private fun SettingsSectionLabel(title: String) {
+    Text(
+        title,
+        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 7.dp, bottom = 2.dp),
+        color = WatchTextSecondary,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable private fun SettingsValueRow(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color = WatchAccent,
+    onClick: () -> Unit,
+) = WatchListRow(
+    title = title,
+    subtitle = value,
+    leading = {
+        Box(Modifier.fillMaxSize().background(WatchSurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(18.dp), tint = tint)
         }
-        HorizontalDivider(color = WatchDivider)
-        content()
-    }
-}
+    },
+    trailing = { Icon(Icons.Default.ChevronRight, null, Modifier.size(17.dp), tint = WatchTextSecondary) },
+    onClick = onClick,
+)
 
-@Composable private fun SettingsSwitchRow(title: String, subtitle: String? = null, checked: Boolean, onCheckedChange: (Boolean) -> Unit) = Row(
-    Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = 5.dp, vertical = 2.dp),
-    verticalAlignment = Alignment.CenterVertically,
-) {
-    Column(Modifier.weight(1f).padding(end = 8.dp)) {
-        Text(title, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        subtitle?.let { Text(it, color = WatchTextSecondary, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-    }
-    Switch(checked, onCheckedChange, modifier = Modifier.width(44.dp).height(28.dp))
-}
+@Composable private fun SettingsSwitchRow(
+    title: String,
+    subtitle: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) = WatchListRow(
+    title = title,
+    subtitle = subtitle,
+    leading = {
+        Box(Modifier.fillMaxSize().background(WatchSurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(18.dp), tint = if (checked) WatchAccent else WatchTextSecondary)
+        }
+    },
+    trailing = { Switch(checked, onCheckedChange, modifier = Modifier.width(42.dp).height(26.dp)) },
+    onClick = { onCheckedChange(!checked) },
+)
 
-@Composable private fun SettingsChoiceBlock(title: String, content: @Composable ColumnScope.() -> Unit) = Column(
-    Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 5.dp),
-) {
-    Text(title, color = WatchTextSecondary, fontSize = 10.sp)
-    Spacer(Modifier.height(3.dp))
-    content()
-}
+@Composable private fun SettingsActionRow(
+    title: String,
+    subtitle: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color = WatchAccent,
+    onClick: () -> Unit,
+) = SettingsValueRow(title, subtitle.orEmpty(), icon, tint, onClick)
 
-@Composable private fun CompactChoices(
-    options: List<Pair<String, String>>,
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        options.forEach { (value, label) ->
-            Surface(
-                onClick = { onSelect(value) },
-                modifier = Modifier.weight(1f).height(32.dp),
-                shape = RoundedCornerShape(50),
-                color = if (selected == value) WatchAccent.copy(alpha = .18f) else WatchSurface,
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(label, color = if (selected == value) WatchAccent else WatchTextSecondary, fontSize = 11.sp)
-                }
+@Composable private fun SettingsAccountRow(state: AppUiState, vm: AppViewModel) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(58.dp),
+        shape = RoundedCornerShape(29.dp),
+        color = WatchSurface,
+    ) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            AccountAvatar(state.profile?.avatarUrl, vm.loginProvider, vm.accountId, 42.dp)
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Text(
+                    state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(accountLabel(vm.loginProvider, vm.accountId), color = WatchTextSecondary, fontSize = 9.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    vipSummary(state.profile, state.profileLoaded, state.profileError),
+                    color = if (state.profile?.isVipActive() == true) WatchVip else WatchTextSecondary,
+                    fontSize = 9.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
 }
 
+@Composable private fun SettingsSelectionSheet(
+    title: String,
+    selected: String?,
+    options: List<Pair<String, String>>,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) = WatchDialog(
+    onDismissRequest = onDismiss,
+    title = {
+        Text(
+            title,
+            Modifier.fillMaxWidth(),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+    },
+    text = {
+        LazyColumn(
+            Modifier.fillMaxWidth().heightIn(max = 176.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            items(options, key = { it.first }) { (value, label) ->
+                Surface(
+                    onClick = { onSelect(value) },
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (selected == value) WatchAccent.copy(alpha = .2f) else WatchSurface,
+                ) {
+                    Row(
+                        Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            label,
+                            Modifier.weight(1f),
+                            color = if (selected == value) WatchAccent else WatchTextPrimary,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (selected == value) Icon(Icons.Default.Check, null, Modifier.size(17.dp), tint = WatchAccent)
+                    }
+                }
+            }
+        }
+    },
+    confirmButton = { TextButton(onDismiss) { Text("关闭") } },
+)
+
 @Composable private fun SettingsHeader(title: String, onBack: () -> Unit) = Box(
-    Modifier.fillMaxWidth().height(42.dp),
+    Modifier.fillMaxWidth().height(38.dp),
     contentAlignment = Alignment.Center,
 ) {
     WatchIconButton(
         Icons.AutoMirrored.Filled.ArrowBack,
         "返回",
-        Modifier.align(Alignment.CenterStart).size(34.dp),
+        Modifier.align(Alignment.CenterStart).size(32.dp),
         onClick = onBack,
     )
     Text(
         title,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 42.dp),
-        fontSize = LocalWatchDimensions.current.titleSp.sp,
+        fontSize = (LocalWatchDimensions.current.titleSp - 2f).coerceAtLeast(15f).sp,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -1623,154 +1719,150 @@ private fun decodeServerQrImage(value: String) = runCatching {
     item { SettingsModule("关于", "${BuildConfig.VERSION_NAME} · 开发者 Ronan", Icons.Default.Info) { nav.navigate("settings/about") } }
 }
 
-@Composable private fun DisplaySettingsScreen(vm: AppViewModel, uiSize: String, lyricSize: String, lyricOriginal: Boolean, lyricTranslation: Boolean, lyricOffset: Long, lyricAnimation: String, lyricAlignment: String, pureBlack: Boolean, lowPowerPlayer: Boolean, onBack: () -> Unit) = LazyColumn(
-    Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp),
-) {
-    item { SettingsHeader("显示与主题", onBack) }
-    item { SettingsGroup("屏幕", "为方屏手表保留清晰度和续航平衡") {
-        SettingsChoiceBlock("界面大小") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                listOf("compact" to "紧凑", "standard" to "标准", "large" to "大字").forEach { (value, label) ->
-                    Surface(
-                        onClick = { vm.setUiSize(value) },
-                        modifier = Modifier.weight(1f).height(32.dp),
-                        shape = RoundedCornerShape(50),
-                        color = if (uiSize == value) WatchAccent.copy(alpha = .18f) else WatchSurface,
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(label, color = if (uiSize == value) WatchAccent else WatchTextSecondary, fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
-        }
-        SettingsSwitchRow("AMOLED 纯黑背景", "减少息屏播放器的耗电", pureBlack, vm::setPureBlack)
-        SettingsSwitchRow("低功耗播放器", "会降低歌词与进度动画帧率", lowPowerPlayer, vm::setLowPowerPlayer)
-    } }
-    item { SettingsGroup("歌词", "左滑进入歌词；点击任意有时间轴的句子跳转") {
-        SettingsChoiceBlock("对齐方式") {
-            CompactChoices(listOf("left" to "靠左", "center" to "居中"), lyricAlignment, vm::setLyricAlignment)
-        }
-        SettingsChoiceBlock("字号") {
-            CompactChoices(listOf("small" to "小", "normal" to "标准", "large" to "大"), lyricSize, vm::setLyricSize)
-        }
-        SettingsSwitchRow("显示原文歌词", checked = lyricOriginal, onCheckedChange = { if (it || lyricTranslation) vm.setLyricOriginal(it) })
-        SettingsSwitchRow("显示翻译歌词", "没有翻译时自动隐藏", checked = lyricTranslation, onCheckedChange = { if (it || lyricOriginal) vm.setLyricTranslation(it) })
-        SettingsChoiceBlock("动效") {
-            CompactChoices(listOf("off" to "关闭", "soft" to "柔和", "strong" to "明显"), lyricAnimation, vm::setLyricAnimation)
-        }
-        SettingsChoiceBlock("时间偏移 ${if (lyricOffset >= 0) "+" else ""}${lyricOffset}ms") {
-            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) { TextButton({ vm.setLyricOffset(lyricOffset - 500) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("-0.5秒", fontSize = 12.sp) }; TextButton({ vm.setLyricOffset(0) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("归零", fontSize = 12.sp) }; TextButton({ vm.setLyricOffset(lyricOffset + 500) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("+0.5秒", fontSize = 12.sp) } }
-        }
-    } }
+@Composable private fun DisplaySettingsScreen(vm: AppViewModel, uiSize: String, lyricSize: String, lyricOriginal: Boolean, lyricTranslation: Boolean, lyricOffset: Long, lyricAnimation: String, lyricAlignment: String, pureBlack: Boolean, lowPowerPlayer: Boolean, onBack: () -> Unit) {
+    var selector by rememberSaveable { mutableStateOf<String?>(null) }
+    val uiSizeName = when (uiSize) { "standard" -> "标准"; "large" -> "大字"; else -> "紧凑" }
+    val alignmentName = if (lyricAlignment == "center") "居中" else "靠左"
+    val lyricSizeName = when (lyricSize) { "small" -> "小"; "large" -> "大"; else -> "标准" }
+    val animationName = when (lyricAnimation) { "off" -> "关闭"; "strong" -> "明显"; else -> "柔和" }
+    val offsetName = if (lyricOffset == 0L) "无偏移" else "${if (lyricOffset > 0) "+" else ""}${lyricOffset} ms"
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding),
+        contentPadding = PaddingValues(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        item { SettingsHeader("显示与主题", onBack) }
+        item { SettingsSectionLabel("屏幕") }
+        item { SettingsValueRow("界面大小", uiSizeName, Icons.Default.AspectRatio) { selector = "ui" } }
+        item { SettingsSwitchRow("AMOLED 纯黑背景", "减少屏幕发光区域", Icons.Default.DarkMode, pureBlack, vm::setPureBlack) }
+        item { SettingsSwitchRow("低功耗播放器", "降低歌词和进度动画帧率", Icons.Default.BatterySaver, lowPowerPlayer, vm::setLowPowerPlayer) }
+        item { SettingsSectionLabel("歌词") }
+        item { SettingsValueRow("对齐方式", alignmentName, Icons.Default.FormatAlignCenter) { selector = "alignment" } }
+        item { SettingsValueRow("歌词字号", lyricSizeName, Icons.Default.TextFields) { selector = "lyricSize" } }
+        item { SettingsSwitchRow("显示原文歌词", null, Icons.Default.Subtitles, lyricOriginal) { if (it || lyricTranslation) vm.setLyricOriginal(it) } }
+        item { SettingsSwitchRow("显示翻译歌词", "无翻译时自动隐藏", Icons.Default.Translate, lyricTranslation) { if (it || lyricOriginal) vm.setLyricTranslation(it) } }
+        item { SettingsValueRow("歌词动效", animationName, Icons.Default.Animation) { selector = "animation" } }
+        item { SettingsValueRow("歌词时间偏移", offsetName, Icons.Default.MoreTime) { selector = "offset" } }
+    }
+    when (selector) {
+        "ui" -> SettingsSelectionSheet("界面大小", uiSize, listOf("compact" to "紧凑", "standard" to "标准", "large" to "大字"), { vm.setUiSize(it); selector = null }) { selector = null }
+        "alignment" -> SettingsSelectionSheet("歌词对齐", lyricAlignment, listOf("left" to "靠左", "center" to "居中"), { vm.setLyricAlignment(it); selector = null }) { selector = null }
+        "lyricSize" -> SettingsSelectionSheet("歌词字号", lyricSize, listOf("small" to "小", "normal" to "标准", "large" to "大"), { vm.setLyricSize(it); selector = null }) { selector = null }
+        "animation" -> SettingsSelectionSheet("歌词动效", lyricAnimation, listOf("off" to "关闭", "soft" to "柔和", "strong" to "明显"), { vm.setLyricAnimation(it); selector = null }) { selector = null }
+        "offset" -> SettingsSelectionSheet(
+            "歌词时间偏移",
+            lyricOffset.toString(),
+            listOf("-1000" to "提前 1 秒", "-500" to "提前 0.5 秒", "0" to "无偏移", "500" to "延后 0.5 秒", "1000" to "延后 1 秒"),
+            { vm.setLyricOffset(it.toLong()); selector = null },
+        ) { selector = null }
+    }
 }
 
 @Composable private fun PlaybackSettingsScreen(vm: AppViewModel, quality: String, profile: UserProfile?, profileLoaded: Boolean, headphoneWarning: Boolean, autoOpenPlayer: Boolean, playMode: String, sleepRemaining: Long, wifiOnlyDownload: Boolean, lastSleepMinutes: Int?, onBack: () -> Unit) {
     val context = LocalContext.current
-    var customTimer by remember { mutableStateOf(false) }; var customMinutes by remember { mutableStateOf("") }; var finishCurrent by remember { mutableStateOf(false) }; var showQualityDialog by remember { mutableStateOf(false) }
+    var customTimer by rememberSaveable { mutableStateOf(false) }
+    var customMinutes by rememberSaveable { mutableStateOf("") }
+    var finishCurrent by rememberSaveable { mutableStateOf(false) }
+    var showQualityDialog by rememberSaveable { mutableStateOf(false) }
+    var showModeDialog by rememberSaveable { mutableStateOf(false) }
+    var showSleepDialog by rememberSaveable { mutableStateOf(false) }
+    val qualitySummary = when {
+        !profileLoaded -> "${qualityLabel(quality)} · 播放时验证权益"
+        profile?.isVipActive() == true -> "${qualityLabel(quality)} · ${profile.vipName.ifBlank { "音乐会员" }}"
+        else -> "${qualityLabel(quality)} · 以歌曲可用资源为准"
+    }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         item { SettingsHeader("播放与缓存", onBack) }
-        item { SettingsGroup("音质", "与账号权益和歌曲可用资源同步") {
-            Row(
-                Modifier.fillMaxWidth().clickable { showQualityDialog = true }.padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Tune, null, Modifier.size(20.dp), tint = Green)
-                Spacer(Modifier.width(9.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("默认音质", fontSize = 14.sp)
-                    Text(qualityLabel(quality), color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Icon(Icons.Default.ChevronRight, null, Modifier.size(19.dp), tint = Color.Gray)
-            }
-            Text(
-                when {
-                    !profileLoaded -> "会员资料未知时不会拦截播放，由 QQ 音乐按歌曲验证"
-                    profile?.isVipActive() == true -> "${profile.vipName.ifBlank { "音乐会员" }} · 实际音质以 vkey 返回为准"
-                    else -> "HQ 与 SQ 可能需要音乐会员，选择后由 QQ 音乐验证"
-                },
-                color = Color.Gray,
-                fontSize = 10.sp,
-                modifier = Modifier.padding(start = 41.dp, end = 12.dp, bottom = 8.dp),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        } }
-        item { SettingsGroup("播放", "手表按键和耳机断开行为") {
-            SettingsSwitchRow("无耳机播放提醒", "未连接耳机时播放前确认", headphoneWarning, vm::setHeadphoneWarning)
-            SettingsSwitchRow("自动进入播放器", "点歌后直接打开播放器页面", autoOpenPlayer, vm::setAutoOpenPlayer)
-            SettingsChoiceBlock("播放顺序") { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Icon(playModeIcon(playMode), null, tint = Green, modifier = Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text(playModeName(playMode), Modifier.weight(1f), fontSize = 14.sp); TextButton({ vm.setPlayMode(nextPlayMode(playMode)) }, contentPadding = PaddingValues(horizontal = 5.dp)) { Text("切换", fontSize = 12.sp) } } }
-        } }
-        item { SettingsGroup("定时关闭", "播放一段时间后自动停止") {
-            if (sleepRemaining > 0) SettingsChoiceBlock("剩余 ${sleepRemaining / 60}:${(sleepRemaining % 60).toString().padStart(2, '0')}") { Text("计时器运行中", color = Green, fontSize = 12.sp) }
-            SettingsChoiceBlock("常用时长") { FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) { (listOfNotNull(lastSleepMinutes) + listOf(15, 30, 60)).distinct().take(4).forEach { minutes -> FilterChip(false, { vm.startSleepTimer(minutes, finishCurrent) }, label = { Text(if (minutes == lastSleepMinutes) "上次${minutes}分" else "${minutes}分", fontSize = 12.sp) }, modifier = Modifier.height(32.dp)) } } }
-            SettingsSwitchRow("播完当前歌曲再关闭", checked = finishCurrent, onCheckedChange = { finishCurrent = it })
-            Row(Modifier.padding(horizontal = 13.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) { TextButton({ customTimer = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("自定义", fontSize = 12.sp) }; if (sleepRemaining > 0) TextButton(vm::cancelSleepTimer, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("取消", fontSize = 12.sp) } }
-        } }
-        item { SettingsGroup("设备与下载", "蓝牙连接交给 Android 系统管理") {
-            SettingsSwitchRow("仅 Wi-Fi 下载", "关闭后允许移动网络缓存", wifiOnlyDownload, vm::setWifiOnlyDownload)
-            OutlinedButton({ context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }, Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 7.dp)) { Icon(Icons.Default.Bluetooth, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text("打开蓝牙设置", fontSize = 13.sp) }
-        } }
+        item { SettingsSectionLabel("音频") }
+        item { SettingsValueRow("默认音质", qualitySummary, Icons.Default.Tune) { showQualityDialog = true } }
+        item { SettingsValueRow("播放顺序", playModeName(playMode), playModeIcon(playMode)) { showModeDialog = true } }
+        item { SettingsSwitchRow("无耳机播放提醒", "未连接耳机时播放前确认", Icons.Default.Headphones, headphoneWarning, vm::setHeadphoneWarning) }
+        item { SettingsSwitchRow("自动进入播放器", "点歌后直接打开播放页", Icons.Default.OpenInFull, autoOpenPlayer, vm::setAutoOpenPlayer) }
+        item { SettingsSectionLabel("定时关闭") }
+        item {
+            SettingsValueRow(
+                "播放定时器",
+                if (sleepRemaining > 0) "剩余 ${sleepRemaining / 60}:${(sleepRemaining % 60).toString().padStart(2, '0')}" else "未设置",
+                Icons.Default.Timer,
+            ) { showSleepDialog = true }
+        }
+        item { SettingsSwitchRow("播完当前歌曲再关闭", "定时结束后等待当前歌曲播放完", Icons.Default.HourglassBottom, finishCurrent) { finishCurrent = it } }
+        item { SettingsSectionLabel("设备与下载") }
+        item { SettingsSwitchRow("仅 Wi-Fi 下载", "关闭后允许移动网络缓存", Icons.Default.Wifi, wifiOnlyDownload, vm::setWifiOnlyDownload) }
+        item { SettingsActionRow("蓝牙设置", "由 Android 系统管理连接", Icons.Default.Bluetooth) { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }
     }
     if (showQualityDialog) QualityDialog(null, quality, null, profile, profileLoaded, vm) { showQualityDialog = false }
+    if (showModeDialog) SettingsSelectionSheet(
+        "播放顺序",
+        playMode,
+        listOf("sequential" to "顺序播放", "repeat_one" to "单曲循环", "loop_all" to "列表循环", "shuffle" to "随机播放"),
+        { vm.setPlayMode(it); showModeDialog = false },
+    ) { showModeDialog = false }
+    if (showSleepDialog) {
+        val commonDurations = (listOfNotNull(lastSleepMinutes) + listOf(15, 30, 60)).distinct().take(4)
+        val sleepOptions = buildList {
+            commonDurations.forEach { minutes -> add("minutes:$minutes" to if (minutes == lastSleepMinutes) "上次使用 · $minutes 分钟" else "$minutes 分钟") }
+            add("custom" to "自定义时长")
+            if (sleepRemaining > 0) add("cancel" to "取消当前定时器")
+        }
+        SettingsSelectionSheet("定时关闭", null, sleepOptions, { selected ->
+            showSleepDialog = false
+            when {
+                selected == "custom" -> customTimer = true
+                selected == "cancel" -> vm.cancelSleepTimer()
+                selected.startsWith("minutes:") -> selected.substringAfter(':').toIntOrNull()?.let { vm.startSleepTimer(it, finishCurrent) }
+            }
+        }) { showSleepDialog = false }
+    }
     if (customTimer) WatchDialog(onDismissRequest = { customTimer = false }, title = { Text("自定义播放时间") }, text = { WatchSearchField(customMinutes, { customMinutes = it.filter(Char::isDigit).take(4) }, "分钟（1-1440）", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)) }, confirmButton = { TextButton({ customMinutes.toIntOrNull()?.coerceIn(1, 1440)?.let { vm.startSleepTimer(it, finishCurrent) }; customTimer = false }) { Text("开始") } }, dismissButton = { TextButton({ customTimer = false }) { Text("取消") } })
 }
 
 @Composable private fun NetworkSettingsScreen(vm: AppViewModel, dailyCount: Int, state: AppUiState, onAnnouncements: () -> Unit, onRelogin: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     var confirmUpload by remember { mutableStateOf(false) }
+    var showDailyDialog by rememberSaveable { mutableStateOf(false) }
     val saveLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> uri?.let { runCatching { AppLog.copyTo(context, it) } } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         item { SettingsHeader("内容与网络", onBack) }
-        item { SettingsGroup("推荐", "控制首页每日推荐的密度") {
-            SettingsChoiceBlock("每日推荐显示数量") { CompactChoices(listOf("5" to "5 首", "10" to "10 首"), dailyCount.toString()) { vm.setDailyCount(it.toInt()) } }
-        } }
-        if (vm.signedIn) item { SettingsGroup("账号与权益", "登录方式、会员状态和歌单同步") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                AccountAvatar(state.profile?.avatarUrl, vm.loginProvider, vm.accountId, 44.dp)
-                Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) {
-                    Text(state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(accountLabel(vm.loginProvider, vm.accountId), color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(vipSummary(state.profile, state.profileLoaded, state.profileError), color = if (state.profile?.isVipActive() == true) Color(0xFFFFC857) else Color.Gray, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
+        item { SettingsSectionLabel("推荐") }
+        item { SettingsValueRow("每日推荐显示数量", "$dailyCount 首", Icons.Default.Recommend) { showDailyDialog = true } }
+        if (vm.signedIn) {
+            item { SettingsSectionLabel("账号与权益") }
+            item { SettingsAccountRow(state, vm) }
+            item { SettingsActionRow("刷新账号资料", "重新读取头像、昵称和会员权益", Icons.Default.VerifiedUser, onClick = vm::refreshMembership) }
+            item { SettingsActionRow("重新登录", loginProviderName(vm.loginProvider), Icons.AutoMirrored.Filled.Login, onClick = onRelogin) }
+        }
+        item { SettingsSectionLabel("服务与公告") }
+        item {
+            val serviceTitle = when { state.controlRefreshing -> "正在同步服务配置"; state.controlError != null -> "正在使用本地配置"; state.controlFetchedAt > 0 -> "服务配置已同步"; else -> "服务尚未同步" }
+            val serviceSubtitle = state.controlError?.take(100)
+                ?: state.controlFetchedAt.takeIf { it > 0 }?.let { "上次同步 ${android.text.format.DateFormat.format("MM-dd HH:mm", it)}" }
+                ?: "点击立即同步"
+            SettingsActionRow(serviceTitle, serviceSubtitle, if (state.controlError == null) Icons.Default.CloudDone else Icons.Default.CloudOff, tint = if (state.controlError == null) WatchAccent else WatchTextSecondary) {
+                if (!state.controlRefreshing) vm.refreshControlPlane()
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(vm::refreshMembership, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp), enabled = !state.profileLoaded || state.profileError != null || state.profile != null) { Icon(Icons.Default.VerifiedUser, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("刷新资料", fontSize = 11.sp, maxLines = 1) }
-                OutlinedButton(onRelogin, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp)) { Icon(Icons.AutoMirrored.Filled.Login, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("重新登录", fontSize = 11.sp, maxLines = 1) }
+        }
+        item { SettingsActionRow("公告", "${state.announcements.size} 条可用公告", Icons.Default.Campaign, onClick = onAnnouncements) }
+        item { SettingsSectionLabel("诊断与日志") }
+        state.diagnostic?.let { diagnostic -> item { WatchListRow("最近诊断", diagnostic, leading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Default.MonitorHeart, null, Modifier.size(18.dp), tint = if (diagnostic.startsWith("诊断失败")) MaterialTheme.colorScheme.error else WatchAccent) } }) } }
+        item { SettingsActionRow("完整诊断", "检查账号、服务与播放链路", Icons.Default.HealthAndSafety, onClick = vm::diagnose) }
+        item {
+            val uploading = state.diagnosticUploadState is DiagnosticUploadState.Uploading
+            SettingsActionRow(if (uploading) "正在提交诊断" else "提交诊断", "仅上传经过二次脱敏的信息", Icons.Default.BugReport, tint = if (uploading || !vm.featureEnabled("diagnostics")) WatchTextSecondary else WatchAccent) {
+                if (!uploading && vm.featureEnabled("diagnostics")) confirmUpload = true
             }
-        } }
-        state.diagnostic?.let { item { Text(it, color = if (it.startsWith("诊断失败")) MaterialTheme.colorScheme.error else Green, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 4.dp)) } }
-        item { SettingsGroup("服务与公告", "远程配置不可用时继续使用本地音乐功能") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (state.controlError == null) Icons.Default.CloudDone else Icons.Default.CloudOff, null, tint = if (state.controlError == null) Green else Color.Gray, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) {
-                    Text(when { state.controlError != null -> "正在使用本地配置"; state.controlFetchedAt > 0 -> "服务配置已同步"; else -> "服务尚未同步" }, fontSize = 14.sp)
-                    Text(state.controlError?.take(100) ?: state.controlFetchedAt.takeIf { it > 0 }?.let { "上次同步 ${android.text.format.DateFormat.format("MM-dd HH:mm", it)}" } ?: "尚未同步", color = Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                IconButton({ vm.refreshControlPlane() }, enabled = !state.controlRefreshing, modifier = Modifier.size(38.dp)) { if (state.controlRefreshing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Default.Refresh, "刷新", modifier = Modifier.size(19.dp)) }
-            }
-            Row(Modifier.fillMaxWidth().clickable(onClick = onAnnouncements).padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Campaign, null, tint = Green, modifier = Modifier.size(21.dp)); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("公告", fontSize = 14.sp); Text("${state.announcements.size} 条可用公告", color = Color.Gray, fontSize = 11.sp) }; Icon(Icons.Default.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(19.dp))
-            }
-        } }
-        item { SettingsGroup("诊断与日志", "日志会脱敏，不记录 Cookie、令牌或播放 URL") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(vm::diagnose, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp)) { Icon(Icons.Default.HealthAndSafety, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("完整诊断", fontSize = 11.sp, maxLines = 1) }
-                OutlinedButton({ confirmUpload = true }, Modifier.weight(1f).height(40.dp), contentPadding = PaddingValues(horizontal = 6.dp), enabled = state.diagnosticUploadState !is DiagnosticUploadState.Uploading && vm.featureEnabled("diagnostics")) { Icon(Icons.Default.BugReport, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(if (state.diagnosticUploadState is DiagnosticUploadState.Uploading) "正在提交" else "提交诊断", fontSize = 11.sp, maxLines = 1) }
-            }
-            when (val upload = state.diagnosticUploadState) {
-                is DiagnosticUploadState.Success -> Text("诊断已提交${upload.requestId.takeIf(String::isNotBlank)?.let { " · $it" }.orEmpty()}", color = Green, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 4.dp))
-                is DiagnosticUploadState.Error -> Text(upload.message, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 4.dp))
-                else -> Unit
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                OutlinedButton({ context.startActivity(Intent.createChooser(AppLog.shareIntent(context), "分享日志")) }, Modifier.weight(1f)) { Icon(Icons.Default.Share, null, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text("分享", fontSize = 12.sp) }
-                OutlinedButton({ saveLog.launch("QMusicWatch-${BuildConfig.VERSION_NAME}.log") }, Modifier.weight(1f)) { Icon(Icons.Default.Save, null, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text("保存", fontSize = 12.sp) }
-                TextButton(AppLog::clear, Modifier.weight(1f)) { Text("清空", fontSize = 12.sp) }
-            }
-        } }
-        if (vm.signedIn) item { OutlinedButton(vm::logout, Modifier.fillMaxWidth()) { Text("退出登录", fontSize = 13.sp) } }
+        }
+        when (val upload = state.diagnosticUploadState) {
+            is DiagnosticUploadState.Success -> item { WatchListRow("诊断已提交", upload.requestId.takeIf(String::isNotBlank)?.let { "请求编号 $it" }) }
+            is DiagnosticUploadState.Error -> item { WatchListRow("诊断提交失败", upload.message) }
+            else -> Unit
+        }
+        item { SettingsActionRow("分享日志", "调用系统分享面板", Icons.Default.Share) { context.startActivity(Intent.createChooser(AppLog.shareIntent(context), "分享日志")) } }
+        item { SettingsActionRow("保存日志", "导出脱敏后的本地日志", Icons.Default.Save) { saveLog.launch("QMusicWatch-${BuildConfig.VERSION_NAME}.log") } }
+        item { SettingsActionRow("清空日志", "删除本机已有日志记录", Icons.Default.DeleteSweep, tint = WatchTextSecondary, onClick = AppLog::clear) }
+        if (vm.signedIn) item { SettingsActionRow("退出登录", "保留离线缓存并锁定到当前账号", Icons.AutoMirrored.Filled.Logout, tint = MaterialTheme.colorScheme.error, onClick = vm::logout) }
     }
+    if (showDailyDialog) SettingsSelectionSheet("每日推荐显示数量", dailyCount.toString(), listOf("5" to "5 首", "10" to "10 首"), { vm.setDailyCount(it.toInt()); showDailyDialog = false }) { showDailyDialog = false }
     if (confirmUpload) WatchDialog(
         onDismissRequest = { confirmUpload = false },
         title = { Text("提交诊断？") },
@@ -2236,7 +2328,7 @@ private fun formatFileSize(bytes: Long): String = when {
         0f
     }
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = if (dimensions.isRound) dimensions.screenPadding else 6.dp, vertical = 3.dp),
         shape = RoundedCornerShape(50),
         color = WatchSurfaceRaised,
         tonalElevation = 0.dp,
