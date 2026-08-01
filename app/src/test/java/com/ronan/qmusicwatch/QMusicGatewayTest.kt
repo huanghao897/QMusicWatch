@@ -10,10 +10,12 @@ import com.ronan.qmusicwatch.network.qmusicAlbumArtworkUrl
 import com.ronan.qmusicwatch.network.qmusicAvatarUrl
 import com.ronan.qmusicwatch.network.qmusicSongArtworkUrl
 import com.ronan.qmusicwatch.network.requiresNewQrLogin
-import com.ronan.qmusicwatch.network.safeLocalOrGatewayUri
+import com.ronan.qmusicwatch.network.safeLocalOrArtworkUri
+import com.ronan.qmusicwatch.network.safeLocalOrGatewayMediaUri
 import com.ronan.qmusicwatch.network.sessionNeedsGatewayCredentialRefresh
 import com.ronan.qmusicwatch.network.shouldRefreshCredential
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
+import com.ronan.qmusicwatch.network.trustedQMusicArtworkUrl
 import com.ronan.qmusicwatch.network.validateRefreshedCookie
 import com.ronan.qmusicwatch.model.SessionTokens
 import java.io.IOException
@@ -24,9 +26,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QMusicGatewayTest {
-    @Test fun stableMediaUrlsUseTheNewServer() {
+    @Test fun accountMediaUsesTheServerButPublicArtworkUsesTheImageCdn() {
         assertEquals(
-            "https://heyboxlite.xyz/api/qmusic-watch/gateway/artwork/album/albumMID123.jpg",
+            "https://y.gtimg.cn/music/photo_new/T002R300x300M000albumMID123.jpg",
             qmusicAlbumArtworkUrl("albumMID123"),
         )
         assertEquals(
@@ -53,8 +55,15 @@ class QMusicGatewayTest {
     }
 
     @Test fun localFilesRemainUsableButOtherRemoteHostsAreRejected() {
-        assertEquals("file:///data/user/0/com.ronan.qmusicwatch/files/song", safeLocalOrGatewayUri("file:///data/user/0/com.ronan.qmusicwatch/files/song"))
-        assertEquals("", safeLocalOrGatewayUri("https://example.com/song.mp3"))
+        val local = "file:///data/user/0/com.ronan.qmusicwatch/files/song"
+        val artwork = qmusicAlbumArtworkUrl("albumMID123")
+        assertEquals(local, safeLocalOrGatewayMediaUri(local))
+        assertEquals(local, safeLocalOrArtworkUri(local))
+        assertEquals(artwork, trustedQMusicArtworkUrl(artwork))
+        assertEquals(artwork, safeLocalOrArtworkUri(artwork))
+        assertEquals("", safeLocalOrGatewayMediaUri(artwork))
+        assertEquals("", trustedQMusicArtworkUrl("https://y.gtimg.cn/unsafe/albumMID123.jpg"))
+        assertEquals("", safeLocalOrGatewayMediaUri("https://example.com/song.mp3"))
     }
 
     @Test fun oldGatewaySessionsNeedOneCredentialMigration() {

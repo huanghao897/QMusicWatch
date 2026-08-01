@@ -7,6 +7,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 internal const val QMUSIC_SERVER_HOST = "heyboxlite.xyz"
+internal const val QMUSIC_ARTWORK_HOST = "y.gtimg.cn"
 
 internal fun sessionNeedsGatewayCredentialRefresh(
     session: SessionTokens?,
@@ -39,18 +40,17 @@ internal fun qmusicServerEndpoint(path: String): HttpUrl =
 internal fun qmusicAlbumArtworkUrl(albumMid: String): String {
     val id = albumMid.trim()
     if (!id.matches(Regex("[A-Za-z0-9]{1,64}"))) return ""
-    return qmusicServerEndpoint("api/qmusic-watch/gateway/artwork/album/$id.jpg").toString()
+    return "https://$QMUSIC_ARTWORK_HOST/music/photo_new/T002R300x300M000$id.jpg"
 }
 
 /**
  * Returns a restart-safe artwork URL when an old cached track does not contain
- * its album MID. The gateway resolves the song MID and still proxies the image;
- * the watch never connects to a QQ Music host.
+ * its album MID. Only this legacy resolution path still uses the gateway.
  */
 internal fun qmusicSongArtworkUrl(songMid: String): String {
     val id = songMid.trim()
     if (!id.matches(Regex("[A-Za-z0-9]{1,48}")) || !isUsableQqSongMid(id)) return ""
-    return qmusicAlbumArtworkUrl("QMWTRACK$id")
+    return qmusicServerEndpoint("api/qmusic-watch/gateway/artwork/album/QMWTRACK$id.jpg").toString()
 }
 
 internal fun qmusicAvatarUrl(uin: String): String {
@@ -90,12 +90,55 @@ internal fun trustedQMusicMediaUrl(
     return value.trim().takeIf { allowed }.orEmpty()
 }
 
-internal fun safeLocalOrGatewayUri(value: String): String {
+internal fun trustedQMusicArtworkUrl(value: String): String {
+    val url = value.trim().toHttpUrlOrNull() ?: return ""
+    if (
+        url.scheme != "https" ||
+        url.host != QMUSIC_ARTWORK_HOST ||
+        url.port != 443 ||
+        url.username.isNotEmpty() ||
+        url.password.isNotEmpty() ||
+        url.query != null ||
+        url.fragment != null
+    ) return ""
+    return value.trim().takeIf {
+        url.encodedPath.matches(
+            Regex("/music/photo_new/T002R(?:150x150|300x300)M000[A-Za-z0-9]{1,64}\\.jpg")
+        )
+    }.orEmpty()
+}
+
+internal fun trustedQMusicImageUrl(value: String): String {
+    trustedQMusicArtworkUrl(value).takeIf(String::isNotBlank)?.let { return it }
+    return trustedQMusicMediaUrl(value)
+}
+
+internal fun preferDirectQMusicArtworkUrl(value: String): String {
+    val trusted = trustedQMusicImageUrl(value)
+    val url = trusted.toHttpUrlOrNull() ?: return ""
+    if (url.host != QMUSIC_SERVER_HOST || !url.encodedPath.startsWith("/api/qmusic-watch/gateway/artwork/album/")) {
+        return trusted
+    }
+    val identifier = url.pathSegments.lastOrNull()?.removeSuffix(".jpg").orEmpty()
+    return if (identifier.startsWith("QMWTRACK")) trusted else qmusicAlbumArtworkUrl(identifier)
+}
+
+internal fun safeLocalOrGatewayMediaUri(value: String): String {
     val trimmed = value.trim()
     val scheme = trimmed.substringBefore(':', "").lowercase()
     return when (scheme) {
         "file", "content", "android.resource" -> trimmed
         "https", "http" -> trustedQMusicMediaUrl(trimmed)
+        else -> ""
+    }
+}
+
+internal fun safeLocalOrArtworkUri(value: String): String {
+    val trimmed = value.trim()
+    val scheme = trimmed.substringBefore(':', "").lowercase()
+    return when (scheme) {
+        "file", "content", "android.resource" -> trimmed
+        "https", "http" -> preferDirectQMusicArtworkUrl(trimmed)
         else -> ""
     }
 }

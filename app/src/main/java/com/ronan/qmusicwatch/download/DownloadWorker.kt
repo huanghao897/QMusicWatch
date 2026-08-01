@@ -9,6 +9,8 @@ import com.ronan.qmusicwatch.model.Track
 import com.ronan.qmusicwatch.model.QUALITY_LEGACY_UNKNOWN
 import com.ronan.qmusicwatch.model.QUALITY_STANDARD
 import com.ronan.qmusicwatch.model.normalizeQualityId
+import com.ronan.qmusicwatch.network.trustedQMusicArtworkUrl
+import com.ronan.qmusicwatch.network.trustedQMusicImageUrl
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,7 +33,10 @@ private val downloadHttp = OkHttpClient.Builder()
     .followRedirects(false)
     .followSslRedirects(false)
     .addInterceptor { chain ->
-        require(trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank()) {
+        require(
+            trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank() ||
+                trustedQMusicArtworkUrl(chain.request().url.toString()).isNotBlank()
+        ) {
             "download host rejected"
         }
         chain.proceed(chain.request())
@@ -119,7 +124,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 db.downloads().progress(id, owner, "complete", target.length(), target.length())
             }
             runCatching { graph.api.lyrics(id) }.getOrNull()?.let { cachedLyricsFile(target.absolutePath).writeText(downloadJson.encodeToString(it)) }
-            trustedQMusicMediaUrl(track.artworkUrl).takeIf(String::isNotBlank)?.let { artwork ->
+            trustedQMusicImageUrl(track.artworkUrl).takeIf(String::isNotBlank)?.let { artwork ->
                 val cover = cachedArtworkFile(target.absolutePath)
                 val coverPart = File("${cover.absolutePath}.part")
                 runCatching {

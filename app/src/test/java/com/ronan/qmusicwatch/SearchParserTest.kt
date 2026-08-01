@@ -23,11 +23,13 @@ class SearchParserTest {
         assertEquals(null, nextSearchCursor(page = 2, rawItemCount = 19))
     }
 
-    @Test fun onlyGatewayArtworkUrlsAreAccepted() {
+    @Test fun onlyGatewayOrExactPublicArtworkUrlsAreAccepted() {
         assertEquals("", normalizeHttpsUrl("//img.qq.com/a.jpg"))
         assertEquals("", normalizeHttpsUrl("http://img.qq.com/a.jpg"))
         val gateway = "https://heyboxlite.xyz/api/qmusic-watch/gateway/media/${"a".repeat(32)}/cover.jpg"
         assertEquals(gateway, normalizeHttpsUrl(gateway))
+        val artwork = "https://y.gtimg.cn/music/photo_new/T002R300x300M000albumMID123.jpg"
+        assertEquals(artwork, normalizeHttpsUrl(artwork))
     }
     @Test fun parsesFullSearchSongShape() {
         val item = Json.parseToJsonElement("""{"songmid":"001","songname":"搁浅","songid":12,"albummid":"alb","albumname":"七里香","size128":10,"size320":20,"singer":[{"name":"周杰伦"}],"pay":{"payplay":1}}""").jsonObject
@@ -45,7 +47,7 @@ class SearchParserTest {
         assertEquals("media-mid", track.mediaMid)
         assertEquals(42L, track.numericId)
         assertEquals("Album", track.album)
-        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/artwork/album/albumMID123.jpg", track.artworkUrl)
+        assertEquals("https://y.gtimg.cn/music/photo_new/T002R300x300M000albumMID123.jpg", track.artworkUrl)
         assertEquals(true, track.requiresVip)
     }
 

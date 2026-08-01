@@ -13,7 +13,7 @@ import com.ronan.qmusicwatch.download.DownloadController
 import com.ronan.qmusicwatch.network.ApiClient
 import com.ronan.qmusicwatch.network.ControlPlaneClient
 import com.ronan.qmusicwatch.network.QMUSIC_SERVER_HOST
-import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
+import com.ronan.qmusicwatch.network.trustedQMusicImageUrl
 import com.ronan.qmusicwatch.playback.PlaybackConnection
 import com.ronan.qmusicwatch.update.UpdateManager
 import okhttp3.OkHttpClient
@@ -23,14 +23,17 @@ private const val IMAGE_CACHE_DIRECTORY = "qmusic_image_cache"
 internal const val IMAGE_CACHE_MAX_SIZE_BYTES = 64L * 1024L * 1024L
 
 internal fun isPersistentQMusicArtworkUrl(value: String): Boolean =
-    trustedQMusicMediaUrl(value).contains("/api/qmusic-watch/gateway/artwork/album/")
+    trustedQMusicImageUrl(value).let { trusted ->
+        trusted.contains("/api/qmusic-watch/gateway/artwork/album/") ||
+            trusted.contains("/music/photo_new/T002R")
+    }
 
 private fun qMusicImageHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .followRedirects(false)
     .followSslRedirects(false)
     .addInterceptor { chain ->
         val request = chain.request()
-        require(trustedQMusicMediaUrl(request.url.toString()).isNotBlank()) {
+        require(trustedQMusicImageUrl(request.url.toString()).isNotBlank()) {
             "image host rejected"
         }
         val response = chain.proceed(request)

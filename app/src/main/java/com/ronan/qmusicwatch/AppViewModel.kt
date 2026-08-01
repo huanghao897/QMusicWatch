@@ -408,7 +408,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             lastStreamExpiresAt = matchingSnapshot?.streamExpiresAt
                 ?: if (uri.startsWith("file:")) Long.MAX_VALUE else 0L
             lastStreamQuality = reportedQualityId(matchingSnapshot?.quality ?: preferredQuality(track))
-            _state.update { it.copy(currentTrack = track, activeStreamQuality = lastStreamQuality, lyrics = emptyList(), message = "已通过耳机或系统媒体控制切换歌曲") }
+            _state.update { it.copy(currentTrack = track, activeStreamQuality = lastStreamQuality, lyrics = emptyList(), message = null) }
             val localPath = android.net.Uri.parse(uri).takeIf { it.scheme == "file" }?.path
             val lines = runCatching { loadLyrics(track, localPath) }
                 .onFailure { AppLog.write("LYRICS", "media key ${it.javaClass.simpleName}:${it.message.orEmpty()}") }

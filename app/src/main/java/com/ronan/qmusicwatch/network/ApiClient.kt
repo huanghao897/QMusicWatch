@@ -22,7 +22,7 @@ import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
-internal fun normalizeHttpsUrl(value: String): String = trustedQMusicMediaUrl(value)
+internal fun normalizeHttpsUrl(value: String): String = preferDirectQMusicArtworkUrl(value)
 
 private val invalidQqSongMids = setOf("null", "undefined", "nil")
 
@@ -142,7 +142,7 @@ internal fun isSystemLikedPlaylist(value: MusicCollection): Boolean {
 }
 
 private fun stableTrackArtwork(track: Track): Track {
-    val current = trustedQMusicMediaUrl(track.artworkUrl)
+    val current = preferDirectQMusicArtworkUrl(track.artworkUrl)
     val stable = when {
         current.isBlank() -> qmusicSongArtworkUrl(track.id)
         "/api/qmusic-watch/gateway/media/" in current -> qmusicSongArtworkUrl(track.id)

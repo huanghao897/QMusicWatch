@@ -267,7 +267,7 @@ private fun vipSummary(profile: UserProfile?, loaded: Boolean, error: String?): 
 private fun rememberArtworkImageRequest(value: String?, sizePx: Int): ImageRequest? {
     val context = LocalContext.current
     val artworkUrl = remember(value) {
-        safeLocalOrGatewayUri(value.orEmpty()).ifBlank { null }
+        safeLocalOrArtworkUri(value.orEmpty()).ifBlank { null }
     }
     return remember(context, artworkUrl, sizePx) {
         artworkUrl?.let {
@@ -794,7 +794,6 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.height(5.dp))
                 WatchPrimaryButton("使用微信扫码", Modifier.fillMaxWidth(), outlined = true) { provider = "wechat" }
                 Spacer(Modifier.height(7.dp))
-                Text("仅通过手机扫码授权", color = WatchTextSecondary, fontSize = dimensions.secondarySp.sp)
             }
         } else {
             val selectedProvider = provider!!
@@ -880,7 +879,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     color = if (type == key) WatchSurfaceRaised else Color.Transparent,
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(label, color = if (type == key) WatchAccent else WatchTextSecondary, fontSize = 11.sp, fontWeight = if (type == key) FontWeight.SemiBold else FontWeight.Normal)
+                        Text(label, color = if (type == key) WatchTextPrimary else WatchTextSecondary, fontSize = 11.sp, fontWeight = if (type == key) FontWeight.SemiBold else FontWeight.Normal)
                     }
                 }
             }
@@ -975,7 +974,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         item { Row(Modifier.fillMaxWidth().height(30.dp), verticalAlignment = Alignment.CenterVertically) { Text("%.1f MB · ${own.size} 首".format(totalBytes / 1024f / 1024f), Modifier.weight(1f), color = WatchTextSecondary, fontSize = 10.sp); TextButton(vm::deleteInvalidDownloads, contentPadding = PaddingValues(horizontal = 5.dp)) { Text("清理失效", fontSize = 10.sp) } } }
         if (locked.isNotEmpty()) item { WatchListRow("其他账号缓存已锁定", "${locked.size} 首 · %.1f MB".format(lockedBytes / 1024f / 1024f), trailing = { WatchIconButton(Icons.Default.Delete, "删除全部锁定缓存", tint = MaterialTheme.colorScheme.error) { confirmDeleteLocked = true } }) }
         own.groupBy(DownloadEntity::groupName).forEach { (group, values) ->
-            item(key = "group-$group") { Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) { Text(group, Modifier.weight(1f), color = WatchAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold); TextButton({ deletingGroup = group }, contentPadding = PaddingValues(horizontal = 5.dp)) { Text("删除本组", fontSize = 10.sp) } } }
+            item(key = "group-$group") { Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) { Text(group, Modifier.weight(1f), color = WatchTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold); TextButton({ deletingGroup = group }, contentPadding = PaddingValues(horizontal = 5.dp)) { Text("删除本组", fontSize = 10.sp) } } }
             items(values, key = { "${it.ownerAccountId}-${it.trackId}" }) { item ->
                 val status = when (item.status) { "complete" -> "已完成"; "queued_wifi" -> "等待 Wi-Fi"; "queued" -> "排队中"; "downloading" -> "下载中"; "paused" -> "已暂停"; "locked" -> "等待原账号登录"; "failed_storage" -> "存储不足，需保留 256MB"; else -> "下载失败" }
                 WatchListRow(
@@ -1018,7 +1017,18 @@ private fun decodeServerQrImage(value: String) = runCatching {
     openQueue: () -> Unit, onBack: () -> Unit,
 ) {
     val dimensions = LocalWatchDimensions.current
-    if (track == null) return Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.align(Alignment.TopStart).padding(4.dp), onClick = onBack); Text("尚未播放", fontSize = dimensions.bodySp.sp) }
+    if (track == null) return BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val horizontalInset = if (dimensions.isRound) maxWidth * .15f else 4.dp
+        val verticalInset = if (dimensions.isRound) maxHeight * .15f else 4.dp
+        WatchIconButton(
+            Icons.AutoMirrored.Filled.ArrowBack,
+            "返回",
+            Modifier.align(Alignment.TopStart)
+                .padding(start = horizontalInset, top = verticalInset),
+            onClick = onBack,
+        )
+        Text("尚未播放", fontSize = dimensions.bodySp.sp)
+    }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var playing by remember { mutableStateOf(false) }
@@ -1038,7 +1048,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     var showQualityDialog by remember(track.id) { mutableStateOf(false) }
     var showModeDialog by remember(track.id) { mutableStateOf(false) }
     val effectiveLiked = selectedLike ?: liked
-    val playerArtwork = safeLocalOrGatewayUri(track.artworkUrl)
+    val playerArtwork = safeLocalOrArtworkUri(track.artworkUrl)
     val playerArtworkRequest = rememberArtworkImageRequest(playerArtwork, 256)
     val artworkAccent = rememberArtworkAccent(playerArtwork, cachedArtworkAccent, vm::cacheArtworkAccent)
     val playerAccent = WatchAccent
@@ -1126,15 +1136,21 @@ private fun decodeServerQrImage(value: String) = runCatching {
         }
         true
     }) {
-        val viewportSide = minOf(maxWidth, maxHeight)
-        Box(Modifier.size(viewportSide).align(Alignment.Center)) {
+        val horizontalControlInset = if (dimensions.isRound) maxWidth * .15f else 3.dp
+        val verticalControlInset = if (dimensions.isRound) maxHeight * .15f else 3.dp
+        val lyricHorizontalPadding = when {
+            dimensions.isRound && centerLyrics -> 18.dp
+            dimensions.isRound -> 22.dp
+            centerLyrics -> 8.dp
+            else -> 12.dp
+        }
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), userScrollEnabled = !locked) { page ->
             if (page == 1) {
                 BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
                         LazyColumn(
                             Modifier.fillMaxSize()
                                 .clipToBounds()
-                                .padding(start = if (centerLyrics) 8.dp else 12.dp, end = 8.dp),
+                                .padding(horizontal = lyricHorizontalPadding),
                             state = listState,
                             contentPadding = PaddingValues(vertical = (maxHeight / 2 - 22.dp).coerceAtLeast(0.dp)),
                             horizontalAlignment = if (centerLyrics) Alignment.CenterHorizontally else Alignment.Start,
@@ -1321,7 +1337,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         )
                         Spacer(Modifier.height(if (compactPlayer) 7.dp else 10.dp))
                         Row(Modifier.fillMaxWidth().height(36.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                            PlayerActionButton(Icons.Default.Favorite.takeIf { effectiveLiked } ?: Icons.Default.FavoriteBorder, if (effectiveLiked) "已喜欢" else "喜欢", tint = if (effectiveLiked) WatchLike else WatchTextPrimary, compact = compactPlayer) {
+                            PlayerActionButton(Icons.Default.FavoriteBorder, if (effectiveLiked) "已喜欢" else "喜欢", selected = effectiveLiked, compact = compactPlayer) {
                                 if (!likePending) {
                                     val target = !effectiveLiked
                                     selectedLike = target
@@ -1333,34 +1349,53 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                 }
                             }
                             PlayerActionButton(Icons.AutoMirrored.Filled.PlaylistAdd, "加歌单", compact = compactPlayer) { showPlaylistDialog = true }
-                            PlayerActionButton(Icons.Default.Tune, qualityShortLabel(activeQuality), tint = playerAccent, compact = compactPlayer) { showQualityDialog = true }
-                            PlayerActionButton(playModeIcon(playMode), playModeName(playMode), tint = playerAccent, compact = compactPlayer) { showModeDialog = true }
+                            PlayerActionButton(Icons.Default.Tune, qualityShortLabel(activeQuality), compact = compactPlayer) { showQualityDialog = true }
+                            PlayerActionButton(playModeIcon(playMode), playModeName(playMode), selected = playMode != "sequential", compact = compactPlayer) { showModeDialog = true }
                             PlayerActionButton(Icons.AutoMirrored.Filled.QueueMusic, "队列", compact = compactPlayer) { openQueue() }
                         }
                     }
                 }
             }
         }
-        WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.align(Alignment.TopStart).padding(3.dp).size(32.dp), onClick = onBack)
-        if (!locked) WatchIconButton(Icons.Default.LockOpen, "锁定触控", Modifier.align(Alignment.TopEnd).padding(3.dp).size(32.dp)) { locked = true }
+        WatchIconButton(
+            Icons.AutoMirrored.Filled.ArrowBack,
+            "返回",
+            Modifier.align(Alignment.TopStart)
+                .padding(start = horizontalControlInset, top = verticalControlInset)
+                .size(32.dp),
+            onClick = onBack,
+        )
+        if (!locked) WatchIconButton(
+            Icons.Default.LockOpen,
+            "锁定触控",
+            Modifier.align(Alignment.TopEnd)
+                .padding(end = horizontalControlInset, top = verticalControlInset)
+                .size(32.dp),
+        ) { locked = true }
         Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(2) { page -> Box(Modifier.size(if (pager.currentPage == page) 6.dp else 4.dp).background(if (pager.currentPage == page) playerAccent else WatchDivider, RoundedCornerShape(50))) }
         }
         if (locked) {
             Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures {} })
-            WatchIconButton(Icons.Default.Lock, "解除锁定", Modifier.align(Alignment.TopEnd).padding(3.dp).size(32.dp), tint = playerAccent) { locked = false }
-        }
+            WatchIconButton(
+                Icons.Default.Lock,
+                "解除锁定",
+                Modifier.align(Alignment.TopEnd)
+                    .padding(end = horizontalControlInset, top = verticalControlInset)
+                    .size(32.dp),
+                tint = playerAccent,
+            ) { locked = false }
         }
     }
     if (showPlaylistDialog) PlayerPlaylistDialog(track, playlists, vm) { showPlaylistDialog = false }
-    if (showQualityDialog) QualityDialog(track, quality, activeQuality, profile, profileLoaded, vm) { showQualityDialog = false }
+    if (showQualityDialog) QualityDialog(track, quality, activeQuality, profile, vm) { showQualityDialog = false }
     if (showModeDialog) PlayModeDialog(playMode, vm) { showModeDialog = false }
 }
 
 @Composable private fun PlayerActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    tint: Color = Color.White,
+    selected: Boolean = false,
     compact: Boolean = false,
     onClick: () -> Unit,
 ) {
@@ -1368,7 +1403,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
         icon = icon,
         contentDescription = label,
         modifier = Modifier.size(if (compact) 34.dp else LocalWatchDimensions.current.playerActionSize),
-        tint = tint,
+        tint = WatchTextPrimary,
+        containerColor = if (selected) WatchTextPrimary.copy(alpha = .16f) else WatchSurfaceRaised,
         onLongClick = {},
         onClick = onClick,
     )
@@ -1379,49 +1415,55 @@ private fun decodeServerQrImage(value: String) = runCatching {
     selectedQuality: String,
     activeQuality: String?,
     profile: UserProfile?,
-    profileLoaded: Boolean,
     vm: AppViewModel,
     onDismiss: () -> Unit,
 ) {
     val options = qualityAvailability(track, profile)
-    val rights = when {
-        !profileLoaded -> "会员资料尚未确认，播放时仍会由 QQ 音乐验证实际权益"
-        profile?.isVipActive() == true -> "${profile.vipName.ifBlank { "音乐会员" }} · 最终以歌曲 vkey 返回为准"
-        else -> "会员音质可选择，QQ 音乐会在播放时验证实际权益"
-    }
     WatchDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (track == null) "默认音质" else "选择音质", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        title = {
+            Text(
+                if (track == null) "默认音质" else "选择音质",
+                Modifier.fillMaxWidth(),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        },
         text = {
-            Column(Modifier.heightIn(max = 292.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(rights, color = Color.Gray, fontSize = 12.sp)
+            Column(Modifier.heightIn(max = 176.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 options.forEach { option ->
-                    val spec = audioQualitySpec(option.id)
                     val enabled = option.available
+                    val selected = normalizeQualityId(selectedQuality) == option.id
+                    val active = activeQuality != null &&
+                        activeQuality != QUALITY_LEGACY_UNKNOWN &&
+                        normalizeQualityId(activeQuality) == option.id
+                    val checked = active || (activeQuality == null && selected)
                     Surface(
                         onClick = { if (enabled) { vm.setQuality(option.id); onDismiss() } },
                         enabled = enabled,
-                        shape = RoundedCornerShape(50),
-                        color = if (normalizeQualityId(selectedQuality) == option.id) Green.copy(alpha = .14f) else Surface,
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (checked) WatchTextPrimary.copy(alpha = .12f) else WatchSurface,
                     ) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(normalizeQualityId(selectedQuality) == option.id, onClick = null, enabled = enabled)
-                            Column(Modifier.weight(1f)) {
-                                Text(option.label, color = if (enabled) Color.White else Color.Gray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    listOf(spec.format, option.reason).filter(String::isNotBlank).joinToString(" · "),
-                                    color = if (enabled) Color.Gray else Color(0xFFFFC857),
-                                    fontSize = 10.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            val status = when {
-                                activeQuality != null && activeQuality != QUALITY_LEGACY_UNKNOWN && normalizeQualityId(activeQuality) == option.id -> "正在播放"
-                                normalizeQualityId(selectedQuality) == option.id -> "默认"
-                                else -> ""
-                            }
-                            if (status.isNotBlank()) Text(status, color = Green, fontSize = 10.sp, maxLines = 1)
+                        Row(Modifier.fillMaxSize().padding(horizontal = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                option.label,
+                                Modifier.weight(1f),
+                                color = WatchTextPrimary.copy(alpha = if (enabled) 1f else .38f),
+                                fontSize = 12.sp,
+                                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Icon(
+                                if (checked) Icons.Default.Check else Icons.Default.Lock,
+                                null,
+                                Modifier.size(17.dp).alpha(if (checked || !enabled) 1f else 0f),
+                                tint = WatchTextPrimary.copy(alpha = if (enabled) 1f else .38f),
+                            )
                         }
                     }
                 }
@@ -1432,29 +1474,17 @@ private fun decodeServerQrImage(value: String) = runCatching {
 }
 
 @Composable private fun PlayModeDialog(mode: String, vm: AppViewModel, onDismiss: () -> Unit) {
-    val modes = listOf("sequential", "loop_all", "repeat_one", "shuffle")
-    WatchDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("播放顺序") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                modes.forEach { value ->
-                    Surface(
-                        onClick = { vm.setPlayMode(value); onDismiss() },
-                        shape = RoundedCornerShape(50),
-                        color = if (mode == value) Green.copy(alpha = .14f) else Surface,
-                    ) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(playModeIcon(value), null, Modifier.size(20.dp), tint = if (mode == value) Green else Color.Gray)
-                            Spacer(Modifier.width(10.dp))
-                            Text(playModeName(value), Modifier.weight(1f), fontSize = 14.sp)
-                            RadioButton(mode == value, onClick = null)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onDismiss) { Text("关闭") } },
+    SettingsSelectionSheet(
+        "播放顺序",
+        mode,
+        listOf(
+            "sequential" to "顺序播放",
+            "repeat_one" to "单曲循环",
+            "loop_all" to "列表循环",
+            "shuffle" to "随机播放",
+        ),
+        { vm.setPlayMode(it); onDismiss() },
+        onDismiss,
     )
 }
 
@@ -1497,7 +1527,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
             WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.size(34.dp), onClick = onBack)
             AsyncImage(
-                model = detail?.tracks?.firstOrNull()?.artworkUrl?.let(::safeLocalOrGatewayUri)?.ifBlank { null },
+                model = detail?.tracks?.firstOrNull()?.artworkUrl?.let(::safeLocalOrArtworkUri)?.ifBlank { null },
                 contentDescription = null,
                 modifier = Modifier.size(50.dp).clip(CircleShape).background(WatchSurface),
                 contentScale = ContentScale.Crop,
@@ -1665,7 +1695,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     onClick = { onSelect(value) },
                     modifier = Modifier.fillMaxWidth().height(40.dp),
                     shape = RoundedCornerShape(20.dp),
-                    color = if (selected == value) WatchAccent.copy(alpha = .2f) else WatchSurface,
+                    color = if (selected == value) WatchTextPrimary.copy(alpha = .12f) else WatchSurface,
                 ) {
                     Row(
                         Modifier.fillMaxSize().padding(horizontal = 10.dp),
@@ -1674,12 +1704,12 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         Text(
                             label,
                             Modifier.weight(1f),
-                            color = if (selected == value) WatchAccent else WatchTextPrimary,
+                            color = WatchTextPrimary,
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (selected == value) Icon(Icons.Default.Check, null, Modifier.size(17.dp), tint = WatchAccent)
+                        if (selected == value) Icon(Icons.Default.Check, null, Modifier.size(17.dp), tint = WatchTextPrimary)
                     }
                 }
             }
@@ -1713,10 +1743,10 @@ private fun decodeServerQrImage(value: String) = runCatching {
     Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp),
 ) {
     item { SettingsHeader("设置中心", onBack) }
-    item { SettingsModule("显示与主题", "主题、歌词、字号与界面显示", Icons.Default.Palette) { nav.navigate("settings/display") } }
-    item { SettingsModule("播放与缓存", "音质、播放模式、耳机与定时关闭", Icons.Default.PlayCircle) { nav.navigate("settings/playback") } }
-    item { SettingsModule("内容与网络", "每日推荐、账号、诊断与日志", Icons.Default.Language) { nav.navigate("settings/network") } }
-    item { SettingsModule("关于", "${BuildConfig.VERSION_NAME} · 开发者 Ronan", Icons.Default.Info) { nav.navigate("settings/about") } }
+    item { SettingsModule("显示与主题", null, Icons.Default.Palette) { nav.navigate("settings/display") } }
+    item { SettingsModule("播放与缓存", null, Icons.Default.PlayCircle) { nav.navigate("settings/playback") } }
+    item { SettingsModule("内容与网络", null, Icons.Default.Language) { nav.navigate("settings/network") } }
+    item { SettingsModule("关于", null, Icons.Default.Info) { nav.navigate("settings/about") } }
 }
 
 @Composable private fun DisplaySettingsScreen(vm: AppViewModel, uiSize: String, lyricSize: String, lyricOriginal: Boolean, lyricTranslation: Boolean, lyricOffset: Long, lyricAnimation: String, lyricAlignment: String, pureBlack: Boolean, lowPowerPlayer: Boolean, onBack: () -> Unit) {
@@ -1734,13 +1764,13 @@ private fun decodeServerQrImage(value: String) = runCatching {
         item { SettingsHeader("显示与主题", onBack) }
         item { SettingsSectionLabel("屏幕") }
         item { SettingsValueRow("界面大小", uiSizeName, Icons.Default.AspectRatio) { selector = "ui" } }
-        item { SettingsSwitchRow("AMOLED 纯黑背景", "减少屏幕发光区域", Icons.Default.DarkMode, pureBlack, vm::setPureBlack) }
-        item { SettingsSwitchRow("低功耗播放器", "降低歌词和进度动画帧率", Icons.Default.BatterySaver, lowPowerPlayer, vm::setLowPowerPlayer) }
+        item { SettingsSwitchRow("AMOLED 纯黑背景", null, Icons.Default.DarkMode, pureBlack, vm::setPureBlack) }
+        item { SettingsSwitchRow("低功耗播放器", null, Icons.Default.BatterySaver, lowPowerPlayer, vm::setLowPowerPlayer) }
         item { SettingsSectionLabel("歌词") }
         item { SettingsValueRow("对齐方式", alignmentName, Icons.Default.FormatAlignCenter) { selector = "alignment" } }
         item { SettingsValueRow("歌词字号", lyricSizeName, Icons.Default.TextFields) { selector = "lyricSize" } }
         item { SettingsSwitchRow("显示原文歌词", null, Icons.Default.Subtitles, lyricOriginal) { if (it || lyricTranslation) vm.setLyricOriginal(it) } }
-        item { SettingsSwitchRow("显示翻译歌词", "无翻译时自动隐藏", Icons.Default.Translate, lyricTranslation) { if (it || lyricOriginal) vm.setLyricTranslation(it) } }
+        item { SettingsSwitchRow("显示翻译歌词", null, Icons.Default.Translate, lyricTranslation) { if (it || lyricOriginal) vm.setLyricTranslation(it) } }
         item { SettingsValueRow("歌词动效", animationName, Icons.Default.Animation) { selector = "animation" } }
         item { SettingsValueRow("歌词时间偏移", offsetName, Icons.Default.MoreTime) { selector = "offset" } }
     }
@@ -1776,8 +1806,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
         item { SettingsSectionLabel("音频") }
         item { SettingsValueRow("默认音质", qualitySummary, Icons.Default.Tune) { showQualityDialog = true } }
         item { SettingsValueRow("播放顺序", playModeName(playMode), playModeIcon(playMode)) { showModeDialog = true } }
-        item { SettingsSwitchRow("无耳机播放提醒", "未连接耳机时播放前确认", Icons.Default.Headphones, headphoneWarning, vm::setHeadphoneWarning) }
-        item { SettingsSwitchRow("自动进入播放器", "点歌后直接打开播放页", Icons.Default.OpenInFull, autoOpenPlayer, vm::setAutoOpenPlayer) }
+        item { SettingsSwitchRow("无耳机播放提醒", null, Icons.Default.Headphones, headphoneWarning, vm::setHeadphoneWarning) }
+        item { SettingsSwitchRow("自动进入播放器", null, Icons.Default.OpenInFull, autoOpenPlayer, vm::setAutoOpenPlayer) }
         item { SettingsSectionLabel("定时关闭") }
         item {
             SettingsValueRow(
@@ -1786,12 +1816,12 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 Icons.Default.Timer,
             ) { showSleepDialog = true }
         }
-        item { SettingsSwitchRow("播完当前歌曲再关闭", "定时结束后等待当前歌曲播放完", Icons.Default.HourglassBottom, finishCurrent) { finishCurrent = it } }
+        item { SettingsSwitchRow("播完当前歌曲再关闭", null, Icons.Default.HourglassBottom, finishCurrent) { finishCurrent = it } }
         item { SettingsSectionLabel("设备与下载") }
-        item { SettingsSwitchRow("仅 Wi-Fi 下载", "关闭后允许移动网络缓存", Icons.Default.Wifi, wifiOnlyDownload, vm::setWifiOnlyDownload) }
-        item { SettingsActionRow("蓝牙设置", "由 Android 系统管理连接", Icons.Default.Bluetooth) { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }
+        item { SettingsSwitchRow("仅 Wi-Fi 下载", null, Icons.Default.Wifi, wifiOnlyDownload, vm::setWifiOnlyDownload) }
+        item { SettingsActionRow("蓝牙设置", null, Icons.Default.Bluetooth) { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }
     }
-    if (showQualityDialog) QualityDialog(null, quality, null, profile, profileLoaded, vm) { showQualityDialog = false }
+    if (showQualityDialog) QualityDialog(null, quality, null, profile, vm) { showQualityDialog = false }
     if (showModeDialog) SettingsSelectionSheet(
         "播放顺序",
         playMode,
@@ -1829,7 +1859,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         if (vm.signedIn) {
             item { SettingsSectionLabel("账号与权益") }
             item { SettingsAccountRow(state, vm) }
-            item { SettingsActionRow("刷新账号资料", "重新读取头像、昵称和会员权益", Icons.Default.VerifiedUser, onClick = vm::refreshMembership) }
+            item { SettingsActionRow("刷新账号资料", null, Icons.Default.VerifiedUser, onClick = vm::refreshMembership) }
             item { SettingsActionRow("重新登录", loginProviderName(vm.loginProvider), Icons.AutoMirrored.Filled.Login, onClick = onRelogin) }
         }
         item { SettingsSectionLabel("服务与公告") }
@@ -1845,10 +1875,10 @@ private fun decodeServerQrImage(value: String) = runCatching {
         item { SettingsActionRow("公告", "${state.announcements.size} 条可用公告", Icons.Default.Campaign, onClick = onAnnouncements) }
         item { SettingsSectionLabel("诊断与日志") }
         state.diagnostic?.let { diagnostic -> item { WatchListRow("最近诊断", diagnostic, leading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Default.MonitorHeart, null, Modifier.size(18.dp), tint = if (diagnostic.startsWith("诊断失败")) MaterialTheme.colorScheme.error else WatchAccent) } }) } }
-        item { SettingsActionRow("完整诊断", "检查账号、服务与播放链路", Icons.Default.HealthAndSafety, onClick = vm::diagnose) }
+        item { SettingsActionRow("完整诊断", null, Icons.Default.HealthAndSafety, onClick = vm::diagnose) }
         item {
             val uploading = state.diagnosticUploadState is DiagnosticUploadState.Uploading
-            SettingsActionRow(if (uploading) "正在提交诊断" else "提交诊断", "仅上传经过二次脱敏的信息", Icons.Default.BugReport, tint = if (uploading || !vm.featureEnabled("diagnostics")) WatchTextSecondary else WatchAccent) {
+            SettingsActionRow(if (uploading) "正在提交诊断" else "提交诊断", null, Icons.Default.BugReport, tint = if (uploading || !vm.featureEnabled("diagnostics")) WatchTextSecondary else WatchAccent) {
                 if (!uploading && vm.featureEnabled("diagnostics")) confirmUpload = true
             }
         }
@@ -1857,10 +1887,10 @@ private fun decodeServerQrImage(value: String) = runCatching {
             is DiagnosticUploadState.Error -> item { WatchListRow("诊断提交失败", upload.message) }
             else -> Unit
         }
-        item { SettingsActionRow("分享日志", "调用系统分享面板", Icons.Default.Share) { context.startActivity(Intent.createChooser(AppLog.shareIntent(context), "分享日志")) } }
-        item { SettingsActionRow("保存日志", "导出脱敏后的本地日志", Icons.Default.Save) { saveLog.launch("QMusicWatch-${BuildConfig.VERSION_NAME}.log") } }
-        item { SettingsActionRow("清空日志", "删除本机已有日志记录", Icons.Default.DeleteSweep, tint = WatchTextSecondary, onClick = AppLog::clear) }
-        if (vm.signedIn) item { SettingsActionRow("退出登录", "保留离线缓存并锁定到当前账号", Icons.AutoMirrored.Filled.Logout, tint = MaterialTheme.colorScheme.error, onClick = vm::logout) }
+        item { SettingsActionRow("分享日志", null, Icons.Default.Share) { context.startActivity(Intent.createChooser(AppLog.shareIntent(context), "分享日志")) } }
+        item { SettingsActionRow("保存日志", null, Icons.Default.Save) { saveLog.launch("QMusicWatch-${BuildConfig.VERSION_NAME}.log") } }
+        item { SettingsActionRow("清空日志", null, Icons.Default.DeleteSweep, tint = WatchTextSecondary, onClick = AppLog::clear) }
+        if (vm.signedIn) item { SettingsActionRow("退出登录", null, Icons.AutoMirrored.Filled.Logout, tint = MaterialTheme.colorScheme.error, onClick = vm::logout) }
     }
     if (showDailyDialog) SettingsSelectionSheet("每日推荐显示数量", dailyCount.toString(), listOf("5" to "5 首", "10" to "10 首"), { vm.setDailyCount(it.toInt()); showDailyDialog = false }) { showDailyDialog = false }
     if (confirmUpload) WatchDialog(
@@ -1882,7 +1912,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 Column(Modifier.padding(8.dp, 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) { Text(announcement.title.take(80), Modifier.weight(1f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (announcement.pinned) Icon(Icons.Default.PushPin, "置顶", Modifier.size(16.dp), tint = Green) }
                     Text(announcement.content.take(2000), color = WatchTextSecondary, fontSize = 11.sp)
-                    if (announcement.id !in seen) Text("新公告", color = WatchAccent, fontSize = 9.sp)
+                    if (announcement.id !in seen) Text("新公告", color = WatchTextPrimary, fontSize = 9.sp)
                 }
             }
         }
@@ -2248,7 +2278,7 @@ private fun formatFileSize(bytes: Long): String = when {
                 }
                 state.queueImportLoading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 else -> Column {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("已选 ${selectedIds.size} 首", Modifier.weight(1f), color = Green); TextButton({ if (selectedIds.size == state.queueImportTracks.size) selectedIds.clear() else { selectedIds.clear(); selectedIds.addAll(state.queueImportTracks.map(Track::id)) } }) { Text(if (selectedIds.size == state.queueImportTracks.size) "取消全选" else "全选") } }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("已选 ${selectedIds.size} 首", Modifier.weight(1f), color = WatchTextPrimary); TextButton({ if (selectedIds.size == state.queueImportTracks.size) selectedIds.clear() else { selectedIds.clear(); selectedIds.addAll(state.queueImportTracks.map(Track::id)) } }) { Text(if (selectedIds.size == state.queueImportTracks.size) "取消全选" else "全选") } }
                     LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         items(state.queueImportTracks, key = { it.id }) { track ->
                             val selected = track.id in selectedIds

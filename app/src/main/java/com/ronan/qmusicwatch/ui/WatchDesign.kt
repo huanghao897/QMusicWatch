@@ -19,14 +19,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 val WatchBackground = Color(0xFF050505)
-val WatchSurface = Color(0xFF1D1B20)
-val WatchSurfaceRaised = Color(0xFF302D36)
-val WatchTextPrimary = Color(0xFFF7F2FA)
-val WatchTextSecondary = Color(0xFFC9C3CE)
-val WatchAccent = Color(0xFFD0BCFF)
+val WatchSurface = Color(0xFF151616)
+val WatchSurfaceRaised = Color(0xFF252626)
+val WatchTextPrimary = Color(0xFFF4F5F4)
+val WatchTextSecondary = Color(0x99F4F5F4)
+val WatchAccent = Color(0xFF78C7FF)
 val WatchLike = Color(0xFFFF6B8B)
-val WatchVip = Color(0xFFF6C453)
-val WatchDivider = Color(0xFF49454F)
+val WatchVip = WatchTextPrimary
+val WatchDivider = Color(0xFF383A39)
 
 enum class WatchUiSize(val storedValue: String) {
     Compact("compact"),

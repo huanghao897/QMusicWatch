@@ -174,7 +174,7 @@ fun WatchSectionHeader(
                 Text(
                     it,
                     Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                    color = WatchAccent,
+                    color = WatchTextPrimary,
                     fontSize = (dimensions.secondarySp + 1f).sp,
                 )
             }
