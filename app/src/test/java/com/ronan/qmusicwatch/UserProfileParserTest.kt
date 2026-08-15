@@ -10,28 +10,30 @@ import org.junit.Test
 
 class UserProfileParserTest {
     @Test fun parsesNicknameAndProtocolRelativeAvatar() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"creator":{"nick":"Ronan","logo":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"greenVip":{"isVip":0},"superVip":{"isSVip":1,"vipEndTime":1893456000}}"""))!!
+        val avatar = "https://q1.qlogo.cn/g?b=qq&nk=12345&s=140"
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"creator":{"nick":"Ronan","logo":"$avatar"},"greenVip":{"isVip":0},"superVip":{"isSVip":1,"vipEndTime":1893456000}}"""))!!
         assertEquals("Ronan", profile.displayName)
-        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png", profile.avatarUrl)
+        assertEquals(avatar, profile.avatarUrl)
         assertEquals(true, profile.isVip)
         assertEquals(1893456000L, profile.vipExpireAt)
         assertEquals("超级会员（SVIP）", profile.vipName)
     }
 
     @Test fun ignoresSongVipFlagsWhenParsingAccount() {
-        val profile = parseUserProfile(Json.parseToJsonElement("""{"info":{"nick":"Ronan","logo":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.png"},"song":{"title":"测试歌曲","isVip":0}}"""))!!
+        val profile = parseUserProfile(Json.parseToJsonElement("""{"info":{"nick":"Ronan","logo":"https://q1.qlogo.cn/g?b=qq&nk=12345&s=140"},"song":{"title":"测试歌曲","isVip":0}}"""))!!
         assertEquals(null, profile.isVip)
     }
 
     @Test fun readsWechatAvatarFieldsAndPrefersAccountAvatarOverPlaceholder() {
-        val wechat = parseUserProfile(Json.parseToJsonElement("""{"profile":{"nickname":"Ronan","headimgurl":"https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png"}}"""))!!
-        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", wechat.avatarUrl)
+        val avatar = "https://thirdwx.qlogo.cn/mmopen/abc123/132"
+        val wechat = parseUserProfile(Json.parseToJsonElement("""{"profile":{"nickname":"Ronan","headimgurl":"$avatar"}}"""))!!
+        assertEquals(avatar, wechat.avatarUrl)
 
         val merged = mergeUserProfiles(listOf(
             UserProfile(displayName = "Ronan"),
             wechat,
         ))!!
-        assertEquals("https://heyboxlite.xyz/api/qmusic-watch/gateway/media/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/wechat.png", merged.avatarUrl)
+        assertEquals(avatar, merged.avatarUrl)
     }
 
     @Test fun parsesDedicatedVipResponse() {

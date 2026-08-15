@@ -37,6 +37,7 @@ import com.ronan.qmusicwatch.model.PlaybackSnapshot
 import com.ronan.qmusicwatch.model.StreamData
 import com.ronan.qmusicwatch.model.belongsToAccount
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
+import com.ronan.qmusicwatch.network.withQqMusicMediaHeaders
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -53,6 +54,7 @@ internal const val BACKGROUND_SNAPSHOT_INTERVAL_MS = 10_000L
 internal const val BACKGROUND_RECOVERY_DELAY_MS = 500L
 internal const val BACKGROUND_RECOVERY_ATTEMPTS = 3
 
+@androidx.annotation.OptIn(UnstableApi::class)
 internal class QMusicLoadErrorHandlingPolicy :
     DefaultLoadErrorHandlingPolicy(BACKGROUND_RECOVERY_ATTEMPTS) {
     override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorHandlingPolicy.LoadErrorInfo): Long {
@@ -211,7 +213,7 @@ class PlaybackService : MediaSessionService() {
                     require(trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank()) {
                         "playback host rejected"
                     }
-                    chain.proceed(chain.request())
+                    chain.proceed(chain.request().newBuilder().withQqMusicMediaHeaders().build())
                 }
                 .build()
         ).setUserAgent("QMusicWatch")
@@ -497,6 +499,7 @@ class PlaybackService : MediaSessionService() {
         return updated && restoredItemStillCurrent(request, stream.url)
     }
 
+    @androidx.annotation.OptIn(UnstableApi::class)
     private suspend fun notifyRecoveryExhausted(
         request: PlaybackRecoveryRequest,
         lastError: Throwable?,

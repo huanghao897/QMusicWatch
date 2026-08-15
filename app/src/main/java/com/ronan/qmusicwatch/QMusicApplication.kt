@@ -12,7 +12,6 @@ import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.download.DownloadController
 import com.ronan.qmusicwatch.network.ApiClient
 import com.ronan.qmusicwatch.network.ControlPlaneClient
-import com.ronan.qmusicwatch.network.QMUSIC_SERVER_HOST
 import com.ronan.qmusicwatch.network.trustedQMusicImageUrl
 import com.ronan.qmusicwatch.playback.PlaybackConnection
 import com.ronan.qmusicwatch.update.UpdateManager
@@ -23,10 +22,7 @@ private const val IMAGE_CACHE_DIRECTORY = "qmusic_image_cache"
 internal const val IMAGE_CACHE_MAX_SIZE_BYTES = 64L * 1024L * 1024L
 
 internal fun isPersistentQMusicArtworkUrl(value: String): Boolean =
-    trustedQMusicImageUrl(value).let { trusted ->
-        trusted.contains("/api/qmusic-watch/gateway/artwork/album/") ||
-            trusted.contains("/music/photo_new/T002R")
-    }
+    trustedQMusicImageUrl(value).contains("/music/photo_new/T002R")
 
 private fun qMusicImageHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .followRedirects(false)
@@ -40,8 +36,7 @@ private fun qMusicImageHttpClient(): OkHttpClient = OkHttpClient.Builder()
         if (!isPersistentQMusicArtworkUrl(request.url.toString())) {
             response
         } else {
-            // Stable album-art URLs identify immutable images. Override the
-            // gateway's API no-store header for artwork only, not avatars.
+            // Stable album-art URLs identify immutable images.
             response.newBuilder()
                 .removeHeader("Pragma")
                 .header("Cache-Control", "public, max-age=31536000, immutable")
@@ -85,7 +80,7 @@ class QMusicApplication : Application(), ImageLoaderFactory {
             cookie = { vault.load()?.upstreamCookie },
             updateCookie = { refreshed ->
                 vault.load()?.let { session ->
-                    vault.save(session.copy(upstreamCookie = refreshed, gatewayHost = QMUSIC_SERVER_HOST))
+                    vault.save(session.copy(upstreamCookie = refreshed))
                 }
             },
         )

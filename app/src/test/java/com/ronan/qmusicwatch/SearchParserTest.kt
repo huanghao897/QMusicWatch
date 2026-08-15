@@ -23,11 +23,11 @@ class SearchParserTest {
         assertEquals(null, nextSearchCursor(page = 2, rawItemCount = 19))
     }
 
-    @Test fun onlyGatewayOrExactPublicArtworkUrlsAreAccepted() {
+    @Test fun onlyOfficialTencentArtworkUrlsAreAccepted() {
         assertEquals("", normalizeHttpsUrl("//img.qq.com/a.jpg"))
         assertEquals("", normalizeHttpsUrl("http://img.qq.com/a.jpg"))
         val gateway = "https://heyboxlite.xyz/api/qmusic-watch/gateway/media/${"a".repeat(32)}/cover.jpg"
-        assertEquals(gateway, normalizeHttpsUrl(gateway))
+        assertEquals("", normalizeHttpsUrl(gateway))
         val artwork = "https://y.gtimg.cn/music/photo_new/T002R300x300M000albumMID123.jpg"
         assertEquals(artwork, normalizeHttpsUrl(artwork))
     }

@@ -289,7 +289,7 @@ private fun rememberArtworkImageRequest(value: String?, sizePx: Int): ImageReque
 ) {
     val context = LocalContext.current
     val qq = accountId.orEmpty().filter(Char::isDigit)
-    val resolvedUrl = trustedQMusicMediaUrl(avatarUrl.orEmpty()).ifBlank {
+    val resolvedUrl = trustedQMusicImageUrl(avatarUrl.orEmpty()).ifBlank {
         if (provider == "qq" && qq.isNotBlank()) qmusicAvatarUrl(qq) else ""
     }
     val request = remember(resolvedUrl) {

@@ -162,8 +162,8 @@ class PlaybackServiceRobolectricTest {
 
     @Test fun aNewRemoteUriIsNotPersistedWithThePreviousUrisExpiry() {
         val track = Track("track-a", "A")
-        val expired = "https://heyboxlite.xyz/api/qmusic-watch/gateway/media/${"a".repeat(32)}/expired.mp3"
-        val refreshed = "https://heyboxlite.xyz/api/qmusic-watch/gateway/media/${"b".repeat(32)}/refreshed.mp3"
+        val expired = "https://isure.stream.qqmusic.qq.com/M500expired.mp3?vkey=old"
+        val refreshed = "https://isure.stream.qqmusic.qq.com/M500refreshed.mp3?vkey=new"
         val snapshot = PlaybackSnapshot(
             track = track,
             queue = listOf(track),

@@ -15,6 +15,7 @@ import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -22,7 +23,8 @@ import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
-internal fun normalizeHttpsUrl(value: String): String = preferDirectQMusicArtworkUrl(value)
+internal fun normalizeHttpsUrl(value: String): String =
+    preferDirectQMusicArtworkUrl(normalizeQqHttpsUrl(value))
 
 private val invalidQqSongMids = setOf("null", "undefined", "nil")
 
@@ -36,15 +38,14 @@ internal fun isUsableQqSongMid(value: String): Boolean {
 private fun firstUsableQqSongMid(vararg values: String): String =
     values.asSequence().map(String::trim).firstOrNull(::isUsableQqSongMid).orEmpty()
 
-private class QqBusinessException(val businessCode: Int, message: String) : IllegalStateException(message)
-private class QqCredentialExpiredException(message: String) : IllegalStateException(message)
-internal class QMusicGatewayException(
+internal class QqBusinessException(val businessCode: Int, message: String) : IllegalStateException(message)
+internal class QqCredentialExpiredException(message: String) : IllegalStateException(message)
+internal class QqHttpException(
     val statusCode: Int,
-    val errorCode: String,
     message: String,
     val retryAfterMs: Long = 0L,
 ) : IllegalStateException(message)
-internal class QMusicGatewayResponseException(
+internal class QqResponseException(
     message: String,
     cause: Throwable? = null,
 ) : IllegalStateException(message, cause)
@@ -58,19 +59,19 @@ internal fun isIdempotentQqReadMethod(method: String): Boolean =
         method.startsWith("query", ignoreCase = true) ||
         method == "vip_login_base"
 
-internal fun isRecoverableGatewayReadFailure(error: Throwable): Boolean = when (error) {
-    is QMusicGatewayResponseException -> true
-    is QMusicGatewayException -> error.statusCode in setOf(429, 502, 503, 504)
+internal fun isRecoverableQqReadFailure(error: Throwable): Boolean = when (error) {
+    is QqResponseException -> true
+    is QqHttpException -> error.statusCode == 429 || error.statusCode in 500..599
     is IOException -> true
     else -> false
 }
 
-internal fun gatewayReadRetryDelayMs(error: Throwable): Long = when (error) {
-    is QMusicGatewayException -> when (error.statusCode) {
+internal fun qqReadRetryDelayMs(error: Throwable): Long = when (error) {
+    is QqHttpException -> when (error.statusCode) {
         429 -> error.retryAfterMs.coerceIn(500L, 2_000L)
         else -> 350L
     }
-    is QMusicGatewayResponseException -> 250L
+    is QqResponseException -> 250L
     else -> 300L
 }
 
@@ -79,6 +80,13 @@ internal fun isCurrentStreamGeneration(captured: Long, current: Long?): Boolean 
 
 private const val LOGIN_USER_INFO_MODULE = "music.UserInfo.userInfoServer"
 private const val LOGIN_CREDENTIAL_PROBE_METHOD = "GetLoginUserInfo"
+private const val MAX_QQ_RESPONSE_BYTES = 4 * 1024 * 1024
+private val passthroughCookieNames = listOf(
+    "login_type", "tmeLoginMethod", "wxuin", "p_lskey", "euin",
+    "wxopenid", "openid", "unionid", "access_token", "refresh_key",
+    "refresh_token", "p_skey", "skey", "expired_at", "musickeyCreateTime",
+    "keyExpiresIn",
+)
 
 internal fun shouldRefreshCredential(module: String, method: String, code: Int): Boolean =
     code in setOf(104400, 104401) ||
@@ -88,7 +96,7 @@ private fun isLoginCredentialProbe(module: String, method: String): Boolean =
     module == LOGIN_USER_INFO_MODULE && method == LOGIN_CREDENTIAL_PROBE_METHOD
 
 internal fun requiresNewQrLogin(error: Throwable): Boolean =
-    error is QMusicGatewayException && error.errorCode == "RELOGIN_REQUIRED"
+    error is QqCredentialExpiredException
 
 private fun JsonObject.hasPositiveNumber(vararg names: String): Boolean = names.any { name ->
     (this[name] as? JsonPrimitive)?.longOrNull?.let { it > 0 } == true
@@ -143,11 +151,7 @@ internal fun isSystemLikedPlaylist(value: MusicCollection): Boolean {
 
 private fun stableTrackArtwork(track: Track): Track {
     val current = preferDirectQMusicArtworkUrl(track.artworkUrl)
-    val stable = when {
-        current.isBlank() -> qmusicSongArtworkUrl(track.id)
-        "/api/qmusic-watch/gateway/media/" in current -> qmusicSongArtworkUrl(track.id)
-        else -> current
-    }
+    val stable = current.ifBlank { qmusicSongArtworkUrl(track.id) }
     return if (stable == track.artworkUrl) track else track.copy(artworkUrl = stable)
 }
 
@@ -571,23 +575,25 @@ internal fun qqPlaylistTrackWrite(
 internal fun qqFavoriteTrackWrite(track: Track, liked: Boolean): QqPlaylistTrackWrite {
     val songMid = track.id.trim()
     require(isUsableQqSongMid(songMid)) { "歌曲 MID 无效" }
+    require(track.numericId > 0) { "歌曲数字标识无效" }
     return QqPlaylistTrackWrite(
         module = "music.musicasset.SongFavWrite",
-        method = if (liked) "AddSongFans" else "DelSongFans",
+        method = if (liked) "AddSongFav" else "DeleteSongFav",
         param = buildJsonObject {
-            putJsonArray("v_songMid") { add(songMid) }
-            if (track.numericId > 0) {
-                putJsonArray("v_songId") { add(track.numericId) }
-                putJsonArray("v_songType") { add(0) }
-            }
+            put("v_songMid", songMid)
+            put("v_songId", track.numericId.toString())
         },
     )
 }
 
-internal fun qqFavoriteComm(base: JsonObject): JsonObject = buildJsonObject {
-    base.forEach { (name, value) -> put(name, value) }
-    put("ct", 20)
-    put("cv", 0)
+internal fun qqFavoritePlaylistFallback(track: Track, liked: Boolean): QqPlaylistTrackWrite =
+    qqPlaylistTrackWrite(201L, track.copy(songType = 0), liked)
+
+internal fun qqFavoriteComm(accountId: String): JsonObject = buildJsonObject {
+    require(accountId.matches(Regex("\\d{1,24}"))) { "账号标识无效" }
+    put("ct", 19)
+    put("cv", 1845)
+    put("uin", accountId)
 }
 
 internal fun qqWriteBusinessCode(data: JsonObject): Int? =
@@ -595,9 +601,23 @@ internal fun qqWriteBusinessCode(data: JsonObject): Int? =
         .mapNotNull { name -> data[name]?.jsonPrimitive?.intOrNull }
         .firstOrNull()
 
+internal fun qqMusicuPayload(
+    comm: JsonObject,
+    module: String,
+    method: String,
+    param: JsonObject,
+): JsonObject = buildJsonObject {
+    put("comm", comm)
+    putJsonObject("req_0") {
+        put("module", module)
+        put("method", method)
+        put("param", param)
+    }
+}
+
 /**
- * QQ Music client backed by the fixed QMusic Watch gateway.
- * The watch never receives or connects to an upstream QQ Music host.
+ * QQ Music client. Post-login requests go from the watch directly to official
+ * QQ Music hosts. The Ronan server is used only by ControlPlaneClient and QR login.
  */
 class ApiClient(
     context: Context,
@@ -803,7 +823,13 @@ class ApiClient(
                 receivedResponse = true
                 val path = streamPath(data) ?: return@attempt
                 if (path.value.isNotBlank()) {
-                    val url = trustedQMusicMediaUrl(path.value)
+                    val bases = walkObjects(data).flatMap { item ->
+                        (item["sip"] as? JsonArray).orEmpty().asSequence()
+                    }.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                        .filter(String::isNotBlank)
+                        .distinct()
+                        .toList()
+                    val url = resolveQqStreamUrl(path.value, bases)
                     if (url.isBlank()) error("音乐服务器返回了不受信任的播放地址")
                     val actual = inferQqStreamQuality(path.value, path.sourceKey)
                     val stream = StreamData(url, actual, System.currentTimeMillis() + data.long("expiration", 3600) * 1000)
@@ -967,7 +993,7 @@ class ApiClient(
                     buildJsonObject { put("vip_response", data) }
                 }
             }
-            val legacyTask = async { runCatching { gatewayLegacy("profile") }.getOrNull() }
+            val legacyTask = async { runCatching { legacyProfile() }.getOrNull() }
             (profileTasks + listOf(vipTask, legacyTask)).awaitAll().filterNotNull()
         }
         mergeUserProfiles(roots.mapNotNull(::parseUserProfile)) ?: error("QQ 音乐未返回账号资料")
@@ -995,7 +1021,8 @@ class ApiClient(
             ?: error("没有找到可用于播放诊断的免费歌曲")
         val stream = stream(track, QUALITY_STANDARD)
         val request = Request.Builder().url(stream.url)
-            .header("Range", "bytes=0-0").header("User-Agent", WEB_UA).build()
+            .withQqMusicMediaHeaders()
+            .header("Range", "bytes=0-0").build()
         http.newCall(request).execute().use { response ->
             AppLog.write("DIAG", "cdn status=${response.code}")
             if (response.code !in listOf(200, 206)) error("播放 CDN 响应 ${response.code}")
@@ -1005,14 +1032,33 @@ class ApiClient(
 
     suspend fun like(track: Track, liked: Boolean): Ack = withContext(Dispatchers.IO) {
         requireLogin()
-        val write = qqFavoriteTrackWrite(track, liked)
+        val complete = if (track.numericId > 0) track else trackDetail(track.id)
+        if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改喜欢状态")
+        val authCookie = normalizedAuthCookie()
+        val primary = qqFavoriteTrackWrite(complete, liked)
         try {
-            requireWriteAccepted(post(favoriteComm(), write.module, write.method, write.param))
+            requireWriteAccepted(
+                post(
+                    qqFavoriteComm(accountId()),
+                    primary.module,
+                    primary.method,
+                    primary.param,
+                    requestCookie = authCookie,
+                )
+            )
         } catch (error: QqBusinessException) {
-            if (error.businessCode == 80105) {
-                throw IllegalStateException("QQ 音乐拒绝了收藏操作，请稍后重试", error)
-            }
-            throw error
+            if (error.businessCode !in setOf(80105, 500003)) throw error
+            AppLog.write("FAVORITE", "primary rejected code=${error.businessCode}; fallback=playlist201")
+            val fallback = qqFavoritePlaylistFallback(complete, liked)
+            requireWriteAccepted(
+                post(
+                    playbackComm(android = true),
+                    fallback.module,
+                    fallback.method,
+                    fallback.param,
+                    requestCookie = authCookie,
+                )
+            )
         }
         Ack(true)
     }
@@ -1050,7 +1096,7 @@ class ApiClient(
 
     suspend fun createPlaylist(title: String): MusicCollection = withContext(Dispatchers.IO) {
         requireLogin()
-        val data = api("music.musicasset.PlaylistBaseWrite", "AddPlaylist", obj("dirName" to title))
+        val data = writeApi("music.musicasset.PlaylistBaseWrite", "AddPlaylist", obj("dirName" to title))
         val item = walkObjects(data).firstOrNull { it["dirId"] != null || it["tid"] != null } ?: JsonObject(emptyMap())
         val dirId = item.string("dirId")
         playlistDirectoryNumber(dirId)
@@ -1059,13 +1105,13 @@ class ApiClient(
 
     suspend fun renamePlaylist(id: String, title: String): Ack = withContext(Dispatchers.IO) {
         requireLogin()
-        api("music.musicasset.PlaylistBaseWrite", "ModifyPlaylist", obj("dirId" to playlistDirectoryNumber(id), "dirName" to title))
+        writeApi("music.musicasset.PlaylistBaseWrite", "ModifyPlaylist", obj("dirId" to playlistDirectoryNumber(id), "dirName" to title))
         Ack(true)
     }
 
     suspend fun deletePlaylist(id: String): Ack = withContext(Dispatchers.IO) {
         requireLogin()
-        api("music.musicasset.PlaylistBaseWrite", "DelPlaylist", obj("dirId" to playlistDirectoryNumber(id)))
+        writeApi("music.musicasset.PlaylistBaseWrite", "DelPlaylist", obj("dirId" to playlistDirectoryNumber(id)))
         Ack(true)
     }
 
@@ -1074,17 +1120,25 @@ class ApiClient(
         val complete = if (track.numericId > 0) track else trackDetail(track.id)
         if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改歌单")
         val write = qqPlaylistTrackWrite(playlistDirectoryNumber(id), complete, add)
-        requireWriteAccepted(post(webComm(), write.module, write.method, write.param))
+        requireWriteAccepted(
+            post(
+                playbackComm(android = true),
+                write.module,
+                write.method,
+                write.param,
+                requestCookie = normalizedAuthCookie(),
+            )
+        )
         Ack(true)
     }
 
     private fun smartSearch(query: String): JsonObject {
-        return gatewayLegacy("smartSearch", query = query)["data"]?.jsonObject
+        return legacySearch("smartSearch", query = query)["data"]?.jsonObject
             ?: error("QQ 音乐搜索响应无效")
     }
 
     private fun webSearch(query: String, page: Int, type: Int): JsonObject {
-        return gatewayLegacy("search", query = query, page = page, type = type)["data"]?.jsonObject
+        return legacySearch("search", query = query, page = page, type = type)["data"]?.jsonObject
             ?: error("QQ 音乐搜索响应无效")
     }
 
@@ -1105,6 +1159,15 @@ class ApiClient(
     private suspend fun api(module: String, method: String, param: JsonObject): JsonObject {
         return post(webComm(), module, method, param)
     }
+
+    private suspend fun writeApi(module: String, method: String, param: JsonObject): JsonObject =
+        post(
+            playbackComm(android = true),
+            module,
+            method,
+            param,
+            requestCookie = normalizedAuthCookie(),
+        )
 
     private suspend fun webApi(
         module: String,
@@ -1127,33 +1190,27 @@ class ApiClient(
         allowCredentialRefresh: Boolean = true,
         callTimeoutMs: Long? = null,
     ): JsonObject {
-        val payload = buildJsonObject {
-            requestCookie?.takeIf(String::isNotBlank)?.let { put("cookie", it) }
-            put("comm", comm)
-            put("module", module)
-            put("method", method)
-            put("param", param)
-        }
+        val payload = qqMusicuPayload(comm, module, method, param)
         val started = System.currentTimeMillis()
         val result = try {
-            gatewayRequest("musicu", payload, callTimeoutMs)
+            musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            if (isIdempotentQqReadMethod(method) && isRecoverableGatewayReadFailure(error)) {
-                val delayMs = gatewayReadRetryDelayMs(error)
+            if (isIdempotentQqReadMethod(method) && isRecoverableQqReadFailure(error)) {
+                val delayMs = qqReadRetryDelayMs(error)
                 AppLog.write("API", "$module/$method transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
                 Thread.sleep(delayMs)
                 try {
-                    gatewayRequest("musicu", payload, callTimeoutMs)
+                    musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (retryError: Throwable) {
-                    AppLog.write("API", "$module/$method gateway_error=${retryError.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
+                    AppLog.write("API", "$module/$method direct_error=${retryError.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
                     throw retryError
                 }
             } else {
-                AppLog.write("API", "$module/$method gateway_error=${error.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
+                AppLog.write("API", "$module/$method direct_error=${error.javaClass.simpleName} ms=${System.currentTimeMillis() - started}")
                 throw error
             }
         }
@@ -1185,105 +1242,129 @@ class ApiClient(
         }
         if (code != 0 && !tolerateBusinessError) throw QqBusinessException(
             code,
-            result.string("message").ifBlank { "QQ 音乐接口拒绝请求 ($code)" },
+            result.string("msg").ifBlank { result.string("message") }
+                .ifBlank { "QQ 音乐接口拒绝请求 ($code)" },
         )
         return result["data"]?.jsonObject ?: JsonObject(emptyMap())
     }
 
-    private fun gatewayLegacy(
+    private fun musicuRequest(
+        payload: JsonObject,
+        requestCookie: String?,
+        androidClient: Boolean,
+        callTimeoutMs: Long?,
+    ): JsonObject {
+        val builder = Request.Builder()
+            .url(QQ_MUSICU_URL)
+            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .header("Accept", "application/json")
+            .header("Origin", "https://y.qq.com")
+            .header("Referer", "https://y.qq.com/")
+            .header(
+                "User-Agent",
+                if (androidClient) "QQMusic 20030508(android ${android.os.Build.VERSION.RELEASE})" else WEB_UA,
+            )
+        requestCookie?.takeIf(String::isNotBlank)?.let { builder.header("Cookie", it) }
+        val call = http.newCall(builder.build())
+        callTimeoutMs?.takeIf { it > 0 }?.let { call.timeout().timeout(it, TimeUnit.MILLISECONDS) }
+        call.execute().use { response ->
+            val body = response.body?.byteStream()?.use(::readBoundedBody).orEmpty()
+            if (!response.isSuccessful) {
+                throw QqHttpException(
+                    response.code,
+                    "QQ 音乐接口响应 ${response.code}",
+                    response.header("Retry-After")?.toLongOrNull()?.times(1_000L) ?: 0L,
+                )
+            }
+            val root = runCatching { json.parseToJsonElement(body).jsonObject }
+                .getOrElse { throw QqResponseException("QQ 音乐响应格式无效", it) }
+            return (root["req_0"] as? JsonObject)
+                ?: (root["req"] as? JsonObject)
+                ?: throw QqResponseException("QQ 音乐响应缺少 req_0")
+        }
+    }
+
+    private fun legacySearch(
         operation: String,
         query: String = "",
         page: Int = 1,
         type: Int = 0,
     ): JsonObject {
-        val payload = buildJsonObject {
-            put("operation", operation)
-            cookie()?.takeIf(String::isNotBlank)?.let { put("cookie", it) }
-            if (operation in setOf("search", "smartSearch")) put("query", query)
+        require(operation in setOf("search", "smartSearch")) { "不支持的搜索接口" }
+        require(query.isNotBlank() && query.length <= 100) { "搜索内容无效" }
+        val url = "https://$QQ_LEGACY_HOST/".toHttpUrl().newBuilder().apply {
             if (operation == "search") {
-                put("page", page)
-                put("type", type)
+                addPathSegments("soso/fcgi-bin/search_for_qq_cp")
+                addQueryParameter("format", "json")
+                addQueryParameter("p", page.coerceIn(1, 100).toString())
+                addQueryParameter("n", "20")
+                addQueryParameter("t", type.toString())
+                addQueryParameter("w", query)
+            } else {
+                addPathSegments("splcloud/fcgi-bin/smartbox_new.fcg")
+                addQueryParameter("format", "json")
+                addQueryParameter("key", query)
+            }
+        }.build()
+        return legacyGet(url, operation)
+    }
+
+    private fun legacyProfile(): JsonObject {
+        val id = accountId()
+        require(id.matches(Regex("\\d{1,24}"))) { "账号标识无效" }
+        val gtk = hash33(cookieValue("qqmusic_key", "qm_keyst", "p_skey", "skey").orEmpty())
+        val url = "https://$QQ_LEGACY_HOST/".toHttpUrl().newBuilder()
+            .addPathSegments("rsc/fcgi-bin/fcg_get_profile_homepage.fcg")
+            .addQueryParameter("format", "json")
+            .addQueryParameter("loginUin", id)
+            .addQueryParameter("hostUin", "0")
+            .addQueryParameter("userid", id)
+            .addQueryParameter("g_tk", gtk.toString())
+            .addQueryParameter("cid", "205360838")
+            .addQueryParameter("reqfrom", "1")
+            .build()
+        return legacyGet(url, "profile", cookie())
+    }
+
+    private fun legacyGet(url: okhttp3.HttpUrl, operation: String, requestCookie: String? = null): JsonObject {
+        fun execute(): JsonObject {
+            val builder = Request.Builder().url(url)
+                .header("Accept", "application/json")
+                .header("Referer", "https://y.qq.com/")
+                .header("User-Agent", WEB_UA)
+            requestCookie?.takeIf(String::isNotBlank)?.let { builder.header("Cookie", it) }
+            http.newCall(builder.build()).execute().use { response ->
+                val body = response.body?.byteStream()?.use(::readBoundedBody).orEmpty()
+                if (!response.isSuccessful) {
+                    throw QqHttpException(
+                        response.code,
+                        "QQ 音乐${if (operation == "profile") "资料" else "搜索"}接口响应 ${response.code}",
+                        response.header("Retry-After")?.toLongOrNull()?.times(1_000L) ?: 0L,
+                    )
+                }
+                return runCatching { json.parseToJsonElement(body).jsonObject }
+                    .getOrElse { throw QqResponseException("QQ 音乐响应格式无效", it) }
             }
         }
         return try {
-            gatewayRequest("legacy", payload)
+            execute()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            if (!isRecoverableGatewayReadFailure(error)) throw error
-            val delayMs = gatewayReadRetryDelayMs(error)
+            if (!isRecoverableQqReadFailure(error)) throw error
+            val delayMs = qqReadRetryDelayMs(error)
             AppLog.write("API", "legacy/$operation transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
             Thread.sleep(delayMs)
-            gatewayRequest("legacy", payload)
-        }
-    }
-
-    private fun gatewayRequest(
-        route: String,
-        payload: JsonObject,
-        callTimeoutMs: Long? = null,
-    ): JsonObject {
-        return gatewayPost("api/qmusic-watch/gateway/$route", payload, callTimeoutMs)
-    }
-
-    private fun gatewayPost(
-        path: String,
-        payload: JsonObject,
-        callTimeoutMs: Long? = null,
-    ): JsonObject {
-        val request = Request.Builder()
-            .url(qmusicServerEndpoint(path))
-            .post(payload.toString().toRequestBody(JSON_MEDIA))
-            .header("Accept", "application/json")
-            .header("User-Agent", WEB_UA)
-            .build()
-        val call = http.newCall(request)
-        callTimeoutMs?.takeIf { it > 0 }?.let {
-            call.timeout().timeout(it, TimeUnit.MILLISECONDS)
-        }
-        call.execute().use { response ->
-            val text = response.body?.byteStream()?.use(::readGatewayBody).orEmpty()
-            val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrElse { parseError ->
-                if (!response.isSuccessful) {
-                    val retryAfterMs = response.header("Retry-After")
-                        ?.toLongOrNull()
-                        ?.times(1_000L)
-                        ?: 0L
-                    throw QMusicGatewayException(
-                        statusCode = response.code,
-                        errorCode = if (response.code == 429) "RATE_LIMITED" else "HTTP_${response.code}",
-                        message = if (response.code == 429) {
-                            "音乐服务器请求较多，正在稍后重试"
-                        } else {
-                            "音乐服务器响应 ${response.code}"
-                        },
-                        retryAfterMs = retryAfterMs,
-                    )
-                }
-                throw QMusicGatewayResponseException("音乐服务器响应格式无效", parseError)
-            }
-            if (!response.isSuccessful || root["ok"]?.jsonPrimitive?.booleanOrNull != true) {
-                val gatewayError = root["error"] as? JsonObject
-                val message = gatewayError?.string("message")
-                    .orEmpty().take(160).ifBlank { "音乐服务器响应 ${response.code}" }
-                throw QMusicGatewayException(
-                    statusCode = response.code,
-                    errorCode = gatewayError?.string("code").orEmpty(),
-                    message = message,
-                    retryAfterMs = response.header("Retry-After")
-                        ?.toLongOrNull()
-                        ?.times(1_000L)
-                        ?: 0L,
-                )
-            }
-            return root["data"]?.jsonObject
-                ?: throw QMusicGatewayResponseException("音乐服务器响应缺少数据")
+            execute()
         }
     }
 
     private fun requestCommAfterCredentialRefresh(module: String): JsonObject = when (module) {
         "vkey.GetVkeyServer" -> playbackComm(android = false)
         "music.vkey.GetVkey" -> playbackComm(android = true)
+        "music.musicasset.SongFavWrite" -> qqFavoriteComm(accountId())
+        "music.musicasset.PlaylistBaseWrite",
+        "music.musicasset.PlaylistDetailWrite" -> playbackComm(android = true)
         else -> webComm()
     }
 
@@ -1322,12 +1403,61 @@ class ApiClient(
                 AppLog.write("AUTH", "credential refresh suppressed after recent rotation")
                 return@synchronized false
             }
-            val payload = buildJsonObject {
-                put("provider", provider)
-                put("cookie", staleCookie)
+            val values = cookieValues(staleCookie)
+            val musicId = MusicCookie.accountId(staleCookie).orEmpty()
+            val musicKey = firstCookieValue(values, "qqmusic_key", "qm_keyst", "p_lskey")
+            val refreshToken = values["refresh_token"].orEmpty()
+            val refreshKey = values["refresh_key"].orEmpty()
+            val openId = firstCookieValue(values, "wxopenid", "openid")
+            if (!musicId.matches(Regex("\\d{1,24}")) || musicKey.isBlank() || refreshToken.isBlank() || openId.isBlank()) {
+                throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
             }
-            val data = gatewayPost("api/qmusic-watch/auth/refresh", payload)
-            val refreshed = validateRefreshedCookie(staleCookie, data.string("cookie"))
+            val param = if (provider == "qq") {
+                obj(
+                    "openid" to openId,
+                    "refresh_token" to refreshToken,
+                    "str_musicid" to musicId,
+                    "musickey" to musicKey,
+                    "unionid" to values["unionid"].orEmpty(),
+                    "refresh_key" to refreshKey,
+                    "loginMode" to 2,
+                )
+            } else {
+                obj(
+                    "openid" to openId,
+                    "access_token" to values["access_token"].orEmpty(),
+                    "refresh_token" to refreshToken,
+                    "expired_in" to (values["expired_at"]?.toLongOrNull() ?: 0L),
+                    "musicid" to musicId.toLong(),
+                    "musickey" to musicKey,
+                    "refresh_key" to refreshKey,
+                    "loginMode" to 2,
+                )
+            }
+            val refreshComm = obj(
+                "g_tk" to 5381,
+                "platform" to "yqq",
+                "ct" to 24,
+                "cv" to 0,
+                "tmeAppID" to "qqmusic",
+                "tmeLoginType" to (values["tmeLoginType"]?.toIntOrNull() ?: if (provider == "qq") 2 else 1),
+            )
+            val data = try {
+                post(
+                    refreshComm,
+                    "music.login.LoginServer",
+                    "Login",
+                    param,
+                    requestCookie = null,
+                    allowCredentialRefresh = false,
+                )
+            } catch (error: QqBusinessException) {
+                throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
+            }
+            val refreshed = validateRefreshedCookie(
+                staleCookie,
+                buildMusicCookie(provider, values, data),
+            )
             updateCookie(refreshed)
             streamCache.clear()
             verifiedCredentialCookie = ""
@@ -1338,7 +1468,71 @@ class ApiClient(
             true
         }
 
-    private fun readGatewayBody(input: java.io.InputStream): String {
+    private fun normalizedAuthCookie(): String {
+        val source = cookie().orEmpty()
+        val values = cookieValues(source)
+        val id = MusicCookie.accountId(source).orEmpty()
+        val key = firstCookieValue(values, "qqmusic_key", "qm_keyst", "p_lskey", "p_skey", "skey")
+        require(id.matches(Regex("\\d{1,24}")) && safeCookieValue(key)) { "登录凭据不完整，请重新扫码登录" }
+        val loginType = values["tmeLoginType"]?.toIntOrNull()?.takeIf { it in 0..20 }
+            ?: if (key.startsWith("W_X")) 1 else 2
+        val normalized = linkedMapOf(
+            "uin" to "o$id",
+            "loginUin" to id,
+            "qqmusic_uin" to id,
+            "tmeLoginType" to loginType.toString(),
+            "qm_keyst" to key,
+            "qqmusic_key" to key,
+            "musickey" to key,
+        )
+        passthroughCookieNames.forEach { name ->
+            values[name]?.takeIf(::safeCookieValue)?.let { normalized[name] = it }
+        }
+        return normalized.entries.joinToString("; ") { "${it.key}=${it.value}" }
+    }
+
+    private fun buildMusicCookie(
+        provider: String,
+        previous: Map<String, String>,
+        data: JsonObject,
+    ): String {
+        fun response(vararg names: String): String = names.firstNotNullOfOrNull { name ->
+            data[name]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        }.orEmpty()
+        val musicId = response("musicid", "str_musicid", "uin")
+            .ifBlank { firstCookieValue(previous, "qqmusic_uin", "uin", "wxuin").trimStart('o') }
+        val musicKey = response("musickey", "musicKey", "music_key")
+            .ifBlank { firstCookieValue(previous, "qqmusic_key", "qm_keyst", "p_lskey") }
+        require(musicId.matches(Regex("\\d{1,24}")) && safeCookieValue(musicKey)) {
+            "QQ 音乐没有返回有效登录凭据"
+        }
+        val pairs = linkedMapOf(
+            "login_type" to "2",
+            "tmeLoginMethod" to "3",
+            "uin" to "o$musicId",
+            "qqmusic_uin" to musicId,
+            "tmeLoginType" to if (provider == "qq") "2" else "1",
+            "wxuin" to "o$musicId",
+            "qm_keyst" to musicKey,
+            "p_lskey" to musicKey,
+            "qqmusic_key" to musicKey,
+        )
+        val optional = linkedMapOf(
+            "euin" to response("encryptUin", "encrypt_uin").ifBlank { previous["euin"].orEmpty() },
+            "wxopenid" to response("openid").ifBlank { firstCookieValue(previous, "wxopenid", "openid") },
+            "unionid" to response("unionid").ifBlank { previous["unionid"].orEmpty() },
+            "refresh_key" to response("refresh_key").ifBlank { previous["refresh_key"].orEmpty() },
+            "refresh_token" to response("refresh_token").ifBlank { previous["refresh_token"].orEmpty() },
+            "access_token" to response("access_token").ifBlank { previous["access_token"].orEmpty() },
+            "expired_at" to response("expired_at", "expiredAt").ifBlank { previous["expired_at"].orEmpty() },
+            "musickeyCreateTime" to response("musickeyCreateTime", "musickey_create_time").ifBlank { previous["musickeyCreateTime"].orEmpty() },
+            "keyExpiresIn" to response("keyExpiresIn", "key_expires_in").ifBlank { previous["keyExpiresIn"].orEmpty() },
+        )
+        optional.forEach { (name, value) -> value.takeIf(::safeCookieValue)?.let { pairs[name] = it } }
+        return pairs.entries.joinToString("; ") { "${it.key}=${it.value}" }
+    }
+
+    private fun readBoundedBody(input: java.io.InputStream): String {
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(8 * 1024)
         var total = 0
@@ -1346,7 +1540,7 @@ class ApiClient(
             val read = input.read(buffer)
             if (read < 0) break
             total += read
-            require(total <= 4 * 1024 * 1024) { "音乐服务器响应过大" }
+            require(total <= MAX_QQ_RESPONSE_BYTES) { "QQ 音乐响应过大" }
             output.write(buffer, 0, read)
         }
         return output.toString(Charsets.UTF_8.name())
@@ -1357,8 +1551,6 @@ class ApiClient(
         put("ct", 24); put("cv", 4_747_474); put("platform", "yqq.json"); put("uin", accountId().ifBlank { "0" })
         put("g_tk", gtk); put("g_tk_new_20200303", gtk); put("format", "json"); put("inCharset", "utf-8"); put("outCharset", "utf-8"); put("notice", 0); put("need_new_code", 1)
     }
-
-    private fun favoriteComm() = qqFavoriteComm(webComm())
 
     private fun playbackComm(android: Boolean) = buildJsonObject {
         val id = accountId()
@@ -1440,7 +1632,18 @@ class ApiClient(
     private fun decodeText(value: String): String = decodeQqLyricText(value)
     private fun saved(key: String, factory: () -> String): String = prefs.getString(key, null) ?: factory().also { prefs.edit().putString(key, it).apply() }
     private fun hash33(value: String): Int = value.fold(5381) { hash, char -> hash + (hash shl 5) + char.code } and 0x7fffffff
-    private fun cookieValue(vararg names: String): String? = cookie()?.split(';')?.map(String::trim)?.firstNotNullOfOrNull { part -> names.firstOrNull { part.startsWith("$it=") }?.let { part.substringAfter('=') } }
+    private fun cookieValues(value: String): Map<String, String> = buildMap {
+        value.split(';').forEach { part ->
+            val (name, content) = part.trim().split('=', limit = 2).takeIf { it.size == 2 } ?: return@forEach
+            if (name.isNotBlank() && name !in this) put(name, content)
+        }
+    }
+    private fun firstCookieValue(values: Map<String, String>, vararg names: String): String =
+        names.firstNotNullOfOrNull { values[it]?.takeIf(String::isNotBlank) }.orEmpty()
+    private fun safeCookieValue(value: String): Boolean =
+        value.isNotBlank() && value.length <= 8192 && value.none { it.code < 0x21 || it in setOf(';', ',', '\u007f') }
+    private fun cookieValue(vararg names: String): String? =
+        firstCookieValue(cookieValues(cookie().orEmpty()), *names).takeIf(String::isNotBlank)
     private fun accountId() = cookieValue("qqmusic_uin", "uin", "wxuin").orEmpty().trimStart('o')
     private fun requireLogin() { if (cookie().isNullOrBlank()) error("请先扫码登录") }
     companion object {

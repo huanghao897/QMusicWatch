@@ -1,5 +1,15 @@
 # QMusic Watch checklist
 
+## Direct QQ Music migration
+
+- [x] Existing server QQ and WeChat QR creation/polling retained
+- [x] Direct musicu, search and profile transport
+- [x] Direct official stream, cover and avatar URLs
+- [x] Current favorite contract with directory-201 fallback
+- [x] Existing server feature switches still gate client behavior
+- [x] No post-login QQ credential or business payload reaches `heyboxlite.xyz`
+- [x] Full tests, signing build and source audit pass
+
 ## Current client quality
 
 - [x] 方屏首页、搜索、歌单、歌词和播放器的紧凑布局
@@ -15,10 +25,9 @@
 - [ ] API 24 and API 36 device smoke tests
 - [ ] 480x480 screenshot and touch regression pass
 - [ ] Wi-Fi/LTE handoff, process recreation and Bluetooth reconnect pass
-- [ ] Re-check signing configuration before any requested release
+- [x] Re-check signing configuration before any requested release
 
 ## Release policy
 
 - [x] Keep Android version unchanged for ordinary fixes
-- [ ] Create and publish a new version only after an explicit release request
-
+- [x] Publish `0.9.9 (39)` after Ronan explicitly requested a server release

@@ -9,9 +9,9 @@ import com.ronan.qmusicwatch.model.Track
 import com.ronan.qmusicwatch.model.QUALITY_LEGACY_UNKNOWN
 import com.ronan.qmusicwatch.model.QUALITY_STANDARD
 import com.ronan.qmusicwatch.model.normalizeQualityId
-import com.ronan.qmusicwatch.network.trustedQMusicArtworkUrl
 import com.ronan.qmusicwatch.network.trustedQMusicImageUrl
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
+import com.ronan.qmusicwatch.network.withQqMusicMediaHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
@@ -35,7 +35,7 @@ private val downloadHttp = OkHttpClient.Builder()
     .addInterceptor { chain ->
         require(
             trustedQMusicMediaUrl(chain.request().url.toString()).isNotBlank() ||
-                trustedQMusicArtworkUrl(chain.request().url.toString()).isNotBlank()
+                trustedQMusicImageUrl(chain.request().url.toString()).isNotBlank()
         ) {
             "download host rejected"
         }
@@ -84,7 +84,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
             )
             val stream = graph.api.stream(track, requestedQuality)
             val streamUrl = trustedQMusicMediaUrl(stream.url)
-            if (streamUrl.isBlank()) error("download gateway url rejected")
+            if (streamUrl.isBlank()) error("download QQ Music URL rejected")
             val issuedQuality = normalizeQualityId(stream.quality)
             val current = db.downloads().find(id, owner)
             if (part.exists() && !canResumePartialDownload(current?.quality, issuedQuality)) part.delete()
@@ -95,7 +95,8 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 updatedAt = System.currentTimeMillis(),
                 quality = issuedQuality,
             )?.let { db.downloads().upsert(it) }
-            val request = Request.Builder().url(streamUrl).apply { if (part.length() > 0) header("Range", "bytes=${part.length()}-") }.build()
+            val request = Request.Builder().url(streamUrl).withQqMusicMediaHeaders()
+                .apply { if (part.length() > 0) header("Range", "bytes=${part.length()}-") }.build()
             downloadHttp.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error("download ${response.code}")
                 val append = response.code == 206 && part.length() > 0

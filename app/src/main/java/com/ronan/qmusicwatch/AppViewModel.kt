@@ -208,13 +208,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         graph.playback.onError = ::handlePlaybackError
         graph.playback.onMediaItemChanged = ::handleMediaItemChanged
-        viewModelScope.launch {
-            try {
-                prepareGatewayCredential()
-            } finally {
-                sessionReady.complete(Unit)
-            }
-        }
+        sessionReady.complete(Unit)
         viewModelScope.launch {
             val generation = sessionGeneration
             val owner = accountId
@@ -268,38 +262,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun prepareGatewayCredential() {
-        val session = currentSession ?: return
-        if (!sessionNeedsGatewayCredentialRefresh(session)) return
-        _state.update { it.copy(message = "正在迁移登录状态…") }
-        runCatching {
-            check(graph.api.refreshCredential(session.provider)) { "登录凭据无法刷新" }
-            val refreshed = graph.vault.load()?.copy(gatewayHost = QMUSIC_SERVER_HOST)
-                ?: error("登录凭据保存失败")
-            graph.vault.save(refreshed)
-            currentSession = refreshed
-        }.onSuccess {
-            AppLog.write("AUTH", "gateway credential migration complete provider=${session.provider}")
-            _state.update { it.copy(message = "登录状态已迁移") }
-        }.onFailure { error ->
-            AppLog.write("AUTH", "gateway credential migration failed ${error.javaClass.simpleName}")
-            if (!requiresNewQrLogin(error)) {
-                _state.update { it.copy(message = "登录状态迁移暂时失败，稍后将自动重试") }
-                return@onFailure
-            }
-            graph.vault.clear()
-            currentSession = null
-            sessionGeneration++
-            _state.update {
-                it.copy(
-                    profile = null,
-                    profileLoaded = true,
-                    profileError = "服务器迁移后需要重新扫码登录一次",
-                    message = "服务器已更换，请重新扫码登录一次",
-                )
-            }
-        }
-    }
     fun consumeMessage() = _state.update { it.copy(message = null) }
     private fun fail(error: Throwable) {
         AppLog.write("ERROR", generateSequence(error) { it.cause }.joinToString(" <- ") { "${it.javaClass.simpleName}:${it.message.orEmpty()}" })
@@ -500,7 +462,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 accountId = account,
                 provider = com.ronan.qmusicwatch.login.MusicCookie.provider(cookie, provider),
                 upstreamCookie = cookie,
-                gatewayHost = QMUSIC_SERVER_HOST,
             )
         }.onSuccess { session ->
             runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "account switch ${it.javaClass.simpleName}:${it.message.orEmpty()}") }
