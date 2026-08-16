@@ -78,6 +78,12 @@ internal fun qqReadRetryDelayMs(error: Throwable): Long = when (error) {
 internal fun isCurrentStreamGeneration(captured: Long, current: Long?): Boolean =
     current == captured
 
+internal fun shouldProbePlaybackCredential(
+    qualityIndex: Int,
+    hasFallback: Boolean,
+    allowRecovery: Boolean,
+): Boolean = qualityIndex == 0 && !hasFallback && allowRecovery
+
 private const val LOGIN_USER_INFO_MODULE = "music.UserInfo.userInfoServer"
 private const val LOGIN_CREDENTIAL_PROBE_METHOD = "GetLoginUserInfo"
 private const val MAX_QQ_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -842,11 +848,7 @@ class ApiClient(
                     }
                 }
             }
-            if (
-                qualityIndex == 0 &&
-                bestFallback == null &&
-                complete.requiresVip &&
-                allowCredentialRecovery &&
+            if (shouldProbePlaybackCredential(qualityIndex, bestFallback != null, allowCredentialRecovery) &&
                 probePlaybackCredential()
             ) {
                 AppLog.write("STREAM", "credential refreshed; retry track=${track.id}")

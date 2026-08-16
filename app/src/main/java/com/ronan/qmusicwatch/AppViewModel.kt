@@ -44,7 +44,7 @@ data class AppUiState(
     val searchQuery: String = "", val searchCursor: String? = null, val searchLoading: Boolean = false,
     val qrStatus: String = "", val qrImageBase64: String = "", val qrMimeType: String = "", val qrExpiresAt: Long = 0,
     val currentTrack: Track? = null, val activeStreamQuality: String = QUALITY_STANDARD,
-    val lyrics: List<LyricLine> = emptyList(), val pendingSpeakerTrack: Track? = null,
+    val lyrics: List<LyricLine> = emptyList(), val pendingSpeakerTrack: Track? = null, val playbackLoading: Boolean = false,
     val detail: CollectionDetail? = null, val detailDirectoryId: String? = null,
     val detailLoading: Boolean = false, val detailError: String? = null, val playEvent: Long = 0,
     val diagnostic: String? = null, val profile: UserProfile? = null, val profileLoaded: Boolean = false,
@@ -271,7 +271,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun failPlayback(error: Throwable) {
         val failure = classifyPlaybackFailure(error)
         AppLog.write("PLAYBACK", "type=${failure.type} ${error.javaClass.simpleName}:${error.message.orEmpty()}")
-        _state.update { it.copy(loading = false, message = failure.message) }
+        _state.update { it.copy(loading = false, playbackLoading = false, message = failure.message) }
     }
 
     private fun handlePlaybackError(event: PlaybackErrorEvent) {
@@ -286,7 +286,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             failure.message
         }
-        _state.update { it.copy(message = message) }
+        _state.update { it.copy(playbackLoading = false, message = message) }
         if (serviceWillRecover) {
             recoveryNoticeJob = viewModelScope.launch {
                 delay(PLAYBACK_RECOVERY_NOTICE_TIMEOUT_MS)
@@ -786,18 +786,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onSuccess { verified -> _state.update { it.copy(updateState = UpdateUiState.Ready(release, verified.absolutePath)) }; onReady(verified) }
             .onFailure { error -> _state.update { it.copy(updateState = UpdateUiState.Error(error.message ?: "安装包校验失败", release)) } }
     }
-    fun requestPlay(track: Track, allowSpeaker: Boolean = false, sourceQueue: List<Track>? = null) {
+    fun requestPlay(
+        track: Track,
+        allowSpeaker: Boolean = false,
+        sourceQueue: List<Track>? = null,
+        forceFreshStream: Boolean = false,
+    ) {
         clearServiceRecovery()
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
         playJob?.cancel()
         playJob = viewModelScope.launch {
         sessionReady.await()
-        if (!track.playable && !track.requiresVip) return@launch fail(IllegalStateException("这首歌曲当前不可播放"))
+        _state.update { it.copy(playbackLoading = true, message = null) }
+        if (!track.playable && !track.requiresVip) return@launch failPlayback(IllegalStateException("这首歌曲当前不可播放"))
         if (headphoneWarning.value && !allowSpeaker && !com.ronan.qmusicwatch.playback.hasPrivateAudioOutput(getApplication())) {
             pendingQueue = sourceQueue
-            _state.update { it.copy(pendingSpeakerTrack = track) }; return@launch
+            _state.update { it.copy(pendingSpeakerTrack = track, playbackLoading = false) }; return@launch
         }
-        val owner = accountId ?: return@launch fail(IllegalStateException("请先登录后播放"))
+        val owner = accountId ?: return@launch failPlayback(IllegalStateException("请先登录后播放"))
         var issuedUrl = ""
         var issuedExpiresAt = 0L
         var issuedQuality = preferredQuality(track)
@@ -805,7 +811,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runCatching {
             val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
             if (local == null && !featureEnabled("stream")) error(featureMessage("stream").ifBlank { "在线播放暂时维护，仍可播放已缓存歌曲" })
-            val stream = if (local == null) graph.api.stream(track, preferredQuality(track)) else null
+            val stream = if (local == null) {
+                if (forceFreshStream) graph.api.refreshStream(track, preferredQuality(track))
+                else graph.api.stream(track, preferredQuality(track))
+            } else null
             val uri = local?.let { android.net.Uri.fromFile(File(it.filePath)).toString() } ?: stream!!.url
             local?.let { item -> cachedArtworkFile(item.filePath).takeIf(File::exists)?.let { resolvedTrack = track.copy(artworkUrl = android.net.Uri.fromFile(it).toString()) } }
             issuedUrl = uri
@@ -828,6 +837,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     activeStreamQuality = reportedQualityId(issuedQuality),
                     lyrics = emptyList(),
                     pendingSpeakerTrack = null,
+                    playbackLoading = false,
                     playEvent = System.nanoTime(),
                     message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile),
                 )
@@ -1142,7 +1152,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun playbackDuration() = graph.playback.duration()
     fun isPlaying() = graph.playback.isPlaying()
     fun pausePlayback() { graph.playback.pause(); persistSnapshot() }
-    fun resumePlayback() { if (graph.playback.duration() == 0L) _state.value.currentTrack?.let { requestPlay(it, true) } else graph.playback.resume() }
+    fun resumePlayback() {
+        if (_state.value.playbackLoading) return
+        if (graph.playback.duration() == 0L) {
+            _state.value.currentTrack?.let { requestPlay(it, allowSpeaker = true, forceFreshStream = true) }
+        } else {
+            graph.playback.resume()
+        }
+    }
     fun seek(position: Long) = graph.playback.seek(position)
     fun adjustVolume(direction: Int) = graph.playback.adjustVolume(direction)
     fun savePlaybackState() = persistSnapshot()

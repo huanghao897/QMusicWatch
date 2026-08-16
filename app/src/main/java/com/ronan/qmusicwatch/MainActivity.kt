@@ -56,8 +56,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
@@ -526,6 +528,7 @@ class MainActivity : ComponentActivity() {
                     lowPowerPlayer = lowPowerPlayer,
                     quality = quality,
                     activeQuality = pageState.activeStreamQuality,
+                    playbackLoading = pageState.playbackLoading,
                     profile = pageState.profile,
                     profileLoaded = pageState.profileLoaded,
                     playlists = writablePlaylists(pageState.library?.playlists.orEmpty()),
@@ -1013,6 +1016,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     playMode: String, lyricSize: String, showOriginal: Boolean, showTranslation: Boolean, lyricOffset: Long,
     lyricAnimation: String, lyricAlignment: String, lowPowerPlayer: Boolean, quality: String,
     activeQuality: String,
+    playbackLoading: Boolean,
     profile: UserProfile?, profileLoaded: Boolean, playlists: List<MusicCollection>, liked: Boolean,
     cachedArtworkAccent: String,
     openQueue: () -> Unit, onBack: () -> Unit,
@@ -1286,16 +1290,16 @@ private fun decodeServerQrImage(value: String) = runCatching {
             } else {
                 BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
                     val compactPlayer = maxWidth <= 280.dp
-                    val playerStageSize = minOf(maxWidth, maxHeight)
+                    val playerStageSize = minOf(maxWidth, maxHeight, 288.dp)
                     if (!lowPowerPlayer && playerArtwork.isNotBlank()) {
                         AsyncImage(
                             model = playerArtworkRequest,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize().alpha(.42f),
+                            modifier = Modifier.fillMaxSize().alpha(.36f),
                             contentScale = ContentScale.Crop,
                             filterQuality = FilterQuality.Low,
                         )
-                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .48f)))
+                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .52f)))
                         Box(Modifier.fillMaxSize().background(artworkAccent.copy(alpha = .06f)))
                     }
                     Column(
@@ -1357,6 +1361,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         Spacer(Modifier.height(3.dp))
                         ExpressivePlayerControls(
                             playing = playing,
+                            loading = playbackLoading,
                             progress = sliderFraction,
                             accent = playerAccent,
                             animateShape = !lowPowerPlayer,
@@ -1365,22 +1370,29 @@ private fun decodeServerQrImage(value: String) = runCatching {
                             onPlayPause = { if (playing) vm.pausePlayback() else vm.resumePlayback() },
                             onNext = vm::skipNext,
                         )
-                        Row(
-                            Modifier.width(if (compactPlayer) 154.dp else 166.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                lyricTime(safePosition),
-                                color = Color.White.copy(alpha = .62f),
-                                fontSize = 9.sp,
-                                maxLines = 1,
-                            )
-                            Text(
-                                lyricTime(duration),
-                                color = Color.White.copy(alpha = .62f),
-                                fontSize = 9.sp,
-                                maxLines = 1,
-                            )
+                        Column(Modifier.width(if (compactPlayer) 160.dp else 174.dp)) {
+                            PlayerProgressBar(
+                                progress = sliderFraction,
+                                enabled = duration > 0L,
+                                accent = playerAccent,
+                            ) { fraction -> vm.seek((duration * fraction).toLong()) }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    lyricTime(safePosition),
+                                    color = Color.White.copy(alpha = .68f),
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    lyricTime(duration),
+                                    color = Color.White.copy(alpha = .68f),
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                )
+                            }
                         }
                         PlayerQuickActions(
                             liked = effectiveLiked,
@@ -1485,15 +1497,15 @@ private fun decodeServerQrImage(value: String) = runCatching {
 ) {
     val haptics = LocalHapticFeedback.current
     Row(
-        modifier = Modifier.width(154.dp).height(38.dp),
+        modifier = Modifier.width(144.dp).height(40.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PlayerQuickAction(Icons.AutoMirrored.Filled.QueueMusic, "播放队列", onQueue)
         Surface(
-            modifier = Modifier.width(58.dp).height(36.dp),
-            shape = RoundedCornerShape(18.dp),
-            color = if (liked) WatchLike.copy(alpha = .2f) else Color.White.copy(alpha = .11f),
+            modifier = Modifier.size(40.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = if (liked) WatchLike.copy(alpha = .24f) else Color.White.copy(alpha = .1f),
             contentColor = if (liked) WatchLike else Color.White,
             onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1504,7 +1516,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 Icon(
                     if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     if (liked) "取消喜欢" else "喜欢",
-                    Modifier.size(19.dp),
+                    Modifier.size(20.dp),
                 )
             }
         }
@@ -1518,21 +1530,69 @@ private fun decodeServerQrImage(value: String) = runCatching {
     onClick: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    Box(
-        Modifier.size(38.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable {
+    Surface(
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White.copy(alpha = .1f),
+        contentColor = Color.White,
+        onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
-            },
-        contentAlignment = Alignment.Center,
+        },
     ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(
                 icon,
                 contentDescription,
                 Modifier.size(20.dp),
                 tint = Color.White.copy(alpha = .9f),
             )
+        }
+    }
+}
+
+@Composable private fun PlayerProgressBar(
+    progress: Float,
+    enabled: Boolean,
+    accent: Color,
+    onSeek: (Float) -> Unit,
+) {
+    var widthPx by remember { mutableIntStateOf(0) }
+    Canvas(
+        Modifier.fillMaxWidth().height(15.dp)
+            .onSizeChanged { widthPx = it.width }
+            .pointerInput(enabled, widthPx) {
+                if (enabled && widthPx > 0) {
+                    detectTapGestures { offset ->
+                        onSeek((offset.x / widthPx).coerceIn(0f, 1f))
+                    }
+                }
+            },
+    ) {
+        val value = progress.coerceIn(0f, 1f)
+        val y = size.height / 2f
+        val stroke = 3.dp.toPx()
+        drawLine(
+            color = Color.White.copy(alpha = .2f),
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
+        if (value > 0f) {
+            drawLine(
+                color = accent,
+                start = Offset(0f, y),
+                end = Offset(size.width * value, y),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+        }
+        drawCircle(
+            color = if (enabled) accent else Color.White.copy(alpha = .36f),
+            radius = 3.5.dp.toPx(),
+            center = Offset(size.width * value, y),
+        )
     }
 }
 

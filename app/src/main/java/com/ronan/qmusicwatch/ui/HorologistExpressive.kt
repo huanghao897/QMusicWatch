@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -85,6 +86,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ExpressivePlayerControls(
     playing: Boolean,
+    loading: Boolean = false,
     progress: Float,
     accent: Color,
     animateShape: Boolean = true,
@@ -125,11 +127,13 @@ fun ExpressivePlayerControls(
             icon = Icons.Default.SkipPrevious,
             contentDescription = "上一首",
             size = previousSize,
+            accent = accent,
             interactionSource = previousInteraction,
             onClick = onPrevious,
         )
         ExpressivePlayPauseButton(
             playing = playing,
+            loading = loading,
             progress = progress,
             accent = accent,
             animateShape = animateShape,
@@ -141,6 +145,7 @@ fun ExpressivePlayerControls(
             icon = Icons.Default.SkipNext,
             contentDescription = "下一首",
             size = nextSize,
+            accent = accent,
             interactionSource = nextInteraction,
             onClick = onNext,
         )
@@ -152,14 +157,15 @@ private fun ExpressiveMediaButton(
     icon: ImageVector,
     contentDescription: String,
     size: androidx.compose.ui.unit.Dp,
+    accent: Color,
     interactionSource: MutableInteractionSource,
     onClick: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    Box(
+    Surface(
         modifier = Modifier
             .size(size)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -168,15 +174,20 @@ private fun ExpressiveMediaButton(
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             },
-        contentAlignment = Alignment.Center,
+        shape = RoundedCornerShape(16.dp),
+        color = accent.copy(alpha = .24f),
+        contentColor = WatchTextPrimary,
     ) {
-        Icon(icon, contentDescription, Modifier.size(23.dp), tint = WatchTextPrimary)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription, Modifier.size(23.dp), tint = WatchTextPrimary)
+        }
     }
 }
 
 @Composable
 private fun ExpressivePlayPauseButton(
     playing: Boolean,
+    loading: Boolean,
     progress: Float,
     accent: Color,
     animateShape: Boolean,
@@ -221,6 +232,7 @@ private fun ExpressivePlayPauseButton(
                     indication = null,
                     role = Role.Button,
                 ) {
+                    if (loading) return@clickable
                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onClick()
                 },
@@ -229,11 +241,19 @@ private fun ExpressivePlayPauseButton(
             contentColor = Color(0xFF24143C),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    if (playing) "暂停" else "播放",
-                    Modifier.size(27.dp),
-                )
+                if (loading) {
+                    CircularProgressIndicator(
+                        Modifier.size(22.dp),
+                        color = Color(0xFF24143C),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(
+                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (playing) "暂停" else "播放",
+                        Modifier.size(27.dp),
+                    )
+                }
             }
         }
     }

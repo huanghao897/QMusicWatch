@@ -15,6 +15,7 @@ import com.ronan.qmusicwatch.network.resolveQqStreamUrl
 import com.ronan.qmusicwatch.network.safeLocalOrArtworkUri
 import com.ronan.qmusicwatch.network.safeLocalOrQqMediaUri
 import com.ronan.qmusicwatch.network.shouldRefreshCredential
+import com.ronan.qmusicwatch.network.shouldProbePlaybackCredential
 import com.ronan.qmusicwatch.network.trustedQMusicArtworkUrl
 import com.ronan.qmusicwatch.network.trustedQMusicImageUrl
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
@@ -124,5 +125,12 @@ class QMusicGatewayTest {
         assertTrue(isCurrentStreamGeneration(captured = 4L, current = 4L))
         assertFalse(isCurrentStreamGeneration(captured = 4L, current = 5L))
         assertFalse(isCurrentStreamGeneration(captured = 4L, current = null))
+    }
+
+    @Test fun missingFirstStreamResultProbesCredentialsForEveryTrackTier() {
+        assertTrue(shouldProbePlaybackCredential(qualityIndex = 0, hasFallback = false, allowRecovery = true))
+        assertFalse(shouldProbePlaybackCredential(qualityIndex = 1, hasFallback = false, allowRecovery = true))
+        assertFalse(shouldProbePlaybackCredential(qualityIndex = 0, hasFallback = true, allowRecovery = true))
+        assertFalse(shouldProbePlaybackCredential(qualityIndex = 0, hasFallback = false, allowRecovery = false))
     }
 }
