@@ -60,6 +60,10 @@ class PlaybackFailureTest {
     @Test fun expiredSessionIsNotMisreportedAsEntitlement() {
         val failure = classifyPlaybackFailure(IllegalStateException("登录凭据已失效，请重新登录"))
         assertEquals(PlaybackFailureType.SESSION_EXPIRED, failure.type)
-        assertEquals("登录状态已失效，请重新登录", failure.message)
+        assertEquals("登录状态已失效，请重新扫码登录", failure.message)
+        assertEquals(
+            PlaybackFailureType.SESSION_EXPIRED,
+            classifyPlaybackFailure(IllegalStateException("登录状态已失效，请重新扫码登录一次")).type,
+        )
     }
 }

@@ -10,6 +10,7 @@ import com.ronan.qmusicwatch.network.qmusicAlbumArtworkUrl
 import com.ronan.qmusicwatch.network.qmusicAvatarUrl
 import com.ronan.qmusicwatch.network.qmusicSongArtworkUrl
 import com.ronan.qmusicwatch.network.qqReadRetryDelayMs
+import com.ronan.qmusicwatch.network.qqCredentialRefreshRequest
 import com.ronan.qmusicwatch.network.requiresNewQrLogin
 import com.ronan.qmusicwatch.network.resolveQqStreamUrl
 import com.ronan.qmusicwatch.network.safeLocalOrArtworkUri
@@ -21,6 +22,8 @@ import com.ronan.qmusicwatch.network.trustedQMusicImageUrl
 import com.ronan.qmusicwatch.network.trustedQMusicMediaUrl
 import com.ronan.qmusicwatch.network.validateRefreshedCookie
 import java.io.IOException
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -132,5 +135,28 @@ class QMusicGatewayTest {
         assertFalse(shouldProbePlaybackCredential(qualityIndex = 1, hasFallback = false, allowRecovery = true))
         assertFalse(shouldProbePlaybackCredential(qualityIndex = 0, hasFallback = true, allowRecovery = true))
         assertFalse(shouldProbePlaybackCredential(qualityIndex = 0, hasFallback = false, allowRecovery = false))
+    }
+
+    @Test fun qqCredentialRefreshUsesDesktopLoginContract() {
+        val request = qqCredentialRefreshRequest(
+            musicId = "12345",
+            musicKey = "music-key",
+            openId = "open-id",
+            accessToken = "access-token",
+            refreshToken = "refresh-token",
+            refreshKey = "refresh-key",
+            unionId = "union-id",
+            expiredAt = 1_800_000_000L,
+            guid = "1234567890",
+            wid = "9876543210",
+            deviceName = "QMusicWatch-TEST",
+        )
+        assertEquals(100497308, request.param["appid"]?.jsonPrimitive?.int)
+        assertEquals("Windows", request.param["deviceType"]?.jsonPrimitive?.content)
+        assertEquals("access-token", request.param["access_token"]?.jsonPrimitive?.content)
+        assertEquals(0, request.param["onlyNeedAccessToken"]?.jsonPrimitive?.int)
+        assertEquals("19", request.comm["ct"]?.jsonPrimitive?.content)
+        assertEquals(2, request.comm["tmeLoginType"]?.jsonPrimitive?.int)
+        assertEquals("9876543210", request.comm["wid"]?.jsonPrimitive?.content)
     }
 }

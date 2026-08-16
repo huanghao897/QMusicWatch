@@ -84,6 +84,80 @@ internal fun shouldProbePlaybackCredential(
     allowRecovery: Boolean,
 ): Boolean = qualityIndex == 0 && !hasFallback && allowRecovery
 
+internal data class QqCredentialRefreshRequest(
+    val comm: JsonObject,
+    val param: JsonObject,
+)
+
+internal fun qqCredentialRefreshRequest(
+    musicId: String,
+    musicKey: String,
+    openId: String,
+    accessToken: String,
+    refreshToken: String,
+    refreshKey: String,
+    unionId: String,
+    expiredAt: Long,
+    guid: String,
+    wid: String,
+    deviceName: String,
+): QqCredentialRefreshRequest {
+    val numericMusicId = musicId.toLongOrNull()?.takeIf { it > 0L }
+        ?: throw IllegalArgumentException("账号标识无效")
+    require(musicKey.isNotBlank() && openId.isNotBlank() && accessToken.isNotBlank() && refreshToken.isNotBlank()) {
+        "登录续期凭据不完整"
+    }
+    require(guid.isNotBlank() && wid.matches(Regex("\\d{1,20}")) && deviceName.isNotBlank()) {
+        "登录设备标识无效"
+    }
+    val expiry = expiredAt.coerceAtLeast(0L)
+    return QqCredentialRefreshRequest(
+        param = objOf(
+            "access_token" to accessToken,
+            "appid" to 100497308,
+            "deviceName" to deviceName,
+            "deviceType" to "Windows",
+            "expired_in" to expiry,
+            "forceRefreshToken" to 0,
+            "musicid" to numericMusicId,
+            "musickey" to musicKey,
+            "onlyNeedAccessToken" to 0,
+            "openid" to openId,
+            "refresh_key" to refreshKey,
+            "refresh_token" to refreshToken,
+        ),
+        comm = objOf(
+            "_channelid" to "0",
+            "_os_version" to "6.2.9200-2",
+            "authst" to musicKey,
+            "ct" to "19",
+            "cv" to "2192",
+            "guid" to guid,
+            "patch" to "118",
+            "psrf_access_token_expiresAt" to expiry,
+            "psrf_qqaccess_token" to accessToken,
+            "psrf_qqopenid" to openId,
+            "psrf_qqunionid" to unionId,
+            "tmeAppID" to "qqmusic",
+            "tmeLoginType" to 2,
+            "uin" to musicId,
+            "wid" to wid,
+        ),
+    )
+}
+
+private fun objOf(vararg entries: Pair<String, Any?>): JsonObject =
+    buildJsonObject { entries.forEach { (key, value) -> put(key, jsonValue(value)) } }
+
+private fun jsonValue(value: Any?): JsonElement = when (value) {
+    null -> JsonNull
+    is JsonElement -> value
+    is String -> JsonPrimitive(value)
+    is Number -> JsonPrimitive(value)
+    is Boolean -> JsonPrimitive(value)
+    else -> JsonPrimitive(value.toString())
+}
+
 private const val LOGIN_USER_INFO_MODULE = "music.UserInfo.userInfoServer"
 private const val LOGIN_CREDENTIAL_PROBE_METHOD = "GetLoginUserInfo"
 private const val MAX_QQ_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -612,9 +686,10 @@ internal fun qqMusicuPayload(
     module: String,
     method: String,
     param: JsonObject,
+    requestKey: String = "req_0",
 ): JsonObject = buildJsonObject {
     put("comm", comm)
-    putJsonObject("req_0") {
+    putJsonObject(requestKey) {
         put("module", module)
         put("method", method)
         put("param", param)
@@ -648,6 +723,10 @@ class ApiClient(
     @Volatile private var recentlyRefreshedAt = 0L
 
     private val guid = saved("guid") { (random.nextLong().ushr(1) % 10_000_000_000L).toString() }
+    private val refreshWid = saved("refresh_wid") { random.nextLong().ushr(1).toString() }
+    private val refreshDeviceName = saved("refresh_device_name") {
+        "QMusicWatch-${random.nextLong().ushr(1).toString(16).takeLast(8).uppercase()}"
+    }
 
     suspend fun refreshCredential(provider: String): Boolean = withContext(Dispatchers.IO) {
         require(provider in setOf("qq", "wechat")) { "不支持的登录方式" }
@@ -1191,11 +1270,13 @@ class ApiClient(
         requestCookie: String? = cookie(), tolerateBusinessError: Boolean = false,
         allowCredentialRefresh: Boolean = true,
         callTimeoutMs: Long? = null,
+        requestKey: String = "req_0",
+        formEncodedJson: Boolean = false,
     ): JsonObject {
-        val payload = qqMusicuPayload(comm, module, method, param)
+        val payload = qqMusicuPayload(comm, module, method, param, requestKey)
         val started = System.currentTimeMillis()
         val result = try {
-            musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs)
+            musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs, requestKey, formEncodedJson)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -1204,7 +1285,7 @@ class ApiClient(
                 AppLog.write("API", "$module/$method transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
                 Thread.sleep(delayMs)
                 try {
-                    musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs)
+                    musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs, requestKey, formEncodedJson)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (retryError: Throwable) {
@@ -1235,6 +1316,8 @@ class ApiClient(
                     tolerateBusinessError = tolerateBusinessError,
                     allowCredentialRefresh = false,
                     callTimeoutMs = callTimeoutMs,
+                    requestKey = requestKey,
+                    formEncodedJson = formEncodedJson,
                 )
             }
             throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
@@ -1255,16 +1338,22 @@ class ApiClient(
         requestCookie: String?,
         androidClient: Boolean,
         callTimeoutMs: Long?,
+        requestKey: String,
+        formEncodedJson: Boolean,
     ): JsonObject {
         val builder = Request.Builder()
             .url(QQ_MUSICU_URL)
-            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .post(payload.toString().toRequestBody(if (formEncodedJson) FORM_JSON_MEDIA else JSON_MEDIA))
             .header("Accept", "application/json")
             .header("Origin", "https://y.qq.com")
             .header("Referer", "https://y.qq.com/")
             .header(
                 "User-Agent",
-                if (androidClient) "QQMusic 20030508(android ${android.os.Build.VERSION.RELEASE})" else WEB_UA,
+                when {
+                    formEncodedJson -> PC_UA
+                    androidClient -> "QQMusic 20030508(android ${android.os.Build.VERSION.RELEASE})"
+                    else -> WEB_UA
+                },
             )
         requestCookie?.takeIf(String::isNotBlank)?.let { builder.header("Cookie", it) }
         val call = http.newCall(builder.build())
@@ -1280,9 +1369,10 @@ class ApiClient(
             }
             val root = runCatching { json.parseToJsonElement(body).jsonObject }
                 .getOrElse { throw QqResponseException("QQ 音乐响应格式无效", it) }
-            return (root["req_0"] as? JsonObject)
+            return (root[requestKey] as? JsonObject)
+                ?: (root["req_0"] as? JsonObject)
                 ?: (root["req"] as? JsonObject)
-                ?: throw QqResponseException("QQ 音乐响应缺少 req_0")
+                ?: throw QqResponseException("QQ 音乐响应缺少请求结果")
         }
     }
 
@@ -1414,18 +1504,24 @@ class ApiClient(
             if (!musicId.matches(Regex("\\d{1,24}")) || musicKey.isBlank() || refreshToken.isBlank() || openId.isBlank()) {
                 throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
             }
-            val param = if (provider == "qq") {
-                obj(
-                    "openid" to openId,
-                    "refresh_token" to refreshToken,
-                    "str_musicid" to musicId,
-                    "musickey" to musicKey,
-                    "unionid" to values["unionid"].orEmpty(),
-                    "refresh_key" to refreshKey,
-                    "loginMode" to 2,
+            val qqRequest = if (provider == "qq") {
+                qqCredentialRefreshRequest(
+                    musicId = musicId,
+                    musicKey = musicKey,
+                    openId = openId,
+                    accessToken = values["access_token"].orEmpty(),
+                    refreshToken = refreshToken,
+                    refreshKey = refreshKey,
+                    unionId = values["unionid"].orEmpty(),
+                    expiredAt = values["expired_at"]?.toLongOrNull() ?: 0L,
+                    guid = guid,
+                    wid = refreshWid,
+                    deviceName = refreshDeviceName,
                 )
             } else {
-                obj(
+                null
+            }
+            val param = qqRequest?.param ?: obj(
                     "openid" to openId,
                     "access_token" to values["access_token"].orEmpty(),
                     "refresh_token" to refreshToken,
@@ -1435,15 +1531,15 @@ class ApiClient(
                     "refresh_key" to refreshKey,
                     "loginMode" to 2,
                 )
-            }
-            val refreshComm = obj(
+            val refreshComm = qqRequest?.comm ?: obj(
                 "g_tk" to 5381,
                 "platform" to "yqq",
                 "ct" to 24,
                 "cv" to 0,
                 "tmeAppID" to "qqmusic",
-                "tmeLoginType" to (values["tmeLoginType"]?.toIntOrNull() ?: if (provider == "qq") 2 else 1),
+                "tmeLoginType" to if (provider == "qq") 2 else 1,
             )
+            AppLog.write("AUTH", "credential refresh contract=${if (qqRequest != null) "desktop" else "mobile"} provider=$provider")
             val data = try {
                 post(
                     refreshComm,
@@ -1452,6 +1548,8 @@ class ApiClient(
                     param,
                     requestCookie = null,
                     allowCredentialRefresh = false,
+                    requestKey = "QQRefreshKey",
+                    formEncodedJson = true,
                 )
             } catch (error: QqBusinessException) {
                 throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
@@ -1650,6 +1748,8 @@ class ApiClient(
     private fun requireLogin() { if (cookie().isNullOrBlank()) error("请先扫码登录") }
     companion object {
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+        private val FORM_JSON_MEDIA = "application/x-www-form-urlencoded; charset=utf-8".toMediaType()
         private const val WEB_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
+        private const val PC_UA = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
     }
 }

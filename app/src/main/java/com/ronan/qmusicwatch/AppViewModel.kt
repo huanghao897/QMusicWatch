@@ -408,7 +408,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val session = graph.controlPlane.createQrLogin(provider)
                 _state.update { it.copy(
-                    qrStatus = "请使用手机扫描二维码",
+                    qrStatus = if (provider == "qq") "使用 QQ 或 QQ音乐扫描" else "使用微信扫描",
                     qrImageBase64 = session.imageBase64,
                     qrMimeType = session.mimeType,
                     qrExpiresAt = session.expiresAt,
@@ -418,7 +418,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     val result = graph.controlPlane.pollQrLogin(session.id, provider)
                     AppLog.write("LOGIN", "server_qr provider=$provider status=${result.status}")
                     when (result.status) {
-                        "waiting" -> _state.update { it.copy(qrStatus = "请使用手机扫描二维码") }
+                        "waiting" -> _state.update { it.copy(qrStatus = if (provider == "qq") "使用 QQ 或 QQ音乐扫描" else "使用微信扫描") }
                         "scanned" -> _state.update { it.copy(qrStatus = "已扫码，请在手机确认") }
                         "complete" -> {
                             _state.update { it.copy(qrStatus = "已确认，正在完成登录…") }

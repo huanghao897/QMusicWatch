@@ -56,10 +56,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
@@ -440,7 +438,16 @@ class MainActivity : ComponentActivity() {
         FramePerformanceMonitor.section = backStack?.destination?.route ?: "home"
         onDispose { }
     }
-    LaunchedEffect(chrome.message) { chrome.message?.let { snackbar.showSnackbar(it); vm.consumeMessage() } }
+    LaunchedEffect(chrome.message) {
+        chrome.message?.let { message ->
+            vm.consumeMessage()
+            if (message.contains("重新扫码登录") && backStack?.destination?.route != "login") {
+                nav.navigate("login") { launchSingleTop = true }
+            } else {
+                snackbar.showSnackbar(message)
+            }
+        }
+    }
     LaunchedEffect(installLaunchError) {
         installLaunchError?.let {
             snackbar.showSnackbar(it)
@@ -773,8 +780,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable private fun LoginScreen(state: AppUiState, vm: AppViewModel, onSuccess: () -> Unit) {
     val dimensions = LocalWatchDimensions.current
-    var provider by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(state.qrStatus) { if (state.qrStatus == "登录成功") onSuccess() }
+    LaunchedEffect(Unit) { vm.startQrLogin("qq") }
+    DisposableEffect(Unit) { onDispose(vm::cancelQrLogin) }
     BoxWithConstraints(Modifier.fillMaxSize().padding(dimensions.screenPadding)) {
         if (!vm.featureEnabled("qrLogin")) {
             Column(
@@ -786,37 +794,22 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.height(6.dp))
                 Text(vm.featureMessage("qrLogin").ifBlank { "扫码登录暂时维护" }, color = WatchTextSecondary, fontSize = dimensions.bodySp.sp)
             }
-        } else if (provider == null) {
-            Column(
-                Modifier.fillMaxSize().padding(horizontal = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text("扫码登录", fontSize = dimensions.titleSp.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(10.dp))
-                WatchPrimaryButton("使用 QQ 扫码", Modifier.fillMaxWidth()) { provider = "qq" }
-                Spacer(Modifier.height(5.dp))
-                WatchPrimaryButton("使用微信扫码", Modifier.fillMaxWidth(), outlined = true) { provider = "wechat" }
-                Spacer(Modifier.height(7.dp))
-            }
         } else {
-            val selectedProvider = provider!!
-            val qrSide = minOf(maxWidth, (maxHeight - 38.dp).coerceAtLeast(1.dp), 320.dp)
-            LaunchedEffect(selectedProvider) { vm.startQrLogin(selectedProvider) }
-            DisposableEffect(selectedProvider) { onDispose(vm::cancelQrLogin) }
+            val qrSide = minOf(maxWidth, (maxHeight - 48.dp).coerceAtLeast(1.dp), 320.dp)
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically) {
-                    WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回登录方式", Modifier.size(32.dp)) { provider = null }
-                    Text(if (selectedProvider == "wechat") "微信登录" else "QQ 登录", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.size(30.dp), onClick = onSuccess)
+                    Spacer(Modifier.width(3.dp))
+                    Text("扫码登录", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    WatchIconButton(Icons.Default.Refresh, "刷新二维码", Modifier.size(32.dp)) { vm.startQrLogin(selectedProvider) }
+                    WatchIconButton(Icons.Default.Refresh, "刷新二维码", Modifier.size(32.dp)) { vm.startQrLogin("qq") }
                 }
                 ServerQrLogin(
                     imageBase64 = state.qrImageBase64,
                     modifier = Modifier.size(qrSide),
                 )
                 Text(
-                    state.qrStatus.ifBlank { "扫码后在手机确认" },
+                    if (state.qrStatus.isBlank()) "使用 QQ 或 QQ音乐扫描" else state.qrStatus,
                     color = if (state.qrStatus.startsWith("登录失败")) MaterialTheme.colorScheme.error else WatchTextSecondary,
                     fontSize = 10.sp,
                     maxLines = 1,
@@ -1370,29 +1363,22 @@ private fun decodeServerQrImage(value: String) = runCatching {
                             onPlayPause = { if (playing) vm.pausePlayback() else vm.resumePlayback() },
                             onNext = vm::skipNext,
                         )
-                        Column(Modifier.width(if (compactPlayer) 160.dp else 174.dp)) {
-                            PlayerProgressBar(
-                                progress = sliderFraction,
-                                enabled = duration > 0L,
-                                accent = playerAccent,
-                            ) { fraction -> vm.seek((duration * fraction).toLong()) }
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    lyricTime(safePosition),
-                                    color = Color.White.copy(alpha = .68f),
-                                    fontSize = 9.sp,
-                                    maxLines = 1,
-                                )
-                                Text(
-                                    lyricTime(duration),
-                                    color = Color.White.copy(alpha = .68f),
-                                    fontSize = 9.sp,
-                                    maxLines = 1,
-                                )
-                            }
+                        Row(
+                            Modifier.width(if (compactPlayer) 154.dp else 166.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                lyricTime(safePosition),
+                                color = Color.White.copy(alpha = .68f),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                            )
+                            Text(
+                                lyricTime(duration),
+                                color = Color.White.copy(alpha = .68f),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                            )
                         }
                         PlayerQuickActions(
                             liked = effectiveLiked,
@@ -1548,51 +1534,6 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 tint = Color.White.copy(alpha = .9f),
             )
         }
-    }
-}
-
-@Composable private fun PlayerProgressBar(
-    progress: Float,
-    enabled: Boolean,
-    accent: Color,
-    onSeek: (Float) -> Unit,
-) {
-    var widthPx by remember { mutableIntStateOf(0) }
-    Canvas(
-        Modifier.fillMaxWidth().height(15.dp)
-            .onSizeChanged { widthPx = it.width }
-            .pointerInput(enabled, widthPx) {
-                if (enabled && widthPx > 0) {
-                    detectTapGestures { offset ->
-                        onSeek((offset.x / widthPx).coerceIn(0f, 1f))
-                    }
-                }
-            },
-    ) {
-        val value = progress.coerceIn(0f, 1f)
-        val y = size.height / 2f
-        val stroke = 3.dp.toPx()
-        drawLine(
-            color = Color.White.copy(alpha = .2f),
-            start = Offset(0f, y),
-            end = Offset(size.width, y),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round,
-        )
-        if (value > 0f) {
-            drawLine(
-                color = accent,
-                start = Offset(0f, y),
-                end = Offset(size.width * value, y),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round,
-            )
-        }
-        drawCircle(
-            color = if (enabled) accent else Color.White.copy(alpha = .36f),
-            radius = 3.5.dp.toPx(),
-            center = Offset(size.width * value, y),
-        )
     }
 }
 
