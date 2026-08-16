@@ -41,6 +41,10 @@ class WatchDesignTest {
         assertTrue(round.screenPadding > square.screenPadding)
         assertTrue(round.topSafeInset > square.topSafeInset)
         assertEquals(square.trackRowHeight, round.trackRowHeight)
+        assertEquals(.64f, round.miniPlayerWidthFraction)
+        assertEquals(.125f, round.miniPlayerBottomInsetFraction)
+        assertEquals(1f, square.miniPlayerWidthFraction)
+        assertEquals(0f, square.miniPlayerBottomInsetFraction)
     }
 
     @Test fun storedUiSizeFallsBackToCompact() {

@@ -21,8 +21,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -264,12 +270,16 @@ fun WatchDialog(
     ) {
         BoxWithConstraints(
             Modifier.fillMaxSize().padding(dimensions.screenPadding),
-            contentAlignment = Alignment.BottomCenter,
+            contentAlignment = Alignment.Center,
         ) {
+            val horizontalInset = if (dimensions.isRound) maxWidth * .08f else 0.dp
+            val verticalInset = if (dimensions.isRound) maxHeight * .08f else 0.dp
             Surface(
-                modifier = modifier.fillMaxWidth().heightIn(max = maxHeight * .75f)
+                modifier = modifier.fillMaxWidth()
+                    .padding(horizontal = horizontalInset, vertical = verticalInset)
+                    .heightIn(max = maxHeight * if (dimensions.isRound) .78f else .82f)
                     .navigationBarsPadding().imePadding(),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(if (dimensions.isRound) 20.dp else 18.dp),
                 color = WatchSurfaceRaised,
                 tonalElevation = 0.dp,
             ) {
@@ -289,6 +299,104 @@ fun WatchDialog(
                         confirmButton()
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun WatchSelectionDialog(
+    title: String,
+    onDismissRequest: () -> Unit,
+    content: LazyListScope.() -> Unit,
+) {
+    val dimensions = LocalWatchDimensions.current
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        BoxWithConstraints(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .97f)),
+        ) {
+            val horizontalInset = if (dimensions.isRound) maxWidth * .12f else dimensions.screenPadding
+            val topInset = if (dimensions.isRound) maxHeight * .21f else 42.dp
+            val bottomInset = if (dimensions.isRound) maxHeight * .12f else 8.dp
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = horizontalInset,
+                    end = horizontalInset,
+                    top = topInset,
+                    bottom = bottomInset,
+                ),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                content = content,
+            )
+            Text(
+                text = title,
+                modifier = Modifier.align(Alignment.TopCenter)
+                    .padding(
+                        top = if (dimensions.isRound) maxHeight * .055f else 9.dp,
+                        start = 42.dp,
+                        end = 42.dp,
+                    ),
+                color = WatchTextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            WatchIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "返回",
+                modifier = Modifier.align(Alignment.TopStart)
+                    .padding(
+                        start = if (dimensions.isRound) maxWidth * .11f else 6.dp,
+                        top = if (dimensions.isRound) maxHeight * .07f else 5.dp,
+                    )
+                    .size(30.dp),
+                containerColor = WatchSurface.copy(alpha = .82f),
+                onClick = onDismissRequest,
+            )
+        }
+    }
+}
+
+@Composable
+fun WatchSelectionRow(
+    title: String,
+    selected: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().height(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) WatchTextPrimary.copy(alpha = .13f) else WatchSurface,
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                color = WatchTextPrimary.copy(alpha = if (enabled) 1f else .38f),
+                fontSize = 12.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (selected || !enabled) {
+                Icon(
+                    imageVector = if (selected) Icons.Default.Check else Icons.Default.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = WatchTextPrimary.copy(alpha = if (enabled) 1f else .38f),
+                )
             }
         }
     }
