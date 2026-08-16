@@ -383,7 +383,6 @@ class MainActivity : ComponentActivity() {
     val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
     val queueReversed by vm.queueReversed.collectAsStateWithLifecycle()
     val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
-    val artworkAccent by vm.artworkAccent.collectAsStateWithLifecycle()
     QMusicWatchTheme(uiSize = uiSize, pureBlack = pureBlack) {
     val appDimensions = LocalWatchDimensions.current
     var dismissedAnnouncements by remember { mutableStateOf(emptySet<String>()) }
@@ -540,7 +539,6 @@ class MainActivity : ComponentActivity() {
                     profileLoaded = pageState.profileLoaded,
                     playlists = writablePlaylists(pageState.library?.playlists.orEmpty()),
                     liked = pageState.library?.liked?.any { it.id == pageState.currentTrack?.id } == true,
-                    cachedArtworkAccent = artworkAccent,
                     openQueue = { nav.navigate("queue") },
                     onBack = { nav.popBackStack() },
                 )
@@ -1011,11 +1009,13 @@ private fun decodeServerQrImage(value: String) = runCatching {
     activeQuality: String,
     playbackLoading: Boolean,
     profile: UserProfile?, profileLoaded: Boolean, playlists: List<MusicCollection>, liked: Boolean,
-    cachedArtworkAccent: String,
     openQueue: () -> Unit, onBack: () -> Unit,
 ) {
     val dimensions = LocalWatchDimensions.current
-    if (track == null) return BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    if (track == null) return BoxWithConstraints(
+        Modifier.fillMaxSize().background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
         val horizontalInset = if (dimensions.isRound) maxWidth * .15f else 4.dp
         val verticalInset = if (dimensions.isRound) maxHeight * .15f else 4.dp
         WatchIconButton(
@@ -1047,9 +1047,6 @@ private fun decodeServerQrImage(value: String) = runCatching {
     var showModeDialog by remember(track.id) { mutableStateOf(false) }
     var showOptionsDialog by remember(track.id) { mutableStateOf(false) }
     val effectiveLiked = selectedLike ?: liked
-    val playerArtwork = safeLocalOrArtworkUri(track.artworkUrl)
-    val playerArtworkRequest = rememberArtworkImageRequest(playerArtwork, 256)
-    val artworkAccent = rememberArtworkAccent(playerArtwork, cachedArtworkAccent, vm::cacheArtworkAccent)
     val playerAccent = WatchAccent
     val centeredLyricIndex by remember(listState) {
         derivedStateOf {
@@ -1140,7 +1137,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             lyricChromeVisible = true
         }
     }
-    BoxWithConstraints(Modifier.fillMaxSize().focusRequester(focusRequester).focusable().onRotaryScrollEvent { event ->
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black).focusRequester(focusRequester).focusable().onRotaryScrollEvent { event ->
         if (!locked) {
             if (pager.currentPage == 0) vm.adjustVolume(if (event.verticalScrollPixels < 0) 1 else -1)
             else {
@@ -1284,36 +1281,25 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
                     val compactPlayer = maxWidth <= 280.dp
                     val playerStageSize = minOf(maxWidth, maxHeight, 288.dp)
-                    if (!lowPowerPlayer && playerArtwork.isNotBlank()) {
-                        AsyncImage(
-                            model = playerArtworkRequest,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().alpha(.36f),
-                            contentScale = ContentScale.Crop,
-                            filterQuality = FilterQuality.Low,
-                        )
-                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .52f)))
-                        Box(Modifier.fillMaxSize().background(artworkAccent.copy(alpha = .06f)))
-                    }
                     Column(
                         Modifier.align(Alignment.Center)
                             .size(playerStageSize)
                             .padding(
-                                horizontal = if (dimensions.isRound) 24.dp else 14.dp,
-                                vertical = if (compactPlayer) 15.dp else 18.dp,
+                                horizontal = if (dimensions.isRound) 22.dp else 14.dp,
+                                vertical = if (compactPlayer) 14.dp else 18.dp,
                             ),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.Center,
                     ) {
                         Column(
                             Modifier.fillMaxWidth()
-                                .padding(horizontal = if (dimensions.isRound) 12.dp else 22.dp),
+                                .padding(horizontal = if (dimensions.isRound) 15.dp else 22.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(1.dp),
                         ) {
                             Text(
                                 track.title,
-                                fontSize = if (compactPlayer) 16.sp else 18.sp,
+                                fontSize = if (compactPlayer) 17.sp else 18.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -1351,7 +1337,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         val safeDuration = duration.coerceAtLeast(1L)
                         val safePosition = position.coerceIn(0L, safeDuration)
                         val sliderFraction = (safePosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
-                        Spacer(Modifier.height(3.dp))
+                        Spacer(Modifier.height(if (compactPlayer) 9.dp else 11.dp))
                         ExpressivePlayerControls(
                             playing = playing,
                             loading = playbackLoading,
@@ -1380,6 +1366,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                 maxLines = 1,
                             )
                         }
+                        Spacer(Modifier.height(if (compactPlayer) 8.dp else 10.dp))
                         PlayerQuickActions(
                             liked = effectiveLiked,
                             onLike = {
@@ -1482,58 +1469,73 @@ private fun decodeServerQrImage(value: String) = runCatching {
     onMore: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    Row(
-        modifier = Modifier.width(144.dp).height(40.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        modifier = Modifier.width(146.dp).height(40.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White.copy(alpha = .08f),
+        contentColor = Color.White,
+        tonalElevation = 0.dp,
     ) {
-        PlayerQuickAction(Icons.AutoMirrored.Filled.QueueMusic, "播放队列", onQueue)
-        Surface(
-            modifier = Modifier.size(40.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = if (liked) WatchLike.copy(alpha = .24f) else Color.White.copy(alpha = .1f),
-            contentColor = if (liked) WatchLike else Color.White,
-            onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onLike()
-            },
+        Row(
+            Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            PlayerQuickAction(
+                Icons.AutoMirrored.Filled.QueueMusic,
+                "播放队列",
+                Modifier.weight(1f),
+                onQueue,
+            )
+            PlayerActionDivider()
+            Box(
+                Modifier.weight(1f).fillMaxHeight().clickable {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onLike()
+                },
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     if (liked) "取消喜欢" else "喜欢",
-                    Modifier.size(20.dp),
+                    Modifier.size(19.dp),
+                    tint = if (liked) WatchLike else Color.White.copy(alpha = .9f),
                 )
             }
+            PlayerActionDivider()
+            PlayerQuickAction(
+                Icons.Default.MoreVert,
+                "播放选项",
+                Modifier.weight(1f),
+                onMore,
+            )
         }
-        PlayerQuickAction(Icons.Default.MoreVert, "播放选项", onMore)
     }
 }
+
+@Composable private fun PlayerActionDivider() = Box(
+    Modifier.width(1.dp).height(17.dp).background(Color.White.copy(alpha = .12f)),
+)
 
 @Composable private fun PlayerQuickAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    Surface(
-        modifier = Modifier.size(40.dp),
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White.copy(alpha = .1f),
-        contentColor = Color.White,
-        onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
+    Box(
+        modifier = modifier.fillMaxHeight().clickable {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
         },
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
-                icon,
-                contentDescription,
-                Modifier.size(20.dp),
-                tint = Color.White.copy(alpha = .9f),
-            )
-        }
+        Icon(
+            icon,
+            contentDescription,
+            Modifier.size(19.dp),
+            tint = Color.White.copy(alpha = .9f),
+        )
     }
 }
 
@@ -2422,12 +2424,10 @@ private fun formatFileSize(bytes: Long): String = when {
     val dimensions = LocalWatchDimensions.current
     val artworkRequest = rememberArtworkImageRequest(track.artworkUrl, 96)
     var position by remember(track.id) { mutableLongStateOf(0L) }
-    var duration by remember(track.id) { mutableLongStateOf(0L) }
     var playing by remember(track.id) { mutableStateOf(false) }
     LaunchedEffect(track.id) {
         while (isActive) {
             position = vm.playbackPosition()
-            duration = vm.playbackDuration()
             playing = vm.isPlaying()
             delay(350)
         }
@@ -2436,78 +2436,68 @@ private fun formatFileSize(bytes: Long): String = when {
         ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
         ?: lyrics.indexOfFirst { it.text.isNotBlank() }
     val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() } ?: "正在播放"
-    val progress = if (duration > 0L) {
-        (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         val round = dimensions.isRound
         val miniModifier = if (round) {
-            Modifier.padding(bottom = maxWidth * dimensions.miniPlayerBottomInsetFraction)
-                .width(maxWidth * dimensions.miniPlayerWidthFraction)
-                .height(40.dp)
+            Modifier.width(maxWidth * dimensions.miniPlayerWidthFraction)
+                .height(dimensions.miniPlayerHeight)
         } else {
-            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp)
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp)
                 .height(dimensions.miniPlayerHeight)
         }
         Surface(
             modifier = miniModifier,
-            shape = RoundedCornerShape(50),
+            shape = if (round) RoundedCornerShape(
+                topStart = dimensions.miniPlayerHeight * .5f,
+                topEnd = dimensions.miniPlayerHeight * .5f,
+                bottomStart = 4.dp,
+                bottomEnd = 4.dp,
+            ) else RoundedCornerShape(50),
             color = WatchSurfaceRaised,
             tonalElevation = 0.dp,
         ) {
-            Box(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier.fillMaxSize()
-                        .padding(start = if (round) 5.dp else 6.dp, end = 1.dp, bottom = 2.dp)
-                        .clickable(onClick = open),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AsyncImage(
-                        model = artworkRequest,
-                        contentDescription = "当前歌曲封面",
-                        modifier = Modifier.size(if (round) 28.dp else dimensions.artworkSize)
-                            .clip(CircleShape).background(WatchSurface),
-                        contentScale = ContentScale.Crop,
+            Row(
+                Modifier.fillMaxSize()
+                    .clickable(onClick = open)
+                    .padding(
+                        start = if (round) 12.dp else 6.dp,
+                        end = if (round) 9.dp else 1.dp,
+                        top = if (round) 5.dp else 2.dp,
+                        bottom = if (round) dimensions.miniPlayerHeight * .22f else 2.dp,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AsyncImage(
+                    model = artworkRequest,
+                    contentDescription = "当前歌曲封面",
+                    modifier = Modifier.size(if (round) 29.dp else dimensions.artworkSize)
+                        .clip(CircleShape).background(WatchSurface),
+                    contentScale = ContentScale.Crop,
+                )
+                Spacer(Modifier.width(if (round) 6.dp else 7.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                    Text(
+                        track.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = if (round) 10.5.sp else dimensions.bodySp.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                    Spacer(Modifier.width(if (round) 5.dp else 7.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                        Text(
-                            track.title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = if (round) 10.5.sp else dimensions.bodySp.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            preview,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = WatchTextSecondary,
-                            fontSize = if (round) 8.5.sp else dimensions.secondarySp.sp,
-                        )
-                    }
-                    WatchIconButton(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        if (playing) "暂停" else "播放",
-                        modifier = Modifier.size(if (round) 30.dp else dimensions.touchTarget),
-                        containerColor = Color.Transparent,
-                    ) {
-                        if (playing) vm.pausePlayback() else vm.resumePlayback()
-                    }
+                    Text(
+                        preview,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = WatchTextSecondary,
+                        fontSize = if (round) 8.5.sp else dimensions.secondarySp.sp,
+                    )
                 }
-                Box(
-                    Modifier.align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(WatchDivider),
+                WatchIconButton(
+                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (playing) "暂停" else "播放",
+                    modifier = Modifier.size(if (round) 31.dp else dimensions.touchTarget),
+                    containerColor = Color.Transparent,
                 ) {
-                    Box(
-                        Modifier.fillMaxHeight()
-                            .fillMaxWidth(progress)
-                            .background(WatchAccent),
-                    )
+                    if (playing) vm.pausePlayback() else vm.resumePlayback()
                 }
             }
         }
