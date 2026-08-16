@@ -36,7 +36,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -99,26 +99,26 @@ fun ExpressivePlayerControls(
     val previousPressed by previousInteraction.collectIsPressedAsState()
     val playPressed by playInteraction.collectIsPressedAsState()
     val nextPressed by nextInteraction.collectIsPressedAsState()
-    val sideBase = 52.dp
-    val centerBase = 66.dp
+    val sideBase = 42.dp
+    val centerBase = 58.dp
     val previousSize by animateDpAsState(
-        if (previousPressed) 58.dp else if (playPressed) 48.dp else sideBase,
+        if (previousPressed) 46.dp else if (playPressed) 40.dp else sideBase,
         tween(180, easing = FastOutSlowInEasing),
         label = "previousButtonSize",
     )
     val centerSize by animateDpAsState(
-        if (playPressed) 72.dp else if (previousPressed || nextPressed) 62.dp else centerBase,
+        if (playPressed) 62.dp else if (previousPressed || nextPressed) 56.dp else centerBase,
         tween(180, easing = FastOutSlowInEasing),
         label = "playButtonSize",
     )
     val nextSize by animateDpAsState(
-        if (nextPressed) 58.dp else if (playPressed) 48.dp else sideBase,
+        if (nextPressed) 46.dp else if (playPressed) 40.dp else sideBase,
         tween(180, easing = FastOutSlowInEasing),
         label = "nextButtonSize",
     )
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ExpressiveMediaButton(
@@ -156,10 +156,10 @@ private fun ExpressiveMediaButton(
     onClick: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    Surface(
+    Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -168,13 +168,9 @@ private fun ExpressiveMediaButton(
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             },
-        shape = CircleShape,
-        color = WatchSurfaceRaised,
-        contentColor = WatchTextPrimary,
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription, Modifier.size(24.dp))
-        }
+        Icon(icon, contentDescription, Modifier.size(23.dp), tint = WatchTextPrimary)
     }
 }
 
@@ -236,7 +232,7 @@ private fun ExpressivePlayPauseButton(
                 Icon(
                     if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                     if (playing) "暂停" else "播放",
-                    Modifier.size(30.dp),
+                    Modifier.size(27.dp),
                 )
             }
         }

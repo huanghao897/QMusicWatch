@@ -1048,6 +1048,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     var showPlaylistDialog by remember(track.id) { mutableStateOf(false) }
     var showQualityDialog by remember(track.id) { mutableStateOf(false) }
     var showModeDialog by remember(track.id) { mutableStateOf(false) }
+    var showOptionsDialog by remember(track.id) { mutableStateOf(false) }
     val effectiveLiked = selectedLike ?: liked
     val playerArtwork = safeLocalOrArtworkUri(track.artworkUrl)
     val playerArtworkRequest = rememberArtworkImageRequest(playerArtwork, 256)
@@ -1285,34 +1286,37 @@ private fun decodeServerQrImage(value: String) = runCatching {
             } else {
                 BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
                     val compactPlayer = maxWidth <= 280.dp
+                    val playerStageSize = minOf(maxWidth, maxHeight)
                     if (!lowPowerPlayer && playerArtwork.isNotBlank()) {
                         AsyncImage(
                             model = playerArtworkRequest,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize().alpha(.1f),
+                            modifier = Modifier.fillMaxSize().alpha(.42f),
                             contentScale = ContentScale.Crop,
                             filterQuality = FilterQuality.Low,
                         )
-                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .72f)))
-                        Box(Modifier.fillMaxSize().background(artworkAccent.copy(alpha = .05f)))
+                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .48f)))
+                        Box(Modifier.fillMaxSize().background(artworkAccent.copy(alpha = .06f)))
                     }
                     Column(
-                        Modifier.fillMaxSize().padding(
-                            horizontal = if (dimensions.isRound) 16.dp else 9.dp,
-                            vertical = 8.dp,
-                        ),
+                        Modifier.align(Alignment.Center)
+                            .size(playerStageSize)
+                            .padding(
+                                horizontal = if (dimensions.isRound) 24.dp else 14.dp,
+                                vertical = if (compactPlayer) 15.dp else 18.dp,
+                            ),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
+                        verticalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Column(
-                            Modifier.fillMaxWidth().height(if (compactPlayer) 58.dp else 66.dp)
-                                .padding(horizontal = 34.dp),
+                            Modifier.fillMaxWidth()
+                                .padding(horizontal = if (dimensions.isRound) 12.dp else 22.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
+                            verticalArrangement = Arrangement.spacedBy(1.dp),
                         ) {
                             Text(
                                 track.title,
-                                fontSize = if (compactPlayer) 15.sp else 17.sp,
+                                fontSize = if (compactPlayer) 16.sp else 18.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -1321,8 +1325,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
                             )
                             Text(
                                 track.artists.joinToString(" / "),
-                                color = WatchTextSecondary,
-                                fontSize = if (compactPlayer) 10.5.sp else 12.sp,
+                                color = Color.White.copy(alpha = .68f),
+                                fontSize = if (compactPlayer) 10.sp else 11.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.fillMaxWidth(),
@@ -1335,14 +1339,14 @@ private fun decodeServerQrImage(value: String) = runCatching {
                             AnimatedContent(
                                 targetState = preview.orEmpty(),
                                 transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
-                                modifier = Modifier.fillMaxWidth().height(16.dp),
+                                modifier = Modifier.fillMaxWidth().height(18.dp),
                                 label = "playerLyricPreview",
                             ) { line ->
                                 if (line.isNotBlank()) SingleLineLyricText(
                                     line,
                                     Modifier.fillMaxWidth(),
-                                    if (compactPlayer) 9.5f else 10.5f,
-                                    WatchTextPrimary.copy(alpha = .7f),
+                                    if (compactPlayer) 9.5f else 10f,
+                                    Color.White.copy(alpha = .54f),
                                     centered = true,
                                 ) else Spacer(Modifier.height(1.dp))
                             }
@@ -1356,17 +1360,30 @@ private fun decodeServerQrImage(value: String) = runCatching {
                             progress = sliderFraction,
                             accent = playerAccent,
                             animateShape = !lowPowerPlayer,
-                            modifier = Modifier.height(72.dp),
+                            modifier = Modifier.height(if (compactPlayer) 62.dp else 66.dp),
                             onPrevious = vm::skipPrevious,
                             onPlayPause = { if (playing) vm.pausePlayback() else vm.resumePlayback() },
                             onNext = vm::skipNext,
                         )
-                        Spacer(Modifier.height(if (compactPlayer) 7.dp else 10.dp))
-                        PlayerActionStrip(
+                        Row(
+                            Modifier.width(if (compactPlayer) 154.dp else 166.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                lyricTime(safePosition),
+                                color = Color.White.copy(alpha = .62f),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                            )
+                            Text(
+                                lyricTime(duration),
+                                color = Color.White.copy(alpha = .62f),
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                            )
+                        }
+                        PlayerQuickActions(
                             liked = effectiveLiked,
-                            qualityLabel = qualityShortLabel(activeQuality),
-                            playMode = playMode,
-                            compact = compactPlayer,
                             onLike = {
                                 if (!likePending) {
                                     val target = !effectiveLiked
@@ -1378,10 +1395,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                     }
                                 }
                             },
-                            onAddToPlaylist = { showPlaylistDialog = true },
-                            onQuality = { showQualityDialog = true },
-                            onPlayMode = { showModeDialog = true },
                             onQueue = openQueue,
+                            onMore = { showOptionsDialog = true },
                         )
                     }
                 }
@@ -1398,7 +1413,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 "返回",
                 Modifier.padding(start = horizontalControlInset, top = verticalControlInset)
                     .size(if (pager.currentPage == 1) 28.dp else 30.dp),
-                containerColor = Color.Black.copy(alpha = .5f),
+                containerColor = Color.Transparent,
                 onClick = onBack,
             )
         }
@@ -1441,90 +1456,108 @@ private fun decodeServerQrImage(value: String) = runCatching {
     if (showPlaylistDialog) PlayerPlaylistDialog(track, playlists, vm) { showPlaylistDialog = false }
     if (showQualityDialog) QualityDialog(track, quality, activeQuality, profile, vm) { showQualityDialog = false }
     if (showModeDialog) PlayModeDialog(playMode, vm) { showModeDialog = false }
+    if (showOptionsDialog) PlayerOptionsDialog(
+        qualityLabel = qualityShortLabel(
+            activeQuality.takeUnless { it == QUALITY_LEGACY_UNKNOWN }.orEmpty().ifBlank { quality },
+        ),
+        playMode = playMode,
+        onPlaylist = {
+            showOptionsDialog = false
+            showPlaylistDialog = true
+        },
+        onQuality = {
+            showOptionsDialog = false
+            showQualityDialog = true
+        },
+        onPlayMode = {
+            showOptionsDialog = false
+            showModeDialog = true
+        },
+        onDismiss = { showOptionsDialog = false },
+    )
 }
 
-@Composable private fun PlayerActionStrip(
+@Composable private fun PlayerQuickActions(
     liked: Boolean,
-    qualityLabel: String,
-    playMode: String,
-    compact: Boolean = false,
     onLike: () -> Unit,
-    onAddToPlaylist: () -> Unit,
-    onQuality: () -> Unit,
-    onPlayMode: () -> Unit,
     onQueue: () -> Unit,
+    onMore: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.width(if (compact) 174.dp else 188.dp).height(34.dp),
-        shape = RoundedCornerShape(14.dp),
-        color = WatchSurfaceRaised,
-        tonalElevation = 0.dp,
+    val haptics = LocalHapticFeedback.current
+    Row(
+        modifier = Modifier.width(154.dp).height(38.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            PlayerStripAction(
-                icon = if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = if (liked) "取消喜欢" else "喜欢",
-                selected = liked,
-                selectedTint = WatchLike,
-                onClick = onLike,
-            )
-            PlayerStripDivider()
-            PlayerStripAction(Icons.AutoMirrored.Filled.PlaylistAdd, "加入歌单", onClick = onAddToPlaylist)
-            PlayerStripDivider()
-            PlayerStripAction(
-                icon = null,
-                contentDescription = "音质 $qualityLabel",
-                label = qualityLabel,
-                onClick = onQuality,
-            )
-            PlayerStripDivider()
-            PlayerStripAction(
-                icon = playModeIcon(playMode),
-                contentDescription = playModeName(playMode),
-                selected = playMode != "sequential",
-                onClick = onPlayMode,
-            )
-            PlayerStripDivider()
-            PlayerStripAction(Icons.AutoMirrored.Filled.QueueMusic, "播放队列", onClick = onQueue)
+        PlayerQuickAction(Icons.AutoMirrored.Filled.QueueMusic, "播放队列", onQueue)
+        Surface(
+            modifier = Modifier.width(58.dp).height(36.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = if (liked) WatchLike.copy(alpha = .2f) else Color.White.copy(alpha = .11f),
+            contentColor = if (liked) WatchLike else Color.White,
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onLike()
+            },
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    if (liked) "取消喜欢" else "喜欢",
+                    Modifier.size(19.dp),
+                )
+            }
         }
+        PlayerQuickAction(Icons.Default.MoreVert, "播放选项", onMore)
     }
 }
 
-@Composable private fun RowScope.PlayerStripAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+@Composable private fun PlayerQuickAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
-    label: String? = null,
-    selected: Boolean = false,
-    selectedTint: Color = WatchAccent,
     onClick: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     Box(
-        Modifier.weight(1f).fillMaxHeight()
-            .background(if (selected) WatchTextPrimary.copy(alpha = .08f) else Color.Transparent)
-            .clickable(onClick = onClick),
+        Modifier.size(38.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
-        if (icon != null) {
             Icon(
                 icon,
                 contentDescription,
-                Modifier.size(17.dp),
-                tint = if (selected) selectedTint else WatchTextPrimary,
+                Modifier.size(20.dp),
+                tint = Color.White.copy(alpha = .9f),
             )
-        } else {
-            Text(
-                label.orEmpty(),
-                color = WatchTextPrimary,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-            )
-        }
     }
 }
 
-@Composable private fun RowScope.PlayerStripDivider() {
-    Box(Modifier.width(1.dp).height(16.dp).background(WatchDivider))
+@Composable private fun PlayerOptionsDialog(
+    qualityLabel: String,
+    playMode: String,
+    onPlaylist: () -> Unit,
+    onQuality: () -> Unit,
+    onPlayMode: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    WatchSelectionDialog(
+        title = "播放选项",
+        onDismissRequest = onDismiss,
+    ) {
+        item {
+            WatchSelectionRow("加入歌单", selected = false, onClick = onPlaylist)
+        }
+        item {
+            WatchSelectionRow("音质 · $qualityLabel", selected = false, onClick = onQuality)
+        }
+        item {
+            WatchSelectionRow("播放顺序 · ${playModeName(playMode)}", selected = false, onClick = onPlayMode)
+        }
+    }
 }
 
 @Composable private fun QualityDialog(
