@@ -2200,16 +2200,32 @@ private fun formatFileSize(bytes: Long): String = when {
                 indexed.value.track.artists.any { artist -> artist.contains(query, true) }
         }
     }
-    Column(Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding)) {
-        Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
-            WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.size(34.dp), onClick = onBack)
-            Text("播放列表", Modifier.weight(1f), fontSize = dimensions.titleSp.sp, fontWeight = FontWeight.Bold)
+    val queueRowHeight = (dimensions.trackRowHeight - 4.dp).coerceAtLeast(40.dp)
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().height(30.dp), verticalAlignment = Alignment.CenterVertically) {
             WatchIconButton(
-                if (reversed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                if (reversed) "倒序" else "正序",
-                onClick = vm::reverseQueue,
+                Icons.AutoMirrored.Filled.ArrowBack,
+                "返回",
+                buttonSize = 30.dp,
+                onClick = onBack,
             )
-            WatchIconButton(Icons.Default.MoreVert, "播放列表操作") { queueMenu = true }
+            Text(
+                "播放列表 · ${workingEntries.size}",
+                Modifier.weight(1f).padding(horizontal = 4.dp),
+                fontSize = (dimensions.bodySp + 2f).sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            WatchIconButton(
+                Icons.Default.MoreVert,
+                "播放列表操作",
+                buttonSize = 30.dp,
+                onClick = { queueMenu = true },
+            )
         }
         WatchSearchField(
             query,
@@ -2217,18 +2233,13 @@ private fun formatFileSize(bytes: Long): String = when {
             "筛选播放列表",
             Modifier.fillMaxWidth(),
             leadingIcon = Icons.Default.Search,
-        )
-        Text(
-            "${workingEntries.size} 首",
-            color = WatchTextSecondary,
-            fontSize = dimensions.secondarySp.sp,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            heightOverride = 34.dp,
         )
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
             state = listState,
-            contentPadding = PaddingValues(bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            contentPadding = PaddingValues(top = 1.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             if (workingEntries.isEmpty()) item {
                 Box(
@@ -2256,7 +2267,7 @@ private fun formatFileSize(bytes: Long): String = when {
                         label = "queueElevation",
                     )
                     val handleModifier = if (query.isBlank()) {
-                        Modifier.draggableHandle(
+                        Modifier.longPressDraggableHandle(
                             onDragStarted = {
                                 dragInProgress = true
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -2277,7 +2288,7 @@ private fun formatFileSize(bytes: Long): String = when {
                                 placementSpec = tween(160),
                                 fadeOutSpec = null,
                             )
-                            .height(dimensions.trackRowHeight),
+                            .height(queueRowHeight),
                         shape = RoundedCornerShape(dimensions.rowCornerRadius),
                         color = if (track.id == currentTrackId) {
                             WatchAccent.copy(alpha = .12f)
@@ -2332,13 +2343,13 @@ private fun formatFileSize(bytes: Long): String = when {
                             Icon(
                                 Icons.Default.DragHandle,
                                 if (query.isBlank()) "拖动排序" else "筛选时不可排序",
-                                Modifier.size(36.dp).then(handleModifier).padding(8.dp),
+                                Modifier.size(30.dp).then(handleModifier).padding(7.dp),
                                 tint = WatchTextSecondary,
                             )
                             WatchIconButton(
                                 Icons.Default.RemoveCircleOutline,
                                 "移除",
-                                Modifier.size(36.dp),
+                                buttonSize = 30.dp,
                             ) {
                                 workingEntries.indexOfFirst { it.stableKey == entry.stableKey }
                                     .takeIf { it >= 0 }
@@ -2355,6 +2366,10 @@ private fun formatFileSize(bytes: Long): String = when {
         title = { Text("播放列表操作", fontWeight = FontWeight.Bold) },
         text = {
             Column {
+                WatchActionRow(
+                    if (reversed) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                    if (reversed) "切换为正序" else "切换为倒序",
+                ) { vm.reverseQueue(); queueMenu = false }
                 WatchActionRow(Icons.Default.Download, "缓存全部") { vm.cacheAll(queue, "当前播放列表"); queueMenu = false }
                 WatchActionRow(Icons.Default.LibraryAdd, "选歌添加") { vm.clearQueueImport(); importDialog = true; queueMenu = false }
                 WatchActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "保存为歌单") { saveDialog = true; queueMenu = false }

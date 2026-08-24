@@ -49,6 +49,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -66,13 +67,14 @@ fun WatchIconButton(
     tint: Color = WatchTextPrimary,
     containerColor: Color = WatchSurfaceRaised,
     onLongClick: (() -> Unit)? = null,
+    buttonSize: Dp? = null,
     onClick: () -> Unit,
 ) {
     val dimensions = LocalWatchDimensions.current
     val haptics = LocalHapticFeedback.current
     Box(
         modifier = modifier
-            .size(dimensions.touchTarget)
+            .size(buttonSize ?: dimensions.touchTarget)
             .clip(CircleShape)
             .background(containerColor, CircleShape)
             .combinedClickable(
@@ -98,11 +100,12 @@ fun WatchSearchField(
     leadingIcon: ImageVector? = null,
     trailingIcon: ImageVector? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    heightOverride: Dp? = null,
     onSearch: () -> Unit = {},
 ) {
     val dimensions = LocalWatchDimensions.current
     Surface(
-        modifier = modifier.height(dimensions.searchHeight),
+        modifier = modifier.height(heightOverride ?: dimensions.searchHeight),
         shape = RoundedCornerShape(dimensions.searchCornerRadius),
         color = WatchSurface,
     ) {
