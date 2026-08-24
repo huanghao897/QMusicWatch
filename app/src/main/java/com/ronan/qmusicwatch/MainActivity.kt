@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
@@ -102,9 +103,11 @@ import com.ronan.qmusicwatch.network.*
 import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
 import com.ronan.qmusicwatch.ui.*
 import com.ronan.qmusicwatch.update.UpdateInstaller
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import java.io.File
 import sh.calvin.reorderable.ReorderableItem
@@ -187,12 +190,11 @@ internal fun lyricProgressBand(progress: Float, feather: Float = .018f): Pair<Fl
         ).size.width.toFloat()
     }
     val fontSizeSp = fitSingleLineFontSp(requestedFontSp, measuredWidthPx, availableWidthPx)
-    // The player clock is sampled every 100 ms (500 ms in low-power mode).
     // Let the tween span the sampling window so the highlight keeps moving
     // between samples instead of stopping briefly after every update.
     val smoothProgress by animateFloatAsState(
         targetValue = renderProgress?.coerceIn(0f, 1f) ?: 0f,
-        animationSpec = tween(if (lowPower) 520 else 130, easing = LinearEasing),
+        animationSpec = tween(if (lowPower) 1_050 else 230, easing = LinearEasing),
         label = "lyricRender",
     )
     // Keep the measured text layout stable while the active line grows. A
@@ -379,10 +381,6 @@ class MainActivity : ComponentActivity() {
     val dailyCount by vm.dailyCount.collectAsStateWithLifecycle()
     val searchHistory by vm.searchHistory.collectAsStateWithLifecycle()
     val seenAnnouncements by vm.seenAnnouncements.collectAsStateWithLifecycle()
-    val queue by vm.queue.collectAsStateWithLifecycle()
-    val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
-    val queueReversed by vm.queueReversed.collectAsStateWithLifecycle()
-    val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
     QMusicWatchTheme(uiSize = uiSize, pureBlack = pureBlack) {
     val appDimensions = LocalWatchDimensions.current
     var dismissedAnnouncements by remember { mutableStateOf(emptySet<String>()) }
@@ -543,11 +541,24 @@ class MainActivity : ComponentActivity() {
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable("queue") { val pageState by vm.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { if (vm.signedIn) vm.loadLibrary() }; QueueScreen(queue, queueIndex, queueReversed, pageState, vm) { nav.popBackStack() } }
+            composable("queue") {
+                val pageState by vm.state.collectAsStateWithLifecycle()
+                // Collected here, not at the root: queue swaps fire on every track
+                // change and previously recomposed the whole NavHost + dialogs.
+                val queue by vm.queue.collectAsStateWithLifecycle()
+                val queueIndex by vm.queueIndex.collectAsStateWithLifecycle()
+                val queueReversed by vm.queueReversed.collectAsStateWithLifecycle()
+                LaunchedEffect(Unit) { if (vm.signedIn) vm.loadLibrary() }
+                QueueScreen(queue, queueIndex, queueReversed, pageState, vm) { nav.popBackStack() }
+            }
             composable("detail") { val pageState by vm.state.collectAsStateWithLifecycle(); DetailScreen(pageState.detail, pageState.detailDirectoryId, pageState.detailLoading, pageState.detailError, writablePlaylists(pageState.library?.playlists.orEmpty()), vm) { nav.popBackStack() } }
             composable("settings") { SettingsCenter(nav) { nav.popBackStack() } }
             composable("settings/display") { DisplaySettingsScreen(vm, uiSize, lyricSize, lyricOriginal, lyricTranslation, lyricOffset, lyricAnimation, lyricAlignment, pureBlack, lowPowerPlayer) { nav.popBackStack() } }
-            composable("settings/playback") { val pageState by vm.state.collectAsStateWithLifecycle(); PlaybackSettingsScreen(vm, quality, pageState.profile, pageState.profileLoaded, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() } }
+            composable("settings/playback") {
+                val pageState by vm.state.collectAsStateWithLifecycle()
+                val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
+                PlaybackSettingsScreen(vm, quality, pageState.profile, pageState.profileLoaded, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() }
+            }
             composable("settings/network") {
                 val pageState by vm.state.collectAsStateWithLifecycle()
                 NetworkSettingsScreen(vm, dailyCount, pageState, onAnnouncements = { nav.navigate("settings/announcements") }, onRelogin = {
@@ -820,12 +831,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun ServerQrLogin(imageBase64: String, modifier: Modifier = Modifier) {
-    val image = remember(imageBase64) { decodeServerQrImage(imageBase64) }
+    // Decode off the main thread: a server-supplied image up to 1024x1024 is a
+    // multi-megabyte Base64+BitmapFactory job that visibly stalls composition.
+    var image by remember(imageBase64) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(imageBase64) {
+        image = withContext(Dispatchers.Default) { decodeServerQrImage(imageBase64) }
+    }
     Surface(modifier, shape = RoundedCornerShape(0.dp), color = Color.Transparent) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (image != null) {
                 Image(
-                    bitmap = image,
+                    bitmap = image!!,
                     contentDescription = "登录二维码",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.FillBounds,
@@ -843,8 +859,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
     val bytes = Base64.decode(value, Base64.DEFAULT)
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    require(bounds.outWidth in 32..2_048 && bounds.outHeight in 32..2_048)
-    require(bounds.outWidth.toLong() * bounds.outHeight <= 4_194_304L)
+    require(bounds.outWidth in 32..1_024 && bounds.outHeight in 32..1_024)
+    require(bounds.outWidth.toLong() * bounds.outHeight <= 1_048_576L)
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() ?: error("二维码图片无法解码")
 }.getOrNull()
 
@@ -1081,7 +1097,17 @@ private fun decodeServerQrImage(value: String) = runCatching {
         onDispose { view.keepScreenOn = previous }
     }
     LaunchedEffect(Unit) { delay(100); focusRequester.requestFocus() }
-    LaunchedEffect(track.id, lowPowerPlayer) { var ticks = 0; val interval = if (lowPowerPlayer) 500L else 100L; while (true) { position = vm.playbackPosition(); duration = vm.playbackDuration(); playing = vm.isPlaying(); if (++ticks * interval >= 10_000) { ticks = 0; vm.savePlaybackState() }; delay(interval) } }
+    LaunchedEffect(track.id, lowPowerPlayer) {
+        var elapsed = 0L
+        val interval = if (lowPowerPlayer) 1_000L else 200L
+        while (true) {
+            val (playingNow, positionNow, durationNow) = vm.playbackSnapshot()
+            position = positionNow; duration = durationNow; playing = playingNow
+            elapsed += interval
+            if (elapsed >= 10_000) { elapsed = 0; vm.savePlaybackState() }
+            delay(interval)
+        }
+    }
     suspend fun centerLyric(index: Int) {
         if (index !in lyrics.indices) return
         while (listState.layoutInfo.viewportSize.height == 0) delay(16)
@@ -2427,8 +2453,9 @@ private fun formatFileSize(bytes: Long): String = when {
     var playing by remember(track.id) { mutableStateOf(false) }
     LaunchedEffect(track.id) {
         while (isActive) {
-            position = vm.playbackPosition()
-            playing = vm.isPlaying()
+            val (playingNow, positionNow) = vm.playbackSnapshot()
+            position = positionNow
+            playing = playingNow
             delay(350)
         }
     }

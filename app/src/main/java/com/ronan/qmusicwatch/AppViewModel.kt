@@ -19,6 +19,7 @@ import com.ronan.qmusicwatch.playback.classifyPlaybackFailure
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -26,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -758,6 +760,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun submitDiagnostics() = viewModelScope.launch {
         if (!featureEnabled("diagnostics")) return@launch _state.update { it.copy(message = featureMessage("diagnostics").ifBlank { "诊断提交暂不可用" }) }
         _state.update { it.copy(diagnosticUploadState = DiagnosticUploadState.Uploading) }
+        val logExcerpt = withContext(Dispatchers.IO) { AppLog.diagnosticExcerpt() }
         val payload = DiagnosticUpload(
             version = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE,
             sdk = android.os.Build.VERSION.SDK_INT,
@@ -769,7 +772,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 append("sdk=${android.os.Build.VERSION.SDK_INT}\n")
                 append("signedIn=${signedIn}\n")
                 append("networkControl=${redactDiagnosticMessage(_state.value.controlError ?: "ok")}\n\n")
-                append(AppLog.diagnosticExcerpt())
+                append(logExcerpt)
             }.take(58_000),
         )
         runCatching { graph.controlPlane.uploadDiagnostics(payload) }
@@ -868,11 +871,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun continueOnSpeaker() { _state.value.pendingSpeakerTrack?.let { requestPlay(it, true, pendingQueue) } }
     fun dismissSpeakerPrompt() = _state.update { it.copy(pendingSpeakerTrack = null) }
     private suspend fun loadLyrics(track: Track, localAudioPath: String?): List<LyricLine> {
-        var data = localAudioPath?.let { cachedLyricsFile(it).takeIf(File::exists)?.let { file -> runCatching { json.decodeFromString<LyricsData>(file.readText()) }.getOrNull() } }
+        var data = withContext(Dispatchers.IO) {
+            localAudioPath?.let { cachedLyricsFile(it).takeIf(File::exists)?.let { file -> runCatching { json.decodeFromString<LyricsData>(file.readText()) }.getOrNull() } }
+        }
         if (data == null) {
             if (!featureEnabled("lyrics")) return emptyList()
             data = graph.api.lyrics(track.id)
-            localAudioPath?.let { cachedLyricsFile(it).writeText(json.encodeToString(data)) }
+            localAudioPath?.let { path ->
+                val encoded = json.encodeToString(data)
+                withContext(Dispatchers.IO) { cachedLyricsFile(path).writeText(encoded) }
+            }
         }
         return LrcParser.parse(data.original, data.translation, data.wordSync)
     }
@@ -1151,6 +1159,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun playbackPosition() = graph.playback.position()
     fun playbackDuration() = graph.playback.duration()
     fun isPlaying() = graph.playback.isPlaying()
+    fun playbackSnapshot() = graph.playback.snapshot()
     fun pausePlayback() { graph.playback.pause(); persistSnapshot() }
     fun resumePlayback() {
         if (_state.value.playbackLoading) return

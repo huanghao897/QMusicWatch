@@ -2,6 +2,8 @@
 gradle-agent-home/
 .kotlin/
 .idea/
+.robo-deps/
+.robo-home/
 local.properties
 release-signing.properties
 **/build/

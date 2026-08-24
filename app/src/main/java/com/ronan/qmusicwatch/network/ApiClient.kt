@@ -10,6 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -77,6 +80,12 @@ internal fun qqReadRetryDelayMs(error: Throwable): Long = when (error) {
 
 internal fun isCurrentStreamGeneration(captured: Long, current: Long?): Boolean =
     current == captured
+
+private fun requireCurrentStreamGeneration(captured: Long, current: Long?) {
+    if (!isCurrentStreamGeneration(captured, current)) {
+        throw CancellationException("stream request superseded")
+    }
+}
 
 internal fun shouldProbePlaybackCredential(
     qualityIndex: Int,
@@ -703,7 +712,8 @@ internal fun qqMusicuPayload(
 class ApiClient(
     context: Context,
     private val cookie: () -> String?,
-    private val updateCookie: (String) -> Unit = {},
+    /** Persists a refreshed cookie; returns false when persistence did not happen. */
+    private val updateCookie: (staleCookie: String, refreshedCookie: String) -> Boolean = { _, _ -> false },
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val http = OkHttpClient.Builder()
@@ -713,7 +723,7 @@ class ApiClient(
         .build()
     private val prefs = context.getSharedPreferences("qq_direct_api", Context.MODE_PRIVATE)
     private val random = SecureRandom()
-    private val credentialRefreshLock = Any()
+    private val credentialRefreshLock = Mutex()
     private data class CachedStream(val data: StreamData, val generation: Long)
     private val streamCache = ConcurrentHashMap<String, CachedStream>()
     private val streamGenerations = ConcurrentHashMap<String, Long>()
@@ -921,7 +931,9 @@ class ApiClient(
                     AppLog.write("STREAM", "issued requested=$requested actual=$actual via=$module")
                     bestFallback = higherQualityStream(bestFallback, stream)
                     if (actual == requested) {
-                        ensureCurrentStreamGeneration(scopeKey, generation)
+                        // A superseded request must not return an old address to
+                        // a caller that is already switching tracks/quality.
+                        requireCurrentStreamGeneration(generation, streamGenerations[scopeKey])
                         cacheStream(cacheKey, scopeKey, generation, bestFallback!!)
                         return@withContext bestFallback!!
                     }
@@ -940,19 +952,13 @@ class ApiClient(
             }
         }
         bestFallback?.let {
-            ensureCurrentStreamGeneration(scopeKey, generation)
+            requireCurrentStreamGeneration(generation, streamGenerations[scopeKey])
             cacheStream(cacheKey, scopeKey, generation, it)
             return@withContext it
         }
         if (!receivedResponse) firstFailure?.let { throw it }
         AppLog.write("STREAM", "no-url track=${track.id} vip=${complete.requiresVip}")
         error(if (complete.requiresVip) "这首歌需要 VIP 或购买" else "QQ 音乐未提供播放地址，可能存在版权、地区或账号权益限制")
-    }
-
-    private fun ensureCurrentStreamGeneration(scopeKey: String, generation: Long) {
-        if (!isCurrentStreamGeneration(generation, streamGenerations[scopeKey])) {
-            throw CancellationException("stream request superseded")
-        }
     }
 
     private fun cacheStream(
@@ -1213,12 +1219,12 @@ class ApiClient(
         Ack(true)
     }
 
-    private fun smartSearch(query: String): JsonObject {
+    private suspend fun smartSearch(query: String): JsonObject {
         return legacySearch("smartSearch", query = query)["data"]?.jsonObject
             ?: error("QQ 音乐搜索响应无效")
     }
 
-    private fun webSearch(query: String, page: Int, type: Int): JsonObject {
+    private suspend fun webSearch(query: String, page: Int, type: Int): JsonObject {
         return legacySearch("search", query = query, page = page, type = type)["data"]?.jsonObject
             ?: error("QQ 音乐搜索响应无效")
     }
@@ -1265,7 +1271,7 @@ class ApiClient(
         )
     }
 
-    private fun post(
+    private suspend fun post(
         comm: JsonObject, module: String, method: String, param: JsonObject,
         requestCookie: String? = cookie(), tolerateBusinessError: Boolean = false,
         allowCredentialRefresh: Boolean = true,
@@ -1283,7 +1289,7 @@ class ApiClient(
             if (isIdempotentQqReadMethod(method) && isRecoverableQqReadFailure(error)) {
                 val delayMs = qqReadRetryDelayMs(error)
                 AppLog.write("API", "$module/$method transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
-                Thread.sleep(delayMs)
+                delay(delayMs)
                 try {
                     musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs, requestKey, formEncodedJson)
                 } catch (cancelled: CancellationException) {
@@ -1301,11 +1307,16 @@ class ApiClient(
         AppLog.write("API", "$module/$method code=$code ms=${System.currentTimeMillis() - started}")
         if (shouldRefreshCredential(module, method, code)) {
             val staleCookie = requestCookie.orEmpty()
-            val refreshed = allowCredentialRefresh && staleCookie.isNotBlank() && runCatching {
-                refreshCredentialBlocking(staleCookie, MusicCookie.provider(staleCookie, "qq"))
-            }.onFailure { error ->
-                AppLog.write("AUTH", "credential refresh failed ${error.javaClass.simpleName}")
-            }.getOrDefault(false)
+            val refreshed = if (allowCredentialRefresh && staleCookie.isNotBlank()) {
+                try {
+                    refreshCredentialBlocking(staleCookie, MusicCookie.provider(staleCookie, "qq"))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    AppLog.write("AUTH", "credential refresh failed ${error.javaClass.simpleName}")
+                    false
+                }
+            } else false
             if (refreshed) {
                 return post(
                     comm = requestCommAfterCredentialRefresh(module),
@@ -1376,7 +1387,7 @@ class ApiClient(
         }
     }
 
-    private fun legacySearch(
+    private suspend fun legacySearch(
         operation: String,
         query: String = "",
         page: Int = 1,
@@ -1401,7 +1412,7 @@ class ApiClient(
         return legacyGet(url, operation)
     }
 
-    private fun legacyProfile(): JsonObject {
+    private suspend fun legacyProfile(): JsonObject {
         val id = accountId()
         require(id.matches(Regex("\\d{1,24}"))) { "账号标识无效" }
         val gtk = hash33(cookieValue("qqmusic_key", "qm_keyst", "p_skey", "skey").orEmpty())
@@ -1418,7 +1429,7 @@ class ApiClient(
         return legacyGet(url, "profile", cookie())
     }
 
-    private fun legacyGet(url: okhttp3.HttpUrl, operation: String, requestCookie: String? = null): JsonObject {
+    private suspend fun legacyGet(url: okhttp3.HttpUrl, operation: String, requestCookie: String? = null): JsonObject {
         fun execute(): JsonObject {
             val builder = Request.Builder().url(url)
                 .header("Accept", "application/json")
@@ -1446,7 +1457,7 @@ class ApiClient(
             if (!isRecoverableQqReadFailure(error)) throw error
             val delayMs = qqReadRetryDelayMs(error)
             AppLog.write("API", "legacy/$operation transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
-            Thread.sleep(delayMs)
+            delay(delayMs)
             execute()
         }
     }
@@ -1460,7 +1471,7 @@ class ApiClient(
         else -> webComm()
     }
 
-    private fun probePlaybackCredential(): Boolean {
+    private suspend fun probePlaybackCredential(): Boolean {
         val staleCookie = cookie().orEmpty()
         if (staleCookie.isBlank()) error("请先登录")
         val now = System.currentTimeMillis()
@@ -1486,14 +1497,14 @@ class ApiClient(
         credentialVerifiedUntil = System.currentTimeMillis() + 5 * 60_000L
     }
 
-    private fun refreshCredentialBlocking(staleCookie: String, provider: String): Boolean =
-        synchronized(credentialRefreshLock) {
+    private suspend fun refreshCredentialBlocking(staleCookie: String, provider: String): Boolean =
+        credentialRefreshLock.withLock {
             val currentCookie = cookie().orEmpty()
-            if (currentCookie.isNotBlank() && currentCookie != staleCookie) return@synchronized true
+            if (currentCookie.isNotBlank() && currentCookie != staleCookie) return@withLock true
             val now = System.currentTimeMillis()
             if (staleCookie == recentlyRefreshedCookie && now - recentlyRefreshedAt < 60_000L) {
                 AppLog.write("AUTH", "credential refresh suppressed after recent rotation")
-                return@synchronized false
+                return@withLock false
             }
             val values = cookieValues(staleCookie)
             val musicId = MusicCookie.accountId(staleCookie).orEmpty()
@@ -1558,7 +1569,13 @@ class ApiClient(
                 staleCookie,
                 buildMusicCookie(provider, values, data),
             )
-            updateCookie(refreshed)
+            // Persistence must succeed before the rotation is considered done;
+            // otherwise the next request still presents the stale cookie while the
+            // refresh is suppressed for 60s, kicking the user out for no reason.
+            if (!persistRefreshedCookie(staleCookie, refreshed)) {
+                AppLog.write("AUTH", "credential persistence failed provider=$provider")
+                throw QqCredentialExpiredException("登录状态保存失败，请重新扫码登录一次")
+            }
             streamCache.clear()
             verifiedCredentialCookie = ""
             credentialVerifiedUntil = 0L
@@ -1566,6 +1583,15 @@ class ApiClient(
             recentlyRefreshedAt = System.currentTimeMillis()
             AppLog.write("AUTH", "credential refreshed provider=$provider")
             true
+        }
+
+    private fun persistRefreshedCookie(staleCookie: String, refreshed: String): Boolean =
+        try {
+            updateCookie(staleCookie, refreshed)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            false
         }
 
     private fun normalizedAuthCookie(): String {

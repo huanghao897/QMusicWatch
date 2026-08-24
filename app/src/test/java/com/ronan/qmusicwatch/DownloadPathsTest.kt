@@ -4,6 +4,7 @@ import com.ronan.qmusicwatch.download.cachedArtworkFile
 import com.ronan.qmusicwatch.download.cachedLyricsFile
 import com.ronan.qmusicwatch.download.offlineAudioRelativePath
 import com.ronan.qmusicwatch.download.hasDownloadSpace
+import com.ronan.qmusicwatch.download.parseDownloadContentRange
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -27,5 +28,14 @@ class DownloadPathsTest {
         assertEquals(true, hasDownloadSpace(400 * mb, 100 * mb))
         assertEquals(false, hasDownloadSpace(300 * mb, 100 * mb))
         assertEquals(false, hasDownloadSpace(200 * mb, -1))
+    }
+
+    @Test fun downloadRangeKeepsTheFullRemoteSizeAcrossTruncatedChunks() {
+        assertEquals(
+            com.ronan.qmusicwatch.download.DownloadContentRange(400, 499, 1_000),
+            parseDownloadContentRange("bytes 400-499/1000"),
+        )
+        assertEquals(null, parseDownloadContentRange("bytes 400-999/999"))
+        assertEquals(null, parseDownloadContentRange("bytes */1000"))
     }
 }

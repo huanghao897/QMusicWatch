@@ -45,6 +45,16 @@ private val downloadHttp = OkHttpClient.Builder()
 private val downloadJson = Json { ignoreUnknownKeys = true }
 private const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
 private class StorageReserveException : IllegalStateException("存储空间不足，需保留 256MB")
+private class AccountChangedException : IllegalStateException("下载所属账号已变更")
+internal data class DownloadContentRange(val start: Long, val end: Long, val total: Long)
+
+internal fun parseDownloadContentRange(value: String?): DownloadContentRange? {
+    val match = Regex("^bytes (\\d+)-(\\d+)/(\\d+)$").matchEntire(value?.trim().orEmpty()) ?: return null
+    val start = match.groupValues[1].toLongOrNull() ?: return null
+    val end = match.groupValues[2].toLongOrNull() ?: return null
+    val total = match.groupValues[3].toLongOrNull() ?: return null
+    return DownloadContentRange(start, end, total).takeIf { start <= end && end < total }
+}
 internal fun hasDownloadSpace(availableBytes: Long, remainingDownloadBytes: Long): Boolean =
     availableBytes >= STORAGE_RESERVE_BYTES && (remainingDownloadBytes < 0 || availableBytes - remainingDownloadBytes >= STORAGE_RESERVE_BYTES)
 internal fun canResumePartialDownload(storedQuality: String?, nextQuality: String): Boolean =
@@ -58,7 +68,8 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val graph = applicationContext as QMusicApplication
         val db = graph.db
         val target = File(applicationContext.filesDir, offlineAudioRelativePath(owner, id))
-        val dir = target.parentFile!!.apply { mkdirs() }
+        val dir = target.parentFile ?: return@withContext Result.failure(workDataOf("reason" to "下载目录无效"))
+        dir.mkdirs()
         val part = File(dir, target.name.removeSuffix(".audio") + ".part")
         val requestedQuality = normalizeQualityId(inputData.getString("quality") ?: QUALITY_STANDARD)
         val existing = db.downloads().find(id, owner)
@@ -95,36 +106,92 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 updatedAt = System.currentTimeMillis(),
                 quality = issuedQuality,
             )?.let { db.downloads().upsert(it) }
-            val request = Request.Builder().url(streamUrl).withQqMusicMediaHeaders()
-                .apply { if (part.length() > 0) header("Range", "bytes=${part.length()}-") }.build()
-            downloadHttp.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) error("download ${response.code}")
-                val append = response.code == 206 && part.length() > 0
-                val start = if (append) part.length() else 0
-                val remaining = response.body?.contentLength() ?: -1
-                val total = if (remaining < 0) -1 else start + remaining
-                if (!hasDownloadSpace(availableBytes(), remaining)) throw StorageReserveException()
-                response.body!!.byteStream().use { input ->
-                    java.io.FileOutputStream(part, append).buffered().use { output ->
+            var complete = false
+            var totalBytes = -1L
+            while (!complete) {
+                if (graph.vault.load()?.accountId != owner) {
+                    db.downloads().progress(id, owner, "locked", part.length(), totalBytes)
+                    throw AccountChangedException()
+                }
+                val start = part.length()
+                val request = Request.Builder().url(streamUrl).withQqMusicMediaHeaders()
+                    .apply { if (start > 0) header("Range", "bytes=$start-") }.build()
+                downloadHttp.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) error("download ${response.code}")
+                    val body = response.body ?: error("下载响应为空")
+                    val bodyLength = body.contentLength()
+                    val range = if (response.code == 206) {
+                        parseDownloadContentRange(response.header("Content-Range"))
+                            ?: error("下载响应缺少有效 Content-Range")
+                    } else null
+                    val append: Boolean
+                    val expectedTotal: Long
+                    val expectedBodyLength: Long?
+                    if (range != null) {
+                        require(range.start == start) { "下载续传位置不匹配" }
+                        append = start > 0
+                        expectedTotal = range.total
+                        expectedBodyLength = range.end - range.start + 1
+                    } else {
+                        require(response.code == 200) { "下载响应状态无效" }
+                        // A 200 response means the server ignored the range; write
+                        // from the beginning so an old partial file is truncated.
+                        append = false
+                        expectedTotal = bodyLength
+                        expectedBodyLength = bodyLength.takeIf { it >= 0 }
+                    }
+                    if (bodyLength >= 0 && expectedBodyLength != null) {
+                        require(bodyLength == expectedBodyLength) { "下载响应长度与范围不一致" }
+                    }
+                    val spaceNeeded = when {
+                        expectedTotal < 0 -> bodyLength
+                        append -> (expectedTotal - start).coerceAtLeast(0)
+                        else -> expectedTotal
+                    }
+                    if (!hasDownloadSpace(availableBytes(), spaceNeeded)) throw StorageReserveException()
+                    totalBytes = expectedTotal
+                    body.byteStream().use { input ->
+                        java.io.FileOutputStream(part, append).use { output ->
                             val buffer = ByteArray(64 * 1024)
-                            var last = 0L
+                            var last = part.length()
                             while (true) {
                                 if (isStopped) throw kotlinx.coroutines.CancellationException("paused")
                                 val read = input.read(buffer); if (read < 0) break
                                 output.write(buffer, 0, read)
                                 if (part.length() - last > 512 * 1024) {
                                     last = part.length()
+                                    if (graph.vault.load()?.accountId != owner) {
+                                        db.downloads().progress(id, owner, "locked", part.length(), totalBytes)
+                                        throw AccountChangedException()
+                                    }
                                     if (!hasDownloadSpace(availableBytes(), 0)) throw StorageReserveException()
-                                    setProgress(workDataOf("bytes" to last, "total" to total)); db.downloads().progress(id, owner, "downloading", last, total)
+                                    setProgress(workDataOf("bytes" to last, "total" to totalBytes))
+                                    db.downloads().progress(id, owner, "downloading", last, totalBytes)
                                 }
                             }
+                            // Force data to disk before a completed file is promoted.
+                            output.fd.sync()
+                        }
+                    }
+                    val written = part.length()
+                    if (expectedTotal >= 0) {
+                        require(written <= expectedTotal) { "下载文件超过声明大小" }
+                        complete = written == expectedTotal
+                        if (!complete && written == start) error("下载响应未返回数据")
+                    } else {
+                        complete = true
+                        totalBytes = written
                     }
                 }
-                if (target.exists()) target.delete()
-                if (!part.renameTo(target)) error("cannot finalize download")
-                db.downloads().progress(id, owner, "complete", target.length(), target.length())
             }
-            runCatching { graph.api.lyrics(id) }.getOrNull()?.let { cachedLyricsFile(target.absolutePath).writeText(downloadJson.encodeToString(it)) }
+            if (!complete || totalBytes >= 0 && part.length() != totalBytes) error("下载文件不完整 (${part.length()}/$totalBytes)")
+            if (target.exists()) target.delete()
+            if (!part.renameTo(target)) error("cannot finalize download")
+            db.downloads().progress(id, owner, "complete", target.length(), target.length())
+            runCatching { graph.api.lyrics(id) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                .getOrNull()
+                ?.let { cachedLyricsFile(target.absolutePath).writeText(downloadJson.encodeToString(it)) }
             trustedQMusicImageUrl(track.artworkUrl).takeIf(String::isNotBlank)?.let { artwork ->
                 val cover = cachedArtworkFile(target.absolutePath)
                 val coverPart = File("${cover.absolutePath}.part")
@@ -135,12 +202,16 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                     }
                     if (cover.exists()) cover.delete()
                     if (!coverPart.renameTo(cover)) error("cannot finalize cover")
-                }.onFailure { coverPart.delete() }
+                }.onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    coverPart.delete()
+                }
             }
         }.fold(onSuccess = { Result.success() }, onFailure = { error ->
-            val status = when { isStopped -> "paused"; error is StorageReserveException -> "failed_storage"; else -> "failed" }
+            if (error is kotlinx.coroutines.CancellationException && !isStopped) throw error
+            val status = when { isStopped -> "paused"; error is StorageReserveException -> "failed_storage"; error is AccountChangedException -> "locked"; else -> "failed" }
             db.downloads().progress(id, owner, status, part.length(), -1)
-            if (!isStopped && error !is StorageReserveException && runAttemptCount < 2) Result.retry() else Result.failure(workDataOf("reason" to error.message.orEmpty()))
+            if (!isStopped && error !is StorageReserveException && error !is AccountChangedException && runAttemptCount < 2) Result.retry() else Result.failure(workDataOf("reason" to error.message.orEmpty()))
         })
     } }
 }

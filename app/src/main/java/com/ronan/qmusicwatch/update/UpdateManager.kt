@@ -107,7 +107,10 @@ internal fun planDownloadResponse(
         200 -> DownloadResponsePlan.Write(append = false, writtenBefore = 0)
         206 -> {
             val range = parseContentRange(contentRange) ?: throw IllegalArgumentException("服务器返回的续传范围无效")
-            require(range.start == requestedStart && range.end == expectedSize - 1 && range.total == expectedSize) {
+            // Accept truncated 206 responses (end < expectedSize - 1): some CDNs
+            // cap Range payloads, and rejecting them made updates permanently
+            // undownloadable. The download loop simply requests the next segment.
+            require(range.start == requestedStart && range.total == expectedSize) {
                 "服务器返回的续传范围不匹配"
             }
             DownloadResponsePlan.Write(append = requestedStart > 0, writtenBefore = requestedStart)
@@ -194,7 +197,16 @@ class UpdateManager(
         }
 
         var retriedFromStart = false
+        var rounds = 0
+        // Permit normal CDN chunking without allowing an unbounded no-progress
+        // loop. The cap scales with the declared APK size (at least 64 rounds,
+        // enough for small releases, and up to 4096 for unusually small chunks).
+        val maxRounds = (((release.apk.sizeBytes + 256L * 1024 - 1) / (256L * 1024)) + 16L)
+            .coerceIn(64L, 4_096L)
+            .toInt()
         while (true) {
+            rounds++
+            require(rounds <= maxRounds) { "更新下载进度异常，已停止重试" }
             coroutineContext.ensureActive()
             ensurePartialMetadata(artifacts, release)
             val start = artifacts.part.length()
@@ -222,7 +234,10 @@ class UpdateManager(
                 plan as DownloadResponsePlan.Write
                 val body = response.body ?: error("更新下载响应为空")
                 val responseBytes = body.contentLength()
-                val expectedResponseBytes = release.apk.sizeBytes - plan.writtenBefore
+                val expectedResponseBytes = if (response.code == 206) {
+                    parseContentRange(response.header("Content-Range"))?.let { it.end - it.start + 1 }
+                        ?: responseBytes
+                } else release.apk.sizeBytes
                 if (responseBytes >= 0) {
                     if (responseBytes != expectedResponseBytes) {
                         discardPartial(artifacts)
@@ -248,6 +263,16 @@ class UpdateManager(
                         }
                         output.fd.sync()
                     }
+                }
+                if (artifacts.part.length() == plan.writtenBefore) {
+                    discardPartial(artifacts)
+                    throw IllegalStateException("服务器未返回更新数据")
+                }
+                // A truncated 206 leaves the part shorter than the release; loop
+                // once more to fetch the remaining segment.
+                if (artifacts.part.length() < release.apk.sizeBytes) {
+                    onProgress(artifacts.part.length(), release.apk.sizeBytes)
+                    return@use
                 }
                 require(artifacts.part.length() == release.apk.sizeBytes) { "安装包下载不完整" }
                 val ready = try {

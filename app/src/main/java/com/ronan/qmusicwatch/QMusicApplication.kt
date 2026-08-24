@@ -78,11 +78,7 @@ class QMusicApplication : Application(), ImageLoaderFactory {
         api = ApiClient(
             this,
             cookie = { vault.load()?.upstreamCookie },
-            updateCookie = { refreshed ->
-                vault.load()?.let { session ->
-                    vault.save(session.copy(upstreamCookie = refreshed))
-                }
-            },
+            updateCookie = { stale, refreshed -> vault.updateCookieIfCurrent(stale, refreshed) },
         )
         controlPlane = ControlPlaneClient()
         updates = UpdateManager(this, controlPlane)
