@@ -92,7 +92,7 @@ private val audioQualitySpecs = listOf(
 
 internal fun allAudioQualitySpecs(): List<AudioQualitySpec> = audioQualitySpecs
 internal fun audioQualitySpec(value: String?): AudioQualitySpec =
-    audioQualitySpecs.first { it.id == normalizeQualityId(value) }
+    audioQualitySpecs.firstOrNull { it.id == normalizeQualityId(value) } ?: audioQualitySpecs.first()
 internal fun qualityLabel(value: String?): String =
     if (value == QUALITY_LEGACY_UNKNOWN) "旧缓存（音质未知）" else audioQualitySpec(value).label
 internal fun qualityShortLabel(value: String?): String =

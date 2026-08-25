@@ -318,6 +318,10 @@ private fun ExpressiveWavyProgress(
     val wrappedIndicatorPath = remember { Path() }
     val wrappedTrackPath = remember { Path() }
     val morphCache = remember { mutableMapOf<Pair<Int, Boolean>, Morph>() }
+    // Reused across frames: constructing a PathMeasure and an android Path per
+    // frame (60fps for the whole song) is pure garbage on a wearable SoC.
+    val measure = remember { PathMeasure() }
+    val morphAndroidPath = remember { android.graphics.Path() }
     Spacer(
         modifier.drawWithCache {
             val strokePx = 3.dp.toPx()
@@ -334,10 +338,10 @@ private fun ExpressiveWavyProgress(
                 Morph(circle, if (playing) scallop else circle)
             }
             val path = morph
-                .toPath(morphProgress.value)
+                .toPath(morphProgress.value, morphAndroidPath)
                 .asComposePath()
                 .apply { translate(Offset(size.width / 2f, size.height / 2f)) }
-            val measure = PathMeasure().also { it.setPath(path, true) }
+            measure.setPath(path, true)
             val length = measure.length
             val value = progress.coerceIn(0f, 1f)
             val rotation = rotationProgress.value

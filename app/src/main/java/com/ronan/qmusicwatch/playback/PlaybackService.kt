@@ -178,6 +178,8 @@ class PlaybackService : MediaSessionService() {
     private val json = Json { ignoreUnknownKeys = true }
     private val skipMutex = Mutex()
     private val recoveryMutex = Mutex()
+    /** Serializes snapshot commits so writes land in capture order (progress, skip, recovery). */
+    private val snapshotMutex = Mutex()
     private val recoveryStateLock = Any()
     private val recoveryTracker = PlaybackRecoveryTracker()
     private var snapshotJob: Job? = null
@@ -561,7 +563,7 @@ class PlaybackService : MediaSessionService() {
         serviceScope.launch { persistCurrentPlaybackNow() }
     }
 
-    private suspend fun persistCurrentPlaybackNow() {
+    private suspend fun persistCurrentPlaybackNow() = snapshotMutex.withLock {
         val current = withContext(Dispatchers.Main.immediate) {
             val item = player.currentMediaItem ?: return@withContext null
             CurrentPlayback(
@@ -570,9 +572,9 @@ class PlaybackService : MediaSessionService() {
                 positionMs = player.currentPosition.coerceAtLeast(0L),
                 generation = mediaItemGeneration,
             )
-        } ?: return
+        } ?: return@withLock
         val graph = application as QMusicApplication
-        if (!currentPlaybackStillCurrent(current)) return
+        if (!currentPlaybackStillCurrent(current)) return@withLock
         val owner = graph.vault.load()?.accountId
         graph.settings.updatePlaybackSnapshot { currentValue ->
             val latest = runCatching {
@@ -609,24 +611,31 @@ class PlaybackService : MediaSessionService() {
     @UnstableApi
     private fun requestSkip(delta: Int, ended: Boolean = false): ListenableFuture<SessionResult> = SettableFuture.create<SessionResult>().also { result ->
         serviceScope.launch {
-            runCatching { skipMutex.withLock { skipFromSnapshot(delta, ended) } }
-                .onSuccess { changed ->
-                    result.set(
-                        if (changed) SessionResult(SessionResult.RESULT_SUCCESS)
-                        else SessionResult(SessionError.INFO_CANCELLED),
-                    )
-                }
-                .onFailure { error ->
-                    AppLog.write("MEDIA_KEY", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
-                    result.set(SessionResult(SessionError.ERROR_IO))
-                }
+            try {
+                val changed = skipMutex.withLock { skipFromSnapshot(delta, ended) }
+                result.set(
+                    if (changed) SessionResult(SessionResult.RESULT_SUCCESS)
+                    else SessionResult(SessionError.INFO_CANCELLED),
+                )
+            } catch (cancelled: CancellationException) {
+                // runCatching would swallow cancellation here and report ERROR_IO
+                // for a destroyed service; propagate it and fail the future cleanly.
+                result.cancel(false)
+                throw cancelled
+            } catch (error: Throwable) {
+                AppLog.write("MEDIA_KEY", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                result.set(SessionResult(SessionError.ERROR_IO))
+            }
         }
     }
+
+    private suspend fun readPlaybackSnapshot(graph: QMusicApplication): PlaybackSnapshot =
+        json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first())
 
     private suspend fun skipFromSnapshot(delta: Int, ended: Boolean): Boolean {
         val graph = application as QMusicApplication
         val owner = graph.vault.load()?.accountId ?: error("请先登录")
-        val snapshot = json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first())
+        val snapshot = snapshotMutex.withLock { readPlaybackSnapshot(graph) }
         if (!snapshot.belongsToAccount(owner)) error("播放记录属于其他账号")
         val queue = snapshot.queue.distinctBy { it.id }
         if (queue.isEmpty()) return false
@@ -638,13 +647,22 @@ class PlaybackService : MediaSessionService() {
         val track = queue.getOrNull(targetIndex) ?: return false
         val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
         val preferredQuality = graph.settings.quality.first()
+        // Network and local lookups happen outside the snapshot lock; the commit
+        // below re-reads the latest snapshot so a concurrent persist cannot be lost.
         val stream = if (local == null) graph.api.stream(track, preferredQuality) else null
-        val uri = local?.let { android.net.Uri.fromFile(File(it.filePath)).toString() } ?: stream!!.url
+        val uri = local?.let { android.net.Uri.fromFile(File(it.filePath)).toString() }
+            ?: stream?.url ?: error("未获取到播放地址")
         val artwork = local?.let { cachedArtworkFile(it.filePath).takeIf(File::exists)?.let { cover -> android.net.Uri.fromFile(cover).toString() } } ?: track.artworkUrl
-        graph.settings.setPlaybackSnapshot(json.encodeToString(snapshot.copy(
-            track = track, positionMs = 0, streamUrl = uri,
-            streamExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE, quality = stream?.quality ?: preferredQuality,
-        )))
+        val committed = snapshotMutex.withLock {
+            val latest = readPlaybackSnapshot(graph)
+            if (!latest.belongsToAccount(owner) || latest.track?.id != currentId) return@withLock false
+            graph.settings.setPlaybackSnapshot(json.encodeToString(latest.copy(
+                track = track, positionMs = 0, streamUrl = uri,
+                streamExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE, quality = stream?.quality ?: preferredQuality,
+            )))
+            true
+        }
+        if (!committed) return false
         graph.db.recent().upsert(RecentEntity(track.id, owner, track.title, track.artists.joinToString(" / "), track.album, track.artworkUrl, System.currentTimeMillis()))
         withContext(Dispatchers.Main) {
             player.setMediaItem(playbackMediaItem(track.id, uri, track.title, track.artists.joinToString(" / "), artwork))

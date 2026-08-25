@@ -93,6 +93,12 @@ class UpdateManagerTest {
             DownloadResponsePlan.Write(append = false, writtenBefore = 0),
             planDownloadResponse(206, requestedStart = 0, expectedSize = size, contentRange = "bytes 0-999/1000", retriedFromStart = false),
         )
+        // Truncated 206 responses (CDNs capping Range payloads) must be accepted:
+        // the download loop requests the next segment instead of failing forever.
+        assertEquals(
+            DownloadResponsePlan.Write(append = true, writtenBefore = 400),
+            planDownloadResponse(206, requestedStart = 400, expectedSize = size, contentRange = "bytes 400-499/1000", retriedFromStart = false),
+        )
         assertEquals(
             DownloadResponsePlan.RetryFromStart,
             planDownloadResponse(416, requestedStart = 400, expectedSize = size, contentRange = "bytes */1000", retriedFromStart = false),

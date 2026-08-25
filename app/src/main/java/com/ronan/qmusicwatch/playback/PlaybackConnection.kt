@@ -93,6 +93,15 @@ class PlaybackConnection(context: Context) {
     fun seek(positionMs: Long) = withController { it.seekTo(positionMs) }
     fun position() = controllerOrNull()?.currentPosition?.coerceAtLeast(0) ?: 0L
     fun duration() = controllerOrNull()?.duration?.coerceAtLeast(0) ?: 0L
+    /** Single controller fetch for poll loops instead of three separate get() calls per tick. */
+    fun snapshot(): Triple<Boolean, Long, Long> {
+        val controller = controllerOrNull()
+        return Triple(
+            controller?.isPlaying == true,
+            controller?.currentPosition?.coerceAtLeast(0) ?: 0L,
+            controller?.duration?.coerceAtLeast(0) ?: 0L,
+        )
+    }
     fun currentMediaId() = controllerOrNull()?.currentMediaItem?.mediaId.orEmpty()
     fun currentUri() = controllerOrNull()?.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
     fun isPlaying() = controllerOrNull()?.isPlaying == true
@@ -103,9 +112,11 @@ class PlaybackConnection(context: Context) {
         AudioManager.FLAG_SHOW_UI,
     )
     fun startSleepTimer(minutes: Int, finishCurrent: Boolean = false) {
+        // Cancel first, then restore: the old job's tail never runs after cancel,
+        // so its fade-out would otherwise leave the volume permanently lowered.
         sleepJob?.cancel()
+        restoreVolume()
         stopAfterCurrent = false
-        sleepVolume = null
         sleepJob = scope.launch {
             _sleepRemaining.value = minutes.coerceIn(1, 1440) * 60L
             while (_sleepRemaining.value > 0) {
@@ -117,13 +128,23 @@ class PlaybackConnection(context: Context) {
                 }
             }
             if (finishCurrent) stopAfterCurrent = true else {
-                controllerOrNull()?.let { player ->
-                    pause(); player.volume = sleepVolume ?: player.volume; sleepVolume = null
-                } ?: pause()
+                controllerOrNull()?.let { pause() } ?: pause()
+                restoreVolume()
             }
         }
     }
-    fun cancelSleepTimer() { sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false; sleepVolume?.let { volume -> controllerOrNull()?.volume = volume }; sleepVolume = null; _sleepRemaining.value = 0 }
+    fun cancelSleepTimer() {
+        sleepJob?.cancel(); sleepJob = null; stopAfterCurrent = false
+        restoreVolume()
+        _sleepRemaining.value = 0
+    }
+
+    /** Restores the volume captured before fade-out exactly once, on every exit path. */
+    private fun restoreVolume() {
+        val saved = sleepVolume ?: return
+        sleepVolume = null
+        withController { it.volume = saved }
+    }
     fun consumeStopAfterCurrentAtEnd(): Boolean {
         if (!stopAfterCurrent) return false
         stopAfterCurrent = false

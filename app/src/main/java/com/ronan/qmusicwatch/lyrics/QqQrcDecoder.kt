@@ -14,9 +14,28 @@ object QqQrcDecoder {
     private val key2 = "123ZXC!@".encodeToByteArray()
     private val key3 = "!@#)(*$%".encodeToByteArray()
 
+    /** Upper bound for inflated QRC text; a real per-word-synced lyric stays well below 1 MB. */
+    private const val MAX_DECODED_CHARS = 2_000_000
+
     fun decode(hex: String): String {
         val data = decryptPayload(hex)
-        return InflaterInputStream(ByteArrayInputStream(data)).bufferedReader(Charsets.UTF_8).use { it.readText() }
+        // Bounded streaming inflate: zlib can expand hostile input by orders of
+        // magnitude, so readText() on the raw inflater is a wearable OOM vector.
+        return InflaterInputStream(ByteArrayInputStream(data)).use { inflater ->
+            inflater.bufferedReader(Charsets.UTF_8).use { reader ->
+                val output = StringBuilder()
+                val buffer = CharArray(8 * 1024)
+                var total = 0
+                while (true) {
+                    val read = reader.read(buffer)
+                    if (read < 0) break
+                    total += read
+                    if (total > MAX_DECODED_CHARS) throw IllegalArgumentException("QRC 歌词数据异常")
+                    output.append(buffer, 0, read)
+                }
+                output.toString()
+            }
+        }
     }
 
     internal fun decryptPayload(hex: String): ByteArray {
