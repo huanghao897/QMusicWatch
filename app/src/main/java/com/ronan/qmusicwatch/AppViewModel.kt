@@ -173,6 +173,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val lyricAlignment = settings.map { it.lyricAlignment }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "left")
     val pureBlack = settings.map { it.pureBlack }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val lowPowerPlayer = settings.map { it.lowPowerPlayer }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val rotaryVolumeEnabled = settings.map { it.rotaryVolumeEnabled }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     val wifiOnlyDownload = settings.map { it.wifiOnlyDownload }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     val lastSleepMinutes = settings.map { it.lastSleepMinutes }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val dailyCount = settings.map { it.dailyCount }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 5)
@@ -180,6 +181,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val seenAnnouncements = settings.map { it.seenAnnouncements }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     val uiSize = settings.map { it.uiSize }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "compact")
     val artworkAccent = settings.map { it.artworkAccent }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    /** Current system/output volume used by the watch crown feedback overlay. */
+    val deviceVolume = graph.playback.deviceVolume
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue = _queue.asStateFlow()
     private val _queueIndex = MutableStateFlow(-1)
@@ -1139,6 +1142,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setLyricAlignment(value: String) = viewModelScope.launch { graph.settings.setLyricAlignment(value) }
     fun setPureBlack(value: Boolean) = viewModelScope.launch { graph.settings.setPureBlack(value) }
     fun setLowPowerPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setLowPowerPlayer(value) }
+    fun setRotaryVolumeEnabled(value: Boolean) = viewModelScope.launch { graph.settings.setRotaryVolumeEnabled(value) }
     fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch { graph.settings.setWifiOnlyDownload(value) }
     fun setDailyCount(value: Int) = viewModelScope.launch { graph.settings.setDailyCount(value) }
     fun setUiSize(value: String) = viewModelScope.launch { graph.settings.setUiSize(value) }

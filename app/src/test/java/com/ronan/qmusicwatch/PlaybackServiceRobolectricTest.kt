@@ -6,6 +6,9 @@ import com.ronan.qmusicwatch.playback.BACKGROUND_RECOVERY_ATTEMPTS
 import com.ronan.qmusicwatch.playback.BACKGROUND_RECOVERY_DELAY_MS
 import com.ronan.qmusicwatch.playback.BACKGROUND_SNAPSHOT_INTERVAL_MS
 import com.ronan.qmusicwatch.playback.BACKGROUND_PLAYBACK_WAKE_MODE
+import com.ronan.qmusicwatch.playback.BACKGROUND_AUTO_SKIP_ATTEMPTS
+import com.ronan.qmusicwatch.playback.BACKGROUND_AUTO_SKIP_RETRY_DELAY_MS
+import com.ronan.qmusicwatch.playback.BACKGROUND_TRANSITION_WAKE_LOCK_MS
 import com.ronan.qmusicwatch.playback.PlaybackRecoveryRequest
 import com.ronan.qmusicwatch.playback.PlaybackRecoveryTracker
 import com.ronan.qmusicwatch.playback.PlaybackService
@@ -34,6 +37,9 @@ class PlaybackServiceRobolectricTest {
         assertTrue(BACKGROUND_SNAPSHOT_INTERVAL_MS in 5_000L..30_000L)
         assertTrue(BACKGROUND_RECOVERY_DELAY_MS in 500L..5_000L)
         assertTrue(BACKGROUND_RECOVERY_ATTEMPTS >= 3)
+        assertTrue(BACKGROUND_AUTO_SKIP_ATTEMPTS >= 2)
+        assertTrue(BACKGROUND_AUTO_SKIP_RETRY_DELAY_MS in 250L..5_000L)
+        assertTrue(BACKGROUND_TRANSITION_WAKE_LOCK_MS in 10_000L..120_000L)
     }
 
     @Test fun consecutiveFailuresCannotBeClearedByTheOlderRecovery() {
@@ -198,4 +204,5 @@ class PlaybackServiceRobolectricTest {
             controller.destroy()
         }
     }
+
 }

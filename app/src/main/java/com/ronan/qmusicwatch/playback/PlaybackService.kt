@@ -5,6 +5,7 @@ import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
@@ -53,6 +54,9 @@ internal const val BACKGROUND_PLAYBACK_WAKE_MODE = C.WAKE_MODE_NETWORK
 internal const val BACKGROUND_SNAPSHOT_INTERVAL_MS = 10_000L
 internal const val BACKGROUND_RECOVERY_DELAY_MS = 500L
 internal const val BACKGROUND_RECOVERY_ATTEMPTS = 3
+internal const val BACKGROUND_AUTO_SKIP_ATTEMPTS = 3
+internal const val BACKGROUND_AUTO_SKIP_RETRY_DELAY_MS = 750L
+internal const val BACKGROUND_TRANSITION_WAKE_LOCK_MS = 90_000L
 
 @androidx.annotation.OptIn(UnstableApi::class)
 internal class QMusicLoadErrorHandlingPolicy :
@@ -189,11 +193,17 @@ class PlaybackService : MediaSessionService() {
     private val previousCommand = SessionCommand(COMMAND_PREVIOUS, Bundle.EMPTY)
     private val nextCommand = SessionCommand(COMMAND_NEXT, Bundle.EMPTY)
     private val connectivity by lazy { getSystemService(ConnectivityManager::class.java) }
+    private val powerManager by lazy { getSystemService(PowerManager::class.java) }
+    private val transitionWakeLockLock = Any()
+    private var transitionWakeLock: PowerManager.WakeLock? = null
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             restartPendingRecovery()
         }
     }
+    private val endedTransitionLock = Any()
+    /** Media3 may report STATE_ENDED more than once for one item. */
+    private var endedTransitionGeneration: Long? = null
     private val noisy = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
@@ -242,7 +252,11 @@ class PlaybackService : MediaSessionService() {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState != Player.STATE_ENDED) return
                     val stopAfterCurrent = (application as? QMusicApplication)?.playback?.consumeStopAfterCurrentAtEnd() == true
-                    if (!stopAfterCurrent) requestSkip(1, ended = true)
+                    if (stopAfterCurrent) {
+                        clearEndedTransitionGuard()
+                    } else if (beginEndedTransition()) {
+                        requestSkip(1, ended = true, expectedEndedGeneration = mediaItemGeneration)
+                    }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
@@ -269,6 +283,7 @@ class PlaybackService : MediaSessionService() {
 
                 override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                     mediaItemGeneration++
+                    clearEndedTransitionGuard()
                     val uri = mediaItem?.localConfiguration?.uri?.toString().orEmpty()
                     synchronized(recoveryStateLock) {
                         val invalidated = recoveryTracker.invalidateUnlessMatches(
@@ -282,7 +297,8 @@ class PlaybackService : MediaSessionService() {
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (!isPlaying) persistCurrentPlayback()
+                    if (isPlaying) clearEndedTransitionGuard()
+                    else persistCurrentPlayback()
                 }
             })
         }
@@ -290,11 +306,19 @@ class PlaybackService : MediaSessionService() {
             CommandButton.Builder(CommandButton.ICON_PREVIOUS).setSessionCommand(previousCommand).setDisplayName("上一首").setSlots(CommandButton.SLOT_BACK).build(),
             CommandButton.Builder(CommandButton.ICON_NEXT).setSessionCommand(nextCommand).setDisplayName("下一首").setSlots(CommandButton.SLOT_FORWARD).build(),
         )
+        val availablePlayerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+            .buildUpon()
+            .add(Player.COMMAND_GET_DEVICE_VOLUME)
+            .add(Player.COMMAND_SET_DEVICE_VOLUME)
+            .add(Player.COMMAND_SET_DEVICE_VOLUME_WITH_FLAGS)
+            .add(Player.COMMAND_ADJUST_DEVICE_VOLUME)
+            .add(Player.COMMAND_ADJUST_DEVICE_VOLUME_WITH_FLAGS)
+            .build()
         session = MediaSession.Builder(this, player).setMediaButtonPreferences(mediaButtons).setCallback(object : MediaSession.Callback {
             override fun onConnect(mediaSession: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
                 MediaSession.ConnectionResult.AcceptedResultBuilder(mediaSession)
                     .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().add(previousCommand).add(nextCommand).build())
-                    .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
+                    .setAvailablePlayerCommands(availablePlayerCommands)
                     .setMediaButtonPreferences(mediaButtons)
                     .build()
 
@@ -609,10 +633,23 @@ class PlaybackService : MediaSessionService() {
     )
 
     @UnstableApi
-    private fun requestSkip(delta: Int, ended: Boolean = false): ListenableFuture<SessionResult> = SettableFuture.create<SessionResult>().also { result ->
+    private fun requestSkip(
+        delta: Int,
+        ended: Boolean = false,
+        expectedEndedGeneration: Long? = null,
+    ): ListenableFuture<SessionResult> = SettableFuture.create<SessionResult>().also { result ->
+        val wakeLockHeld = ended && acquireTransitionWakeLock()
         serviceScope.launch {
             try {
-                val changed = skipMutex.withLock { skipFromSnapshot(delta, ended) }
+                val changed = skipMutex.withLock {
+                    if (ended && expectedEndedGeneration != null && !stillAtEndedItem(expectedEndedGeneration)) {
+                        false
+                    } else if (ended) {
+                        skipFromSnapshotWithRetry(delta, expectedEndedGeneration)
+                    } else {
+                        skipFromSnapshot(delta, ended = false)
+                    }
+                }
                 result.set(
                     if (changed) SessionResult(SessionResult.RESULT_SUCCESS)
                     else SessionResult(SessionError.INFO_CANCELLED),
@@ -624,8 +661,82 @@ class PlaybackService : MediaSessionService() {
                 throw cancelled
             } catch (error: Throwable) {
                 AppLog.write("MEDIA_KEY", "${error.javaClass.simpleName}:${error.message.orEmpty()}")
+                if (ended) clearEndedTransitionGuard()
                 result.set(SessionResult(SessionError.ERROR_IO))
+            } finally {
+                if (wakeLockHeld) releaseTransitionWakeLock()
             }
+        }
+    }
+
+    private suspend fun skipFromSnapshotWithRetry(
+        delta: Int,
+        expectedEndedGeneration: Long?,
+    ): Boolean {
+        var lastError: Throwable? = null
+        repeat(BACKGROUND_AUTO_SKIP_ATTEMPTS) { attempt ->
+            if (expectedEndedGeneration != null && !stillAtEndedItem(expectedEndedGeneration)) return false
+            try {
+                return skipFromSnapshot(delta, ended = true)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                lastError = error
+                AppLog.write(
+                    "MEDIA_KEY",
+                    "auto-skip attempt=${attempt + 1}/$BACKGROUND_AUTO_SKIP_ATTEMPTS ${error.javaClass.simpleName}",
+                )
+                if (attempt + 1 < BACKGROUND_AUTO_SKIP_ATTEMPTS) {
+                    delay(BACKGROUND_AUTO_SKIP_RETRY_DELAY_MS * (attempt + 1))
+                }
+            }
+        }
+        throw lastError ?: IllegalStateException("自动切歌失败")
+    }
+
+    private suspend fun stillAtEndedItem(expectedGeneration: Long): Boolean =
+        withContext(Dispatchers.Main.immediate) {
+            synchronized(endedTransitionLock) {
+                endedTransitionGeneration == expectedGeneration
+            } && player.playbackState == Player.STATE_ENDED
+        }
+
+    private fun beginEndedTransition(): Boolean = synchronized(endedTransitionLock) {
+        val generation = mediaItemGeneration
+        if (endedTransitionGeneration == generation) {
+            false
+        } else {
+            endedTransitionGeneration = generation
+            true
+        }
+    }
+
+    private fun clearEndedTransitionGuard() = synchronized(endedTransitionLock) {
+        endedTransitionGeneration = null
+    }
+
+    private fun acquireTransitionWakeLock(): Boolean = runCatching {
+        synchronized(transitionWakeLockLock) {
+            val lock = transitionWakeLock ?: powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "${packageName}:track-transition",
+            ).apply { setReferenceCounted(false) }.also { transitionWakeLock = it }
+            if (!lock.isHeld) {
+                lock.acquire(BACKGROUND_TRANSITION_WAKE_LOCK_MS)
+            }
+        }
+        true
+    }.onFailure {
+        AppLog.write("PLAYER_SERVICE", "transition-wakelock acquire ${it.javaClass.simpleName}")
+    }.getOrDefault(false)
+
+    private fun releaseTransitionWakeLock() {
+        runCatching {
+            synchronized(transitionWakeLockLock) {
+                transitionWakeLock?.takeIf { it.isHeld }?.release()
+            }
+        }.onFailure {
+            AppLog.write("PLAYER_SERVICE", "transition-wakelock release ${it.javaClass.simpleName}")
         }
     }
 
@@ -686,6 +797,7 @@ class PlaybackService : MediaSessionService() {
         snapshotJob?.cancel()
         recoveryJob?.cancel()
         serviceScope.cancel()
+        releaseTransitionWakeLock()
         unregisterReceiver(noisy)
         session?.release()
         player.release()

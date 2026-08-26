@@ -2,10 +2,16 @@ package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.data.normalizeLyricAlignment
 import com.ronan.qmusicwatch.data.normalizeUiSize
+import com.ronan.qmusicwatch.data.SettingsSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsStoreTest {
+    @Test fun rotaryVolumeControlDefaultsToEnabledForExistingInstalls() {
+        assertTrue(SettingsSnapshot().rotaryVolumeEnabled)
+    }
+
     @Test fun uiSizeDefaultsToCompactAndAcceptsOnlySupportedModes() {
         assertEquals("compact", normalizeUiSize(null))
         assertEquals("compact", normalizeUiSize("compact"))

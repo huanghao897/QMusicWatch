@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.media.AudioManager
 import android.net.Uri
 import android.provider.Settings
 import android.util.Base64
@@ -103,6 +104,8 @@ import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.network.*
 import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
+import com.ronan.qmusicwatch.playback.rotaryScrollDelta
+import com.ronan.qmusicwatch.playback.rotaryVolumeDirection
 import com.ronan.qmusicwatch.ui.*
 import com.ronan.qmusicwatch.update.UpdateInstaller
 import kotlinx.coroutines.Dispatchers
@@ -348,7 +351,13 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) hideStatusBar()
     }
 
-    override fun onResume() { super.onResume(); FramePerformanceMonitor.start() }
+    override fun onResume() {
+        super.onResume()
+        // Make hardware crown/volume keys target the same media stream as the
+        // Media3 player while this activity is visible.
+        setVolumeControlStream(AudioManager.STREAM_MUSIC)
+        FramePerformanceMonitor.start()
+    }
     override fun onPause() { FramePerformanceMonitor.stop(); super.onPause() }
 
     private fun hideStatusBar() = WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -379,6 +388,7 @@ class MainActivity : ComponentActivity() {
     val pureBlack = watchSettings.pureBlack
     val uiSize = watchSettings.uiSize
     val lowPowerPlayer = watchSettings.lowPowerPlayer
+    val rotaryVolumeEnabled = watchSettings.rotaryVolumeEnabled
     val wifiOnlyDownload = watchSettings.wifiOnlyDownload
     val lastSleepMinutes = watchSettings.lastSleepMinutes
     val dailyCount = watchSettings.dailyCount
@@ -533,6 +543,7 @@ class MainActivity : ComponentActivity() {
                     lyricAnimation = lyricAnimation,
                     lyricAlignment = lyricAlignment,
                     lowPowerPlayer = lowPowerPlayer,
+                    rotaryVolumeEnabled = rotaryVolumeEnabled,
                     quality = quality,
                     activeQuality = pageState.activeStreamQuality,
                     playbackLoading = pageState.playbackLoading,
@@ -560,7 +571,7 @@ class MainActivity : ComponentActivity() {
             composable("settings/playback") {
                 val pageState by vm.state.collectAsStateWithLifecycle()
                 val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
-                PlaybackSettingsScreen(vm, quality, pageState.profile, pageState.profileLoaded, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() }
+                PlaybackSettingsScreen(vm, quality, pageState.profile, pageState.profileLoaded, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, rotaryVolumeEnabled, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() }
             }
             composable("settings/network") {
                 val pageState by vm.state.collectAsStateWithLifecycle()
@@ -1028,7 +1039,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
 @Composable private fun PlayerScreen(
     track: Track?, lyrics: List<LyricLine>, vm: AppViewModel,
     playMode: String, lyricSize: String, showOriginal: Boolean, showTranslation: Boolean, lyricOffset: Long,
-    lyricAnimation: String, lyricAlignment: String, lowPowerPlayer: Boolean, quality: String,
+    lyricAnimation: String, lyricAlignment: String, lowPowerPlayer: Boolean, rotaryVolumeEnabled: Boolean, quality: String,
     activeQuality: String,
     playbackLoading: Boolean,
     profile: UserProfile?, profileLoaded: Boolean, playlists: List<MusicCollection>, liked: Boolean,
@@ -1089,6 +1100,9 @@ private fun decodeServerQrImage(value: String) = runCatching {
     val pager = rememberPagerState(initialPage = 0) { 2 }
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
+    val deviceVolume by vm.deviceVolume.collectAsStateWithLifecycle()
+    var volumeFeedbackTick by remember(track.id) { mutableIntStateOf(0) }
+    var showVolumeFeedback by remember(track.id) { mutableStateOf(false) }
     var locked by rememberSaveable { mutableStateOf(false) }
     var lyricChromeVisible by remember(track.id) { mutableStateOf(true) }
     var lyricChromeInteraction by remember(track.id) { mutableIntStateOf(0) }
@@ -1116,7 +1130,18 @@ private fun decodeServerQrImage(value: String) = runCatching {
         if (locked) view.keepScreenOn = true
         onDispose { view.keepScreenOn = previous }
     }
-    LaunchedEffect(Unit) { delay(100); focusRequester.requestFocus() }
+    LaunchedEffect(track.id, pager.currentPage, locked) {
+        // A tap on a player control can move focus away from the rotary target.
+        // Reclaim it whenever the player/lyrics page changes or lock mode ends.
+        delay(80)
+        focusRequester.requestFocus()
+    }
+    LaunchedEffect(track.id, volumeFeedbackTick) {
+        if (volumeFeedbackTick == 0) return@LaunchedEffect
+        showVolumeFeedback = true
+        delay(1_150)
+        showVolumeFeedback = false
+    }
     LaunchedEffect(track.id, lowPowerPlayer) {
         var elapsed = 0L
         val interval = if (lowPowerPlayer) 1_000L else 200L
@@ -1183,25 +1208,37 @@ private fun decodeServerQrImage(value: String) = runCatching {
             lyricChromeVisible = true
         }
     }
-    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black).focusRequester(focusRequester).focusable().onRotaryScrollEvent { event ->
+    BoxWithConstraints(
+        Modifier.fillMaxSize()
+            .background(Color.Black)
+            // Rotary input must sit outside the focus target in the modifier
+            // chain; this keeps it active after a control has been tapped.
+            .onRotaryScrollEvent { event ->
+                val delta = rotaryScrollDelta(event.verticalScrollPixels, event.horizontalScrollPixels)
         if (!locked) {
             if (pager.currentPage == 0) {
-                if (event.verticalScrollPixels != 0f) {
-                    vm.adjustVolume(if (event.verticalScrollPixels < 0) 1 else -1)
-                    performRotaryTick()
+                if (rotaryVolumeEnabled) {
+                    rotaryVolumeDirection(delta)?.let { direction ->
+                        vm.adjustVolume(direction)
+                        volumeFeedbackTick++
+                        performRotaryTick()
+                    }
                 }
             }
             else {
-                if (event.verticalScrollPixels != 0f) {
+                if (delta != 0f) {
                     manualLyricSelection = true
                     manualLyricInteraction++
-                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    scope.launch { listState.scrollBy(delta) }
                     performRotaryTick()
                 }
             }
         }
         true
-    }) {
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
+    ) {
         val horizontalControlInset = if (dimensions.isRound) maxWidth * .15f else 3.dp
         val verticalControlInset = if (dimensions.isRound) maxHeight * .15f else 3.dp
         val lyricHorizontalPadding = when {
@@ -1436,6 +1473,66 @@ private fun decodeServerQrImage(value: String) = runCatching {
                             },
                             onQueue = openQueue,
                             onMore = { showOptionsDialog = true },
+                        )
+                    }
+                }
+            }
+        }
+        val volumePercent = deviceVolume?.percent
+        val volumeFraction = deviceVolume?.let { state ->
+            if (state.max > 0) state.current.toFloat() / state.max.toFloat() else 0f
+        }?.coerceIn(0f, 1f) ?: 0f
+        val animatedVolumeFraction by animateFloatAsState(
+            targetValue = volumeFraction,
+            animationSpec = tween(180, easing = FastOutSlowInEasing),
+            label = "volumeFeedbackProgress",
+        )
+        AnimatedVisibility(
+            visible = showVolumeFeedback && rotaryVolumeEnabled && pager.currentPage == 0 && !locked,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = verticalControlInset + 34.dp),
+            enter = fadeIn(tween(130)),
+            exit = fadeOut(tween(220)),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = WatchSurfaceRaised.copy(alpha = .96f),
+                border = BorderStroke(1.dp, playerAccent.copy(alpha = .22f)),
+                tonalElevation = 0.dp,
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Icon(
+                        imageVector = when {
+                            deviceVolume?.muted == true || volumePercent == 0 -> Icons.Default.VolumeOff
+                            volumePercent != null && volumePercent < 50 -> Icons.Default.VolumeDown
+                            else -> Icons.Default.VolumeUp
+                        },
+                        contentDescription = "音量",
+                        modifier = Modifier.size(16.dp),
+                        tint = playerAccent,
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        AnimatedContent(
+                            targetState = volumePercent,
+                            transitionSpec = { fadeIn(tween(100)) togetherWith fadeOut(tween(80)) },
+                            label = "volumeFeedbackValue",
+                        ) { percent ->
+                            Text(
+                                text = percent?.let { "$it%" } ?: "—",
+                                color = WatchTextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { animatedVolumeFraction },
+                            modifier = Modifier.width(54.dp).height(3.dp),
+                            color = playerAccent,
+                            trackColor = WatchDivider,
                         )
                     }
                 }
@@ -1928,7 +2025,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
 }
 
-@Composable private fun PlaybackSettingsScreen(vm: AppViewModel, quality: String, profile: UserProfile?, profileLoaded: Boolean, headphoneWarning: Boolean, autoOpenPlayer: Boolean, playMode: String, sleepRemaining: Long, wifiOnlyDownload: Boolean, lastSleepMinutes: Int?, onBack: () -> Unit) {
+@Composable private fun PlaybackSettingsScreen(vm: AppViewModel, quality: String, profile: UserProfile?, profileLoaded: Boolean, headphoneWarning: Boolean, autoOpenPlayer: Boolean, playMode: String, sleepRemaining: Long, rotaryVolumeEnabled: Boolean, wifiOnlyDownload: Boolean, lastSleepMinutes: Int?, onBack: () -> Unit) {
     val context = LocalContext.current
     var customTimer by rememberSaveable { mutableStateOf(false) }
     var customMinutes by rememberSaveable { mutableStateOf("") }
@@ -1948,6 +2045,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         item { SettingsValueRow("播放顺序", playModeName(playMode), playModeIcon(playMode)) { showModeDialog = true } }
         item { SettingsSwitchRow("无耳机播放提醒", null, Icons.Default.Headphones, headphoneWarning, vm::setHeadphoneWarning) }
         item { SettingsSwitchRow("自动进入播放器", null, Icons.Default.OpenInFull, autoOpenPlayer, vm::setAutoOpenPlayer) }
+        item { SettingsSwitchRow("表冠调节音量", null, Icons.Default.Tune, rotaryVolumeEnabled, vm::setRotaryVolumeEnabled) }
         item { SettingsSectionLabel("定时关闭") }
         item {
             SettingsValueRow(

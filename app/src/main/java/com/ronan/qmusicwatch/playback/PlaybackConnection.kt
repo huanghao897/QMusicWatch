@@ -7,6 +7,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.C
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.core.content.ContextCompat
@@ -17,6 +18,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.ronan.qmusicwatch.data.AppLog
 import com.ronan.qmusicwatch.network.safeLocalOrArtworkUri
 import com.ronan.qmusicwatch.network.safeLocalOrQqMediaUri
+import kotlin.math.roundToInt
+
+data class DeviceVolumeState(
+    val current: Int,
+    val max: Int,
+    val muted: Boolean = false,
+) {
+    val percent: Int?
+        get() = max.takeIf { it > 0 }
+            ?.let { ((current.coerceIn(0, it).toFloat() / it) * 100f).roundToInt() }
+}
 
 class PlaybackConnection(context: Context) {
     private val audio = context.getSystemService(AudioManager::class.java)
@@ -25,14 +37,20 @@ class PlaybackConnection(context: Context) {
     private val _sleepRemaining = MutableStateFlow(0L)
     val sleepRemaining = _sleepRemaining.asStateFlow()
     private var sleepJob: Job? = null
+    private var volumeRefreshJob: Job? = null
     private var stopAfterCurrent = false
     private var sleepVolume: Float? = null
     private val mainExecutor = ContextCompat.getMainExecutor(context)
+    private val _deviceVolume = MutableStateFlow<DeviceVolumeState?>(null)
+    val deviceVolume = _deviceVolume.asStateFlow()
     var onError: ((PlaybackErrorEvent) -> Unit)? = null
     var onMediaItemChanged: ((String, String) -> Unit)? = null
     init {
+        publishSystemVolume()
         future.addListener({
-            controllerOrNull()?.addListener(object : Player.Listener {
+            controllerOrNull()?.let { controller ->
+                publishControllerVolume(controller)
+                controller.addListener(object : Player.Listener {
                 override fun onPlayerError(error: PlaybackException) {
                     val causes = generateSequence<Throwable>(error) { it.cause }.joinToString(" <- ") { "${it.javaClass.simpleName}:${it.message.orEmpty()}" }
                     AppLog.write("PLAYER", "${error.errorCodeName} $causes")
@@ -48,7 +66,11 @@ class PlaybackConnection(context: Context) {
                     mediaItem ?: return
                     onMediaItemChanged?.invoke(mediaItem.mediaId, mediaItem.localConfiguration?.uri?.toString().orEmpty())
                 }
-            }) ?: AppLog.write("PLAYER", "controller connection failed")
+                override fun onDeviceVolumeChanged(deviceVolume: Int, muted: Boolean) {
+                    publishControllerVolume(controller, deviceVolume, muted)
+                }
+            })
+            } ?: AppLog.write("PLAYER", "controller connection failed")
         }, mainExecutor)
     }
     private fun controllerOrNull(): MediaController? =
@@ -106,11 +128,94 @@ class PlaybackConnection(context: Context) {
     fun currentUri() = controllerOrNull()?.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
     fun isPlaying() = controllerOrNull()?.isPlaying == true
     fun playWhenReady() = controllerOrNull()?.playWhenReady == true
-    fun adjustVolume(direction: Int) = audio.adjustStreamVolume(
-        AudioManager.STREAM_MUSIC,
-        if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-        AudioManager.FLAG_SHOW_UI,
-    )
+    /**
+     * Changes the device/media-session volume rather than the ExoPlayer
+     * software gain. On watches the active output is often a Bluetooth device,
+     * so the suggested-volume path is more reliable than changing a fixed
+     * stream. Media3 is attempted first, with the Android audio manager as a
+     * compatibility fallback for players that do not implement device volume.
+     */
+    fun adjustVolume(direction: Int) {
+        if (direction == 0) return
+        val run: () -> Unit = run@{
+            val controller = controllerOrNull()
+            if (controller == null) {
+                adjustSystemVolume(direction, "controller-unavailable")
+                return@run
+            }
+            val adjusted = runCatching {
+                when {
+                    controller.deviceInfo.maxVolume > 0 &&
+                        controller.isCommandAvailable(Player.COMMAND_ADJUST_DEVICE_VOLUME_WITH_FLAGS) -> {
+                        if (direction > 0) controller.increaseDeviceVolume(C.VOLUME_FLAG_SHOW_UI)
+                        else controller.decreaseDeviceVolume(C.VOLUME_FLAG_SHOW_UI)
+                        publishControllerVolume(controller)
+                        refreshVolumeSoon()
+                        true
+                    }
+                    controller.deviceInfo.maxVolume > 0 &&
+                        controller.isCommandAvailable(Player.COMMAND_ADJUST_DEVICE_VOLUME) -> {
+                        if (direction > 0) controller.increaseDeviceVolume()
+                        else controller.decreaseDeviceVolume()
+                        publishControllerVolume(controller)
+                        refreshVolumeSoon()
+                        true
+                    }
+                    else -> false
+                }
+            }.onFailure {
+                AppLog.write("PLAYER", "device-volume ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+            }.getOrDefault(false)
+            if (!adjusted) adjustSystemVolume(direction, "device-command-unavailable")
+        }
+        if (future.isDone) run() else future.addListener(run, mainExecutor)
+    }
+
+    private fun adjustSystemVolume(direction: Int, reason: String) {
+        runCatching {
+            audio.adjustVolume(
+                if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                AudioManager.FLAG_SHOW_UI,
+            )
+            publishSystemVolume()
+            refreshVolumeSoon()
+        }.onFailure {
+            AppLog.write("PLAYER", "system-volume fallback=$reason ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+        }
+    }
+
+    private fun publishControllerVolume(
+        controller: MediaController,
+        current: Int = controller.deviceVolume,
+        muted: Boolean = controller.isDeviceMuted,
+    ) {
+        val max = controller.deviceInfo.maxVolume
+        if (max > 0 && current >= 0) {
+            _deviceVolume.value = DeviceVolumeState(current, max, muted)
+        } else {
+            publishSystemVolume()
+        }
+    }
+
+    private fun publishSystemVolume() {
+        runCatching {
+            _deviceVolume.value = DeviceVolumeState(
+                current = audio.getStreamVolume(AudioManager.STREAM_MUSIC),
+                max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+                muted = false,
+            )
+        }.onFailure {
+            AppLog.write("PLAYER", "volume-state ${it.javaClass.simpleName}:${it.message.orEmpty()}")
+        }
+    }
+
+    private fun refreshVolumeSoon() {
+        volumeRefreshJob?.cancel()
+        volumeRefreshJob = scope.launch {
+            delay(90)
+            controllerOrNull()?.let(::publishControllerVolume) ?: publishSystemVolume()
+        }
+    }
     fun startSleepTimer(minutes: Int, finishCurrent: Boolean = false) {
         // Cancel first, then restore: the old job's tail never runs after cancel,
         // so its fade-out would otherwise leave the volume permanently lowered.
@@ -152,7 +257,11 @@ class PlaybackConnection(context: Context) {
         pause()
         return true
     }
-    fun release() { scope.cancel(); MediaController.releaseFuture(future) }
+    fun release() {
+        volumeRefreshJob?.cancel()
+        scope.cancel()
+        MediaController.releaseFuture(future)
+    }
 }
 
 internal fun playbackMediaItem(id: String, uri: String, title: String, artist: String, artwork: String): MediaItem {

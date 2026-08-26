@@ -31,6 +31,7 @@ data class SettingsSnapshot(
     val lyricAlignment: String = "left",
     val pureBlack: Boolean = false,
     val lowPowerPlayer: Boolean = false,
+    val rotaryVolumeEnabled: Boolean = true,
     val wifiOnlyDownload: Boolean = true,
     val lastSleepMinutes: Int? = null,
     val dailyCount: Int = 5,
@@ -53,6 +54,7 @@ class SettingsStore(private val context: Context) {
     private val lyricAlignmentKey = stringPreferencesKey("lyric_alignment")
     private val pureBlackKey = booleanPreferencesKey("pure_black")
     private val lowPowerPlayerKey = booleanPreferencesKey("low_power_player")
+    private val rotaryVolumeEnabledKey = booleanPreferencesKey("rotary_volume_enabled")
     private val wifiOnlyDownloadKey = booleanPreferencesKey("wifi_only_download")
     private val lastSleepMinutesKey = stringPreferencesKey("last_sleep_minutes")
     private val playbackSnapshotKey = stringPreferencesKey("playback_snapshot")
@@ -79,6 +81,7 @@ class SettingsStore(private val context: Context) {
             lyricAlignment = normalizeLyricAlignment(prefs[lyricAlignmentKey]),
             pureBlack = prefs[pureBlackKey] ?: false,
             lowPowerPlayer = prefs[lowPowerPlayerKey] ?: false,
+            rotaryVolumeEnabled = prefs[rotaryVolumeEnabledKey] ?: true,
             wifiOnlyDownload = prefs[wifiOnlyDownloadKey] ?: true,
             lastSleepMinutes = prefs[lastSleepMinutesKey]?.toIntOrNull()?.coerceIn(1, 1440),
             dailyCount = if (prefs[dailyCountKey] == "10") 10 else 5,
@@ -102,6 +105,7 @@ class SettingsStore(private val context: Context) {
     val lyricAlignment = context.settingsDataStore.data.map { normalizeLyricAlignment(it[lyricAlignmentKey]) }
     val pureBlack = context.settingsDataStore.data.map { it[pureBlackKey] ?: false }
     val lowPowerPlayer = context.settingsDataStore.data.map { it[lowPowerPlayerKey] ?: false }
+    val rotaryVolumeEnabled = context.settingsDataStore.data.map { it[rotaryVolumeEnabledKey] ?: true }
     val wifiOnlyDownload = context.settingsDataStore.data.map { it[wifiOnlyDownloadKey] ?: true }
     val lastSleepMinutes = context.settingsDataStore.data.map { it[lastSleepMinutesKey]?.toIntOrNull()?.coerceIn(1, 1440) }
     val playbackSnapshot = context.settingsDataStore.data.map { it[playbackSnapshotKey].orEmpty() }
@@ -128,6 +132,7 @@ class SettingsStore(private val context: Context) {
     suspend fun setLyricAlignment(value: String) = context.settingsDataStore.edit { it[lyricAlignmentKey] = normalizeLyricAlignment(value) }
     suspend fun setPureBlack(value: Boolean) = context.settingsDataStore.edit { it[pureBlackKey] = value }
     suspend fun setLowPowerPlayer(value: Boolean) = context.settingsDataStore.edit { it[lowPowerPlayerKey] = value }
+    suspend fun setRotaryVolumeEnabled(value: Boolean) = context.settingsDataStore.edit { it[rotaryVolumeEnabledKey] = value }
     suspend fun setWifiOnlyDownload(value: Boolean) = context.settingsDataStore.edit { it[wifiOnlyDownloadKey] = value }
     suspend fun setLastSleepMinutes(value: Int) = context.settingsDataStore.edit { it[lastSleepMinutesKey] = value.coerceIn(1, 1440).toString() }
     suspend fun setPlaybackSnapshot(value: String) = context.settingsDataStore.edit { it[playbackSnapshotKey] = value }
