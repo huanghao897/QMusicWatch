@@ -57,8 +57,8 @@ android {
         applicationId = "com.ronan.qmusicwatch"
         minSdk = 24
         targetSdk = 36
-        versionCode = 42
-        versionName = "0.9.12"
+        versionCode = 43
+        versionName = "0.9.13"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartext"] = "false"
         buildConfigField("String", "QMUSIC_SERVER_BASE_URL", "\"https://heyboxlite.xyz/\"")
