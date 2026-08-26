@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [24, 36], qualifiers = "w240dp-h240dp-xhdpi")
+@Config(sdk = [24, 35], qualifiers = "w240dp-h240dp-xhdpi")
 @LooperMode(LooperMode.Mode.PAUSED)
 class WatchActivityRobolectricTest {
     @Test fun manifestDeclaresNotificationPermissionForMediaControls() {
@@ -41,7 +41,7 @@ class WatchActivityRobolectricTest {
     }
 
     @Test
-    @Config(sdk = [36], qualifiers = "w320dp-h320dp-mdpi")
+    @Config(sdk = [35], qualifiers = "w320dp-h320dp-mdpi")
     fun mainActivityAlsoLaysOutOnA320DpSquareDisplay() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).create().start().resume()
         try {

@@ -16,7 +16,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [24, 36], application = Application::class)
+@Config(sdk = [24, 35], application = Application::class)
 class DatabaseMigrationRobolectricTest {
     private val context get() = RuntimeEnvironment.getApplication() as Application
 

@@ -11,12 +11,19 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.min
 
 val WatchBackground = Color(0xFF050505)
 val WatchSurface = Color(0xFF151616)
@@ -73,6 +80,50 @@ data class WatchDimensions(
     val playerArtworkSize: Dp,
 )
 
+/**
+ * Bottom surface for the round-watch mini player.
+ *
+ * The sides stop higher than the centre so the lower edge follows the round
+ * display instead of leaving a flat rectangular black band at the bottom.
+ * Keeping the curve inside the layout bounds also works on square displays
+ * that happen to apply a round window mask at runtime.
+ */
+object RoundMiniPlayerShape : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val width = size.width
+        val height = size.height
+        if (width <= 0f || height <= 0f) return Outline.Rectangle(androidx.compose.ui.geometry.Rect.Zero)
+
+        val topRadius = min(height * .48f, with(density) { 22.dp.toPx() })
+        // Leave enough vertical room at the edges for the compact artwork and
+        // text while keeping a clearly visible centre dip.
+        val sideBottom = height * .82f
+        val path = Path().apply {
+            moveTo(0f, topRadius)
+            quadraticTo(0f, 0f, topRadius, 0f)
+            lineTo(width - topRadius, 0f)
+            quadraticTo(width, 0f, width, topRadius)
+            lineTo(width, sideBottom)
+            cubicTo(
+                width * .82f, height * .84f,
+                width * .66f, height * .97f,
+                width * .5f, height,
+            )
+            cubicTo(
+                width * .34f, height * .97f,
+                width * .18f, height * .84f,
+                0f, sideBottom,
+            )
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
 internal fun resolveWatchDimensions(
     width: Dp,
     uiSize: WatchUiSize,
@@ -103,8 +154,8 @@ internal fun resolveWatchDimensions(
         trackRowHeight = 46.dp.scaled(),
         searchHeight = 40.dp.scaled(),
         artworkSize = 36.dp.scaled(),
-        miniPlayerHeight = (if (isRound) 58.dp else 50.dp).scaled(),
-        miniPlayerWidthFraction = if (isRound) .82f else 1f,
+        miniPlayerHeight = 48.dp.scaled(),
+        miniPlayerWidthFraction = 1f,
         touchTarget = 40.dp.scaled(),
         iconSize = 19.dp.scaled(),
         cornerRadius = 23.dp.scaled(),

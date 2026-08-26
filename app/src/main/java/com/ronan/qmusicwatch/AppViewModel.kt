@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ronan.qmusicwatch.data.RecentEntity
 import com.ronan.qmusicwatch.data.mergeRecent
 import com.ronan.qmusicwatch.data.AppLog
+import com.ronan.qmusicwatch.data.SettingsSnapshot
 import com.ronan.qmusicwatch.data.redactDiagnosticMessage
 import com.ronan.qmusicwatch.download.cachedArtworkFile
 import com.ronan.qmusicwatch.download.cachedLyricsFile
@@ -27,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -39,7 +41,7 @@ import kotlin.math.roundToInt
 private const val PLAYBACK_RECOVERY_NOTICE_TIMEOUT_MS = 65_000L
 
 data class AppUiState(
-    val loading: Boolean = false, val message: String? = null, val home: HomeData? = null,
+    val loading: Boolean = false, val sessionLoaded: Boolean = false, val message: String? = null, val home: HomeData? = null,
     val library: LibraryData? = null, val recent: List<Track> = emptyList(), val recentLoaded: Boolean = false,
     val searchTracks: List<Track> = emptyList(),
     val searchCollections: List<MusicCollection> = emptyList(), val searchType: String = "track",
@@ -152,28 +154,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, AppChromeUiState())
     val downloads = graph.downloads.downloads.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val quality = graph.settings.quality.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QUALITY_STANDARD)
+    /** One root subscription prevents a cascade of DataStore-driven recompositions. */
+    val settings = graph.settings.snapshot.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsSnapshot())
+    // Keep the small individual flows as compatibility accessors for existing
+    // screens/tests. They are lazy now; the root collects the snapshot above.
+    val quality = settings.map { it.quality }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QUALITY_STANDARD)
     /** Account-level options for the compact watch quality picker. */
     val qualityEntitlements = state.map { profileQualityOptions(it.profile) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, profileQualityOptions(null))
-    val headphoneWarning = graph.settings.headphoneWarning.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val autoOpenPlayer = graph.settings.autoOpenPlayer.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val playMode = graph.settings.playMode.stateIn(viewModelScope, SharingStarted.Eagerly, "sequential")
-    val lyricSize = graph.settings.lyricSize.stateIn(viewModelScope, SharingStarted.Eagerly, "normal")
-    val lyricTranslation = graph.settings.lyricTranslation.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val lyricOriginal = graph.settings.lyricOriginal.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val lyricOffset = graph.settings.lyricOffset.stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
-    val lyricAnimation = graph.settings.lyricAnimation.stateIn(viewModelScope, SharingStarted.Eagerly, "soft")
-    val lyricAlignment = graph.settings.lyricAlignment.stateIn(viewModelScope, SharingStarted.Eagerly, "left")
-    val pureBlack = graph.settings.pureBlack.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-    val lowPowerPlayer = graph.settings.lowPowerPlayer.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-    val wifiOnlyDownload = graph.settings.wifiOnlyDownload.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val lastSleepMinutes = graph.settings.lastSleepMinutes.stateIn(viewModelScope, SharingStarted.Eagerly, null)
-    val dailyCount = graph.settings.dailyCount.stateIn(viewModelScope, SharingStarted.Eagerly, 5)
-    val searchHistory = graph.settings.searchHistory.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val seenAnnouncements = graph.settings.seenAnnouncements.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
-    val uiSize = graph.settings.uiSize.stateIn(viewModelScope, SharingStarted.Eagerly, "compact")
-    val artworkAccent = graph.settings.artworkAccent.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val headphoneWarning = settings.map { it.headphoneWarning }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val autoOpenPlayer = settings.map { it.autoOpenPlayer }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val playMode = settings.map { it.playMode }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "sequential")
+    val lyricSize = settings.map { it.lyricSize }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "normal")
+    val lyricTranslation = settings.map { it.lyricTranslation }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val lyricOriginal = settings.map { it.lyricOriginal }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val lyricOffset = settings.map { it.lyricOffset }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+    val lyricAnimation = settings.map { it.lyricAnimation }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "soft")
+    val lyricAlignment = settings.map { it.lyricAlignment }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "left")
+    val pureBlack = settings.map { it.pureBlack }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val lowPowerPlayer = settings.map { it.lowPowerPlayer }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val wifiOnlyDownload = settings.map { it.wifiOnlyDownload }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val lastSleepMinutes = settings.map { it.lastSleepMinutes }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val dailyCount = settings.map { it.dailyCount }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 5)
+    val searchHistory = settings.map { it.searchHistory }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val seenAnnouncements = settings.map { it.seenAnnouncements }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    val uiSize = settings.map { it.uiSize }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "compact")
+    val artworkAccent = settings.map { it.artworkAccent }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue = _queue.asStateFlow()
     private val _queueIndex = MutableStateFlow(-1)
@@ -196,12 +202,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var queueImportJob: Job? = null
     private var updateJob: Job? = null
     private var qrLoginJob: Job? = null
+    private var sessionRestoreJob: Job? = null
     private val json = Json { ignoreUnknownKeys = true }
     private val sessionReady = CompletableDeferred<Unit>()
     private val profileCacheReady = CompletableDeferred<Unit>()
     private val snapshotMutex = Mutex()
     private val playbackSnapshotMutex = Mutex()
-    private var currentSession = graph.vault.load()
+    // Android Keystore access can involve Binder work and AES-GCM decryption.  Do
+    // not perform it while the ViewModel is being constructed on the UI thread;
+    // the first frame should be able to render before the session is restored.
+    private var currentSession: SessionTokens? = null
     private var sessionGeneration = 0L
     val signedIn get() = currentSession != null
     val accountId get() = currentSession?.accountId
@@ -210,11 +220,39 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         graph.playback.onError = ::handlePlaybackError
         graph.playback.onMediaItemChanged = ::handleMediaItemChanged
-        sessionReady.complete(Unit)
+        val restoreGeneration = sessionGeneration
+        sessionRestoreJob = viewModelScope.launch(Dispatchers.IO) {
+            val startedAt = android.os.SystemClock.elapsedRealtime()
+            val restored = runCatching { graph.vault.load() }
+                .onFailure { error ->
+                    AppLog.write("PERF", "session_load_error=${error.javaClass.simpleName}")
+                }
+                .getOrNull()
+            withContext(Dispatchers.Main.immediate) {
+                // A fast logout can happen before Keystore restoration returns.
+                // Never let that old read resurrect a signed-in session.
+                if (sessionReady.isCompleted || sessionGeneration != restoreGeneration) return@withContext
+                currentSession = restored
+                sessionReady.complete(Unit)
+                // signedIn/accountId are deliberately lightweight properties rather
+                // than another public Flow.  Emit one state change so the existing
+                // screens redraw when the background restore finishes.
+                _state.update { it.copy(sessionLoaded = true) }
+                AppLog.write(
+                    "PERF",
+                    "session_load_ms=${android.os.SystemClock.elapsedRealtime() - startedAt} signed_in=${restored != null}",
+                )
+            }
+        }
         viewModelScope.launch {
+            sessionReady.await()
             val generation = sessionGeneration
             val owner = accountId
-            runCatching { json.decodeFromString<PlaybackSnapshot>(graph.settings.playbackSnapshot.first()) }.getOrNull()?.takeIf { it.belongsToAccount(owner) && generation == sessionGeneration }?.let { snapshot ->
+            val rawSnapshot = graph.settings.playbackSnapshot.first()
+            val snapshot = withContext(Dispatchers.Default) {
+                runCatching { json.decodeFromString<PlaybackSnapshot>(rawSnapshot) }.getOrNull()
+            }
+            snapshot?.takeIf { it.belongsToAccount(owner) && generation == sessionGeneration }?.let { snapshot ->
                 _queue.value = snapshot.queue.distinctBy(Track::id)
                 _queueReversed.value = snapshot.queueReversed
                 restoredPosition = snapshot.positionMs
@@ -233,17 +271,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             var refresh = false
             try {
                 if (signedIn) {
-                    val cached = runCatching { json.decodeFromString<CachedUserProfile>(graph.settings.profileCache.first()) }
-                        .getOrNull()?.let(::normalizeCachedUserProfile)
+                    val rawProfile = graph.settings.profileCache.first()
+                    val cached = withContext(Dispatchers.Default) {
+                        runCatching { json.decodeFromString<CachedUserProfile>(rawProfile) }
+                            .getOrNull()?.let(::normalizeCachedUserProfile)
+                    }
                     cached?.takeIf { it.accountId == accountId && generation == sessionGeneration }?.let { _state.update { state -> state.copy(profile = it.profile, profileLoaded = true, profileError = null) } }
                     refresh = profileCacheNeedsRefresh(cached, accountId, System.currentTimeMillis())
                 }
             } finally { profileCacheReady.complete(Unit) }
-            if (refresh && generation == sessionGeneration) loadProfile(force = true)
+            if (refresh && generation == sessionGeneration) {
+                // Membership refresh is important, but it need not contend with
+                // the first home frame on a low-power watch.
+                delay(520)
+                if (generation == sessionGeneration) loadProfile(force = true)
+            }
         }
         viewModelScope.launch { while (isActive) { delay(10_000); if (_state.value.currentTrack != null) persistSnapshot() } }
-        viewModelScope.launch { restoreControlPlaneAndRefresh() }
         viewModelScope.launch {
+            // Control-plane data is useful, but it should not compete with the
+            // first home composition or the initial media-controller handshake.
+            delay(700)
+            restoreControlPlaneAndRefresh()
+        }
+        viewModelScope.launch {
+            delay(1_000)
             restorePendingUpdate()
             checkForUpdateNow(showStatus = false)
         }
@@ -257,11 +309,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-        loadHome()
-        viewModelScope.launch {
-            sessionReady.await()
-            if (signedIn) { loadLibrary(); loadRecent() }
-        }
+        // Home renders its cached snapshot first and refreshes after the first
+        // frame. Library/recent are loaded on demand when the user opens "我的"
+        // (and after an explicit login), avoiding duplicate cold-start requests.
+        loadHome(deferNetwork = true)
     }
 
     fun consumeMessage() = _state.update { it.copy(message = null) }
@@ -383,11 +434,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadHome() = viewModelScope.launch {
+    fun loadHome(deferNetwork: Boolean = false) = viewModelScope.launch {
         sessionReady.await()
         val generation = sessionGeneration
         restoreAccountSnapshot()
         if (generation != sessionGeneration) return@launch
+        if (deferNetwork) {
+            // Let Compose commit the cached/empty first frame before opening a
+            // network connection on a low-power wearable.
+            yield()
+            delay(160)
+        }
         _state.update { it.copy(loading = it.home == null) }
         runCatching { graph.api.home() }.onSuccess { home ->
             if (generation != sessionGeneration) return@onSuccess
@@ -492,6 +549,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun logout() {
+        sessionRestoreJob?.cancel()
+        sessionRestoreJob = null
+        // Unblock startup coroutines if the user logs out while the initial
+        // Keystore read is still in flight.
+        if (!sessionReady.isCompleted) sessionReady.complete(Unit)
         viewModelScope.launch { runCatching { graph.downloads.pauseAll() }.onFailure { AppLog.write("DOWNLOAD", "logout ${it.javaClass.simpleName}:${it.message.orEmpty()}") } }
         playJob?.cancel(); playJob = null
         qualitySwitchJob?.cancel(); qualitySwitchJob = null
@@ -534,8 +596,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun restoreAccountSnapshot() {
         val owner = accountId ?: "guest"
-        val cached = runCatching { json.decodeFromString<CachedAccountSnapshots>(graph.settings.accountSnapshots.first()) }.getOrNull()
-            ?.items?.firstOrNull { it.accountId == owner } ?: return
+        val raw = graph.settings.accountSnapshots.first()
+        val cached = withContext(Dispatchers.Default) {
+            runCatching { json.decodeFromString<CachedAccountSnapshots>(raw) }.getOrNull()
+        }?.items?.firstOrNull { it.accountId == owner } ?: return
         _state.update { state -> state.copy(
             home = state.home ?: cached.home,
             library = state.library ?: cached.library?.let(::normalizeLibraryData),
@@ -545,11 +609,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun cacheAccountSnapshot(home: HomeData? = null, library: LibraryData? = null) = snapshotMutex.withLock {
         val owner = accountId ?: "guest"
-        val cache = runCatching { json.decodeFromString<CachedAccountSnapshots>(graph.settings.accountSnapshots.first()) }.getOrDefault(CachedAccountSnapshots())
+        val raw = graph.settings.accountSnapshots.first()
+        val cache = withContext(Dispatchers.Default) {
+            runCatching { json.decodeFromString<CachedAccountSnapshots>(raw) }.getOrDefault(CachedAccountSnapshots())
+        }
         val old = cache.items.firstOrNull { it.accountId == owner }
         val normalizedLibrary = (library ?: old?.library)?.let(::normalizeLibraryData)
         val updated = CachedAccountSnapshot(owner, home ?: old?.home, normalizedLibrary, System.currentTimeMillis())
-        graph.settings.setAccountSnapshots(json.encodeToString(upsertAccountSnapshot(cache, updated)))
+        val serialized = withContext(Dispatchers.Default) { json.encodeToString(upsertAccountSnapshot(cache, updated)) }
+        graph.settings.setAccountSnapshots(serialized)
     }
     fun loadProfile(force: Boolean = false) = viewModelScope.launch {
         val generation = sessionGeneration
@@ -616,7 +684,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun featureMessage(name: String): String = _state.value.controlConfig.messages[name].orEmpty()
 
     private suspend fun restoreControlPlaneAndRefresh() {
-        val cached = runCatching { json.decodeFromString<CachedControlPlane>(graph.settings.controlPlaneCache.first()) }.getOrNull()
+        val raw = graph.settings.controlPlaneCache.first()
+        val cached = withContext(Dispatchers.Default) {
+            runCatching { json.decodeFromString<CachedControlPlane>(raw) }.getOrNull()
+        }
         val now = System.currentTimeMillis()
         cached?.let { value -> _state.update { it.copy(
             controlConfig = value.config.takeIf { controlCacheIsFresh(value, now) } ?: RemoteFeatureConfig(),

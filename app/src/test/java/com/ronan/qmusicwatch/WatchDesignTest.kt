@@ -16,7 +16,7 @@ class WatchDesignTest {
         assertEquals(8.dp, dimensions.screenPadding)
         assertEquals(46.dp, dimensions.trackRowHeight)
         assertEquals(40.dp, dimensions.searchHeight)
-        assertEquals(50.dp, dimensions.miniPlayerHeight)
+        assertEquals(48.dp, dimensions.miniPlayerHeight)
         assertEquals(13f, dimensions.bodySp)
         assertEquals(23.dp, dimensions.rowCornerRadius)
         assertEquals(20.dp, dimensions.searchCornerRadius)
@@ -41,8 +41,8 @@ class WatchDesignTest {
         assertTrue(round.screenPadding > square.screenPadding)
         assertTrue(round.topSafeInset > square.topSafeInset)
         assertEquals(square.trackRowHeight, round.trackRowHeight)
-        assertEquals(.82f, round.miniPlayerWidthFraction)
-        assertEquals(58.dp, round.miniPlayerHeight)
+        assertEquals(1f, round.miniPlayerWidthFraction)
+        assertEquals(48.dp, round.miniPlayerHeight)
         assertEquals(1f, square.miniPlayerWidthFraction)
     }
 

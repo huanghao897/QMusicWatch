@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = android.app.Application::class)
+@Config(sdk = [35], application = android.app.Application::class)
 @LooperMode(LooperMode.Mode.PAUSED)
 class PlaybackServiceRobolectricTest {
     @Test fun backgroundPlaybackKeepsCpuAndNetworkAwake() {

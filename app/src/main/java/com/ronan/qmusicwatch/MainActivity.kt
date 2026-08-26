@@ -8,6 +8,8 @@ import android.net.Uri
 import android.provider.Settings
 import android.util.Base64
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -363,24 +365,25 @@ class MainActivity : ComponentActivity() {
     val backStack by nav.currentBackStackEntryAsState()
     val chrome by vm.chromeState.collectAsStateWithLifecycle()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
-    val quality by vm.quality.collectAsStateWithLifecycle()
-    val headphoneWarning by vm.headphoneWarning.collectAsStateWithLifecycle()
-    val autoOpenPlayer by vm.autoOpenPlayer.collectAsStateWithLifecycle()
-    val playMode by vm.playMode.collectAsStateWithLifecycle()
-    val lyricSize by vm.lyricSize.collectAsStateWithLifecycle()
-    val lyricTranslation by vm.lyricTranslation.collectAsStateWithLifecycle()
-    val lyricOriginal by vm.lyricOriginal.collectAsStateWithLifecycle()
-    val lyricOffset by vm.lyricOffset.collectAsStateWithLifecycle()
-    val lyricAnimation by vm.lyricAnimation.collectAsStateWithLifecycle()
-    val lyricAlignment by vm.lyricAlignment.collectAsStateWithLifecycle()
-    val pureBlack by vm.pureBlack.collectAsStateWithLifecycle()
-    val uiSize by vm.uiSize.collectAsStateWithLifecycle()
-    val lowPowerPlayer by vm.lowPowerPlayer.collectAsStateWithLifecycle()
-    val wifiOnlyDownload by vm.wifiOnlyDownload.collectAsStateWithLifecycle()
-    val lastSleepMinutes by vm.lastSleepMinutes.collectAsStateWithLifecycle()
-    val dailyCount by vm.dailyCount.collectAsStateWithLifecycle()
-    val searchHistory by vm.searchHistory.collectAsStateWithLifecycle()
-    val seenAnnouncements by vm.seenAnnouncements.collectAsStateWithLifecycle()
+    val watchSettings by vm.settings.collectAsStateWithLifecycle()
+    val quality = watchSettings.quality
+    val headphoneWarning = watchSettings.headphoneWarning
+    val autoOpenPlayer = watchSettings.autoOpenPlayer
+    val playMode = watchSettings.playMode
+    val lyricSize = watchSettings.lyricSize
+    val lyricTranslation = watchSettings.lyricTranslation
+    val lyricOriginal = watchSettings.lyricOriginal
+    val lyricOffset = watchSettings.lyricOffset
+    val lyricAnimation = watchSettings.lyricAnimation
+    val lyricAlignment = watchSettings.lyricAlignment
+    val pureBlack = watchSettings.pureBlack
+    val uiSize = watchSettings.uiSize
+    val lowPowerPlayer = watchSettings.lowPowerPlayer
+    val wifiOnlyDownload = watchSettings.wifiOnlyDownload
+    val lastSleepMinutes = watchSettings.lastSleepMinutes
+    val dailyCount = watchSettings.dailyCount
+    val searchHistory = watchSettings.searchHistory
+    val seenAnnouncements = watchSettings.seenAnnouncements
     QMusicWatchTheme(uiSize = uiSize, pureBlack = pureBlack) {
     val appDimensions = LocalWatchDimensions.current
     var dismissedAnnouncements by remember { mutableStateOf(emptySet<String>()) }
@@ -682,7 +685,7 @@ class MainActivity : ComponentActivity() {
     var dailyOffset by remember { mutableIntStateOf(0) }
     val daily = state.home?.daily.orEmpty()
     val shown = dailyBatch(daily, dailyOffset, dailyCount)
-    LaunchedEffect(pager.settledPage, vm.signedIn, state.profileLoaded, state.library, state.recentLoaded) {
+    LaunchedEffect(pager.settledPage, state.sessionLoaded, vm.signedIn, state.profileLoaded, state.library, state.recentLoaded) {
         if (pager.settledPage == 1 && vm.signedIn) {
             if (!state.profileLoaded) vm.loadProfile()
             if (state.library == null) vm.loadLibrary()
@@ -724,7 +727,11 @@ class MainActivity : ComponentActivity() {
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
                             Text(
-                                if (vm.signedIn) state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户" else "尚未登录",
+                                when {
+                                    !state.sessionLoaded -> "正在读取账号…"
+                                    vm.signedIn -> state.profile?.displayName?.ifBlank { null } ?: "${loginProviderName(vm.loginProvider)}音乐用户"
+                                    else -> "尚未登录"
+                                },
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -1091,6 +1098,19 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
     val view = LocalView.current
     val lyricHaptics = LocalHapticFeedback.current
+    // Rotary events can arrive much faster than the watch's haptic actuator can
+    // respond. Keep the volume behavior immediate, but coalesce tactile ticks so
+    // a fast crown spin feels like a clean sequence instead of a buzz.
+    val lastRotaryHapticAt = remember(track.id) { longArrayOf(0L) }
+    fun performRotaryTick() {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastRotaryHapticAt[0] >= 48L) {
+            if (!view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)) {
+                lyricHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
+            lastRotaryHapticAt[0] = now
+        }
+    }
     DisposableEffect(locked) {
         val previous = view.keepScreenOn
         if (locked) view.keepScreenOn = true
@@ -1165,11 +1185,19 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black).focusRequester(focusRequester).focusable().onRotaryScrollEvent { event ->
         if (!locked) {
-            if (pager.currentPage == 0) vm.adjustVolume(if (event.verticalScrollPixels < 0) 1 else -1)
+            if (pager.currentPage == 0) {
+                if (event.verticalScrollPixels != 0f) {
+                    vm.adjustVolume(if (event.verticalScrollPixels < 0) 1 else -1)
+                    performRotaryTick()
+                }
+            }
             else {
-                manualLyricSelection = true
-                manualLyricInteraction++
-                scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                if (event.verticalScrollPixels != 0f) {
+                    manualLyricSelection = true
+                    manualLyricInteraction++
+                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    performRotaryTick()
+                }
             }
         }
         true
@@ -2478,23 +2506,19 @@ private fun formatFileSize(bytes: Long): String = when {
         ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
         ?: lyrics.indexOfFirst { it.text.isNotBlank() }
     val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() } ?: "正在播放"
-    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         val round = dimensions.isRound
         val miniModifier = if (round) {
-            Modifier.width(maxWidth * dimensions.miniPlayerWidthFraction)
-                .height(dimensions.miniPlayerHeight)
+            // Full width lets the system's circular window mask do the work;
+            // the custom lower curve removes the old rectangular black band.
+            Modifier.fillMaxWidth().height(dimensions.miniPlayerHeight)
         } else {
             Modifier.fillMaxWidth().padding(horizontal = 6.dp)
                 .height(dimensions.miniPlayerHeight)
         }
         Surface(
             modifier = miniModifier,
-            shape = if (round) RoundedCornerShape(
-                topStart = dimensions.miniPlayerHeight * .5f,
-                topEnd = dimensions.miniPlayerHeight * .5f,
-                bottomStart = 4.dp,
-                bottomEnd = 4.dp,
-            ) else RoundedCornerShape(50),
+            shape = if (round) RoundMiniPlayerShape else RoundedCornerShape(50),
             color = WatchSurfaceRaised,
             tonalElevation = 0.dp,
         ) {
@@ -2502,27 +2526,27 @@ private fun formatFileSize(bytes: Long): String = when {
                 Modifier.fillMaxSize()
                     .clickable(onClick = open)
                     .padding(
-                        start = if (round) 12.dp else 6.dp,
-                        end = if (round) 9.dp else 1.dp,
-                        top = if (round) 5.dp else 2.dp,
-                        bottom = if (round) dimensions.miniPlayerHeight * .22f else 2.dp,
+                        start = if (round) 10.dp else 6.dp,
+                        end = if (round) 8.dp else 1.dp,
+                        top = if (round) 2.dp else 2.dp,
+                        bottom = if (round) 1.dp else 2.dp,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AsyncImage(
                     model = artworkRequest,
                     contentDescription = "当前歌曲封面",
-                    modifier = Modifier.size(if (round) 29.dp else dimensions.artworkSize)
+                    modifier = Modifier.size(if (round) 27.dp else dimensions.artworkSize)
                         .clip(CircleShape).background(WatchSurface),
                     contentScale = ContentScale.Crop,
                 )
-                Spacer(Modifier.width(if (round) 6.dp else 7.dp))
+                Spacer(Modifier.width(if (round) 5.dp else 7.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
                     Text(
                         track.title,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fontSize = if (round) 10.5.sp else dimensions.bodySp.sp,
+                        fontSize = if (round) 10.sp else dimensions.bodySp.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
@@ -2530,13 +2554,13 @@ private fun formatFileSize(bytes: Long): String = when {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = WatchTextSecondary,
-                        fontSize = if (round) 8.5.sp else dimensions.secondarySp.sp,
+                        fontSize = if (round) 8.sp else dimensions.secondarySp.sp,
                     )
                 }
                 WatchIconButton(
                     if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                     if (playing) "暂停" else "播放",
-                    modifier = Modifier.size(if (round) 31.dp else dimensions.touchTarget),
+                    modifier = Modifier.size(if (round) 29.dp else dimensions.touchTarget),
                     containerColor = Color.Transparent,
                 ) {
                     if (playing) vm.pausePlayback() else vm.resumePlayback()

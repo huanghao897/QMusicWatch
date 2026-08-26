@@ -13,6 +13,33 @@ private val Context.settingsDataStore by preferencesDataStore("settings")
 internal fun normalizeLyricAlignment(value: String?): String = if (value == "center") "center" else "left"
 internal fun normalizeUiSize(value: String?): String = value?.takeIf { it in setOf("compact", "standard", "large") } ?: "compact"
 
+/**
+ * One immutable read model for settings used by the root watch composition.
+ * Reading the DataStore once and emitting one snapshot avoids a cascade of
+ * independent first-value recompositions when the app is opened on a watch.
+ */
+data class SettingsSnapshot(
+    val quality: String = QUALITY_STANDARD,
+    val headphoneWarning: Boolean = true,
+    val autoOpenPlayer: Boolean = true,
+    val playMode: String = "sequential",
+    val lyricSize: String = "normal",
+    val lyricTranslation: Boolean = true,
+    val lyricOriginal: Boolean = true,
+    val lyricOffset: Long = 0L,
+    val lyricAnimation: String = "soft",
+    val lyricAlignment: String = "left",
+    val pureBlack: Boolean = false,
+    val lowPowerPlayer: Boolean = false,
+    val wifiOnlyDownload: Boolean = true,
+    val lastSleepMinutes: Int? = null,
+    val dailyCount: Int = 5,
+    val searchHistory: List<String> = emptyList(),
+    val seenAnnouncements: Set<String> = emptySet(),
+    val uiSize: String = "compact",
+    val artworkAccent: String = "",
+)
+
 class SettingsStore(private val context: Context) {
     private val qualityKey = stringPreferencesKey("quality")
     private val headphoneWarningKey = booleanPreferencesKey("headphone_warning")
@@ -38,6 +65,31 @@ class SettingsStore(private val context: Context) {
     private val pendingUpdateReleaseKey = stringPreferencesKey("pending_update_release")
     private val uiSizeKey = stringPreferencesKey("ui_size")
     private val artworkAccentKey = stringPreferencesKey("artwork_accent")
+    val snapshot = context.settingsDataStore.data.map { prefs ->
+        SettingsSnapshot(
+            quality = normalizeQualityId(prefs[qualityKey]),
+            headphoneWarning = prefs[headphoneWarningKey] ?: true,
+            autoOpenPlayer = prefs[autoOpenPlayerKey] ?: true,
+            playMode = prefs[playModeKey] ?: "sequential",
+            lyricSize = prefs[lyricSizeKey] ?: "normal",
+            lyricTranslation = prefs[lyricTranslationKey] ?: true,
+            lyricOriginal = prefs[lyricOriginalKey] ?: true,
+            lyricOffset = prefs[lyricOffsetKey]?.toLongOrNull() ?: 0L,
+            lyricAnimation = prefs[lyricAnimationKey] ?: "soft",
+            lyricAlignment = normalizeLyricAlignment(prefs[lyricAlignmentKey]),
+            pureBlack = prefs[pureBlackKey] ?: false,
+            lowPowerPlayer = prefs[lowPowerPlayerKey] ?: false,
+            wifiOnlyDownload = prefs[wifiOnlyDownloadKey] ?: true,
+            lastSleepMinutes = prefs[lastSleepMinutesKey]?.toIntOrNull()?.coerceIn(1, 1440),
+            dailyCount = if (prefs[dailyCountKey] == "10") 10 else 5,
+            searchHistory = prefs[searchHistoryKey].orEmpty().lineSequence()
+                .filter(String::isNotBlank).take(8).toList(),
+            seenAnnouncements = prefs[seenAnnouncementsKey].orEmpty().lineSequence()
+                .map(String::trim).filter(String::isNotBlank).take(100).toSet(),
+            uiSize = normalizeUiSize(prefs[uiSizeKey]),
+            artworkAccent = prefs[artworkAccentKey].orEmpty(),
+        )
+    }
     val quality = context.settingsDataStore.data.map { normalizeQualityId(it[qualityKey]) }
     val headphoneWarning = context.settingsDataStore.data.map { it[headphoneWarningKey] ?: true }
     val autoOpenPlayer = context.settingsDataStore.data.map { it[autoOpenPlayerKey] ?: true }
