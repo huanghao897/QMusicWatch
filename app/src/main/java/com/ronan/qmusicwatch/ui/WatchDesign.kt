@@ -144,7 +144,9 @@ internal fun resolveWatchDimensions(
         windowClass = windowClass,
         uiSize = uiSize,
         isRound = isRound,
-        screenPadding = (if (isRound) 14.dp else 8.dp).scaled(),
+        // Keep round-watch content inside the visible chord so leading
+        // controls and list rows remain tappable near the clipped corners.
+        screenPadding = (if (isRound) 20.dp else 8.dp).scaled(),
         topSafeInset = (if (isRound) 12.dp else 8.dp).scaled(),
         verticalPadding = 5.dp.scaled(),
         itemSpacing = 4.dp.scaled(),
@@ -154,8 +156,8 @@ internal fun resolveWatchDimensions(
         trackRowHeight = 46.dp.scaled(),
         searchHeight = 40.dp.scaled(),
         artworkSize = 36.dp.scaled(),
-        miniPlayerHeight = 48.dp.scaled(),
-        miniPlayerWidthFraction = 1f,
+        miniPlayerHeight = (if (isRound) 58.dp else 48.dp).scaled(),
+        miniPlayerWidthFraction = if (isRound) .82f else 1f,
         touchTarget = 40.dp.scaled(),
         iconSize = 19.dp.scaled(),
         cornerRadius = 23.dp.scaled(),

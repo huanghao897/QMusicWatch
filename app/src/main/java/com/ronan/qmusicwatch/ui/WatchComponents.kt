@@ -163,7 +163,12 @@ fun WatchSectionHeader(
     onAction: () -> Unit = {},
 ) {
     val dimensions = LocalWatchDimensions.current
-    Box(modifier.fillMaxWidth().height(34.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier.fillMaxWidth()
+            .height(34.dp)
+            .padding(horizontal = if (dimensions.isRound) 22.dp else 0.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(
             title,
             Modifier.padding(horizontal = if (action == null) 8.dp else 58.dp),
