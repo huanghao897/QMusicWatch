@@ -3,6 +3,7 @@ package com.ronan.qmusicwatch.playback
 import android.content.ComponentName
 import android.content.Context
 import android.media.AudioManager
+import android.os.SystemClock
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -32,6 +33,12 @@ data class DeviceVolumeState(
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackConnection(context: Context) {
+    private companion object {
+        // A single crown detent can be reported as several MotionEvents or
+        // repeated volume-key downs. Keep one media-volume step per window so
+        // the first turn cannot jump from 0 to a loud mid-scale value.
+        const val MIN_VOLUME_STEP_INTERVAL_MS = 55L
+    }
     private val audio = context.getSystemService(AudioManager::class.java)
     private val future: ListenableFuture<MediaController> = MediaController.Builder(
         context,
@@ -47,6 +54,7 @@ class PlaybackConnection(context: Context) {
     val sleepRemaining = _sleepRemaining.asStateFlow()
     private var sleepJob: Job? = null
     private var volumeRefreshJob: Job? = null
+    private var lastVolumeAdjustmentAt = 0L
     private var stopAfterCurrent = false
     private var sleepVolume: Float? = null
     private val mainExecutor = ContextCompat.getMainExecutor(context)
@@ -144,8 +152,8 @@ class PlaybackConnection(context: Context) {
      * stream. Media3 is attempted first, with the Android audio manager as a
      * compatibility fallback for players that do not implement device volume.
      */
-    fun adjustVolume(direction: Int) {
-        if (direction == 0) return
+    fun adjustVolume(direction: Int): Boolean {
+        if (direction == 0 || !acceptVolumeAdjustment()) return false
         val run: () -> Unit = run@{
             val controller = controllerOrNull()
             if (controller == null) {
@@ -178,6 +186,14 @@ class PlaybackConnection(context: Context) {
             if (!adjusted) adjustSystemVolume(direction, "device-command-unavailable")
         }
         if (future.isDone) run() else future.addListener(run, mainExecutor)
+        return true
+    }
+
+    private fun acceptVolumeAdjustment(): Boolean {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastVolumeAdjustmentAt < MIN_VOLUME_STEP_INTERVAL_MS) return false
+        lastVolumeAdjustmentAt = now
+        return true
     }
 
     private fun adjustSystemVolume(direction: Int, reason: String) {
@@ -202,20 +218,18 @@ class PlaybackConnection(context: Context) {
         current: Int = controller.deviceVolume,
         muted: Boolean = controller.isDeviceMuted,
     ) {
-        val max = controller.deviceInfo.maxVolume
-        if (max > 0 && current >= 0) {
-            _deviceVolume.value = DeviceVolumeState(current, max, muted)
-        } else {
-            publishSystemVolume()
-        }
+        // MediaController can briefly expose stale 0/50% values while the
+        // service connects. AudioManager is the actual stream used by
+        // ExoPlayer, so keep it as the single source for the UI state.
+        publishSystemVolume(mutedOverride = muted)
     }
 
-    private fun publishSystemVolume() {
+    private fun publishSystemVolume(mutedOverride: Boolean? = null) {
         runCatching {
             _deviceVolume.value = DeviceVolumeState(
                 current = audio.getStreamVolume(AudioManager.STREAM_MUSIC),
                 max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
-                muted = false,
+                muted = mutedOverride ?: audio.isStreamMute(AudioManager.STREAM_MUSIC),
             )
         }.onFailure {
             AppLog.write("PLAYER", "volume-state ${it.javaClass.simpleName}:${it.message.orEmpty()}")

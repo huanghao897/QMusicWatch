@@ -1245,7 +1245,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun seek(position: Long) = graph.playback.seek(position)
-    fun adjustVolume(direction: Int) = graph.playback.adjustVolume(direction)
+    fun adjustVolume(direction: Int): Boolean = graph.playback.adjustVolume(direction)
     fun savePlaybackState() = persistSnapshot()
     private fun persistSnapshot(position: Long = graph.playback.position()) = viewModelScope.launch {
         persistSnapshotNow(position)

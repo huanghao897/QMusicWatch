@@ -402,7 +402,7 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             hardwareVolumeDirection(event.keyCode)?.let { direction ->
                 if (dispatchHardwareVolume(direction)) return true
             }
@@ -1239,9 +1239,10 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
     fun handleHardwareVolume(direction: Int): Boolean {
         if (locked || pager.currentPage != 0 || !rotaryVolumeEnabled) return false
-        vm.adjustVolume(direction)
-        volumeFeedbackTick++
-        performRotaryTick()
+        if (vm.adjustVolume(direction)) {
+            volumeFeedbackTick++
+            performRotaryTick()
+        }
         return true
     }
     val hardwareVolumeAction = rememberUpdatedState(newValue = { direction: Int ->
