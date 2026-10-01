@@ -1,5 +1,6 @@
 package com.ronan.qmusicwatch
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
@@ -11,6 +12,8 @@ import android.util.Base64
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -105,6 +108,7 @@ import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.network.*
 import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
+import com.ronan.qmusicwatch.playback.hardwareVolumeDirection
 import com.ronan.qmusicwatch.playback.rotaryScrollDelta
 import com.ronan.qmusicwatch.playback.rotaryVolumeDirection
 import com.ronan.qmusicwatch.ui.*
@@ -376,6 +380,51 @@ internal fun automaticInstallCandidate(pendingReleaseId: Long, update: UpdateUiS
     (update as? UpdateUiState.Ready)?.takeIf { pendingReleaseId > 0 && it.release.releaseId == pendingReleaseId }
 
 class MainActivity : ComponentActivity() {
+    /**
+     * Xiaomi and several non-Wear watch firmwares deliver a crown as a
+     * generic motion event or as VOLUME_UP/VOLUME_DOWN key events. Compose's
+     * rotary modifier only receives the former when its focus target is
+     * active, so the player registers a short-lived Activity-level handler as
+     * a reliable fallback.
+     */
+    private var hardwareVolumeHandler: ((Int) -> Boolean)? = null
+
+    internal fun setHardwareVolumeHandler(handler: ((Int) -> Boolean)?) {
+        hardwareVolumeHandler = handler
+    }
+
+    internal fun clearHardwareVolumeHandler(handler: (Int) -> Boolean) {
+        if (hardwareVolumeHandler === handler) hardwareVolumeHandler = null
+    }
+
+    private fun dispatchHardwareVolume(direction: Int): Boolean =
+        hardwareVolumeHandler?.invoke(direction) == true
+
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            hardwareVolumeDirection(event.keyCode)?.let { direction ->
+                if (dispatchHardwareVolume(direction)) return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_SCROLL) {
+            val vertical = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            val horizontal = event.getAxisValue(MotionEvent.AXIS_HSCROLL)
+            val generic = event.getAxisValue(MotionEvent.AXIS_SCROLL)
+            val delta = rotaryScrollDelta(vertical, horizontal).let { selected ->
+                if (selected != 0f) selected else generic
+            }
+            rotaryVolumeDirection(delta)?.let { direction ->
+                if (dispatchHardwareVolume(direction)) return true
+            }
+        }
+        return super.dispatchGenericMotionEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -1188,6 +1237,27 @@ private fun decodeServerQrImage(value: String) = runCatching {
             lastRotaryHapticAt[0] = now
         }
     }
+    fun handleHardwareVolume(direction: Int): Boolean {
+        if (locked || pager.currentPage != 0 || !rotaryVolumeEnabled) return false
+        vm.adjustVolume(direction)
+        volumeFeedbackTick++
+        performRotaryTick()
+        return true
+    }
+    val hardwareVolumeAction = rememberUpdatedState(newValue = { direction: Int ->
+        handleHardwareVolume(direction)
+    })
+    @SuppressLint("ContextCastToActivity")
+    val activity = LocalContext.current as? MainActivity
+    DisposableEffect(activity) {
+        if (activity == null) {
+            onDispose { }
+        } else {
+            val handler: (Int) -> Boolean = { direction -> hardwareVolumeAction.value(direction) }
+            activity.setHardwareVolumeHandler(handler)
+            onDispose { activity.clearHardwareVolumeHandler(handler) }
+        }
+    }
     DisposableEffect(locked) {
         val previous = view.keepScreenOn
         if (locked) view.keepScreenOn = true
@@ -1282,9 +1352,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             if (pager.currentPage == 0) {
                 if (rotaryVolumeEnabled) {
                     rotaryVolumeDirection(delta)?.let { direction ->
-                        vm.adjustVolume(direction)
-                        volumeFeedbackTick++
-                        performRotaryTick()
+                        handleHardwareVolume(direction)
                     }
                 }
             }

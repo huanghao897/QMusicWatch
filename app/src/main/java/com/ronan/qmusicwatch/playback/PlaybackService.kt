@@ -245,6 +245,7 @@ class PlaybackService : MediaSessionService() {
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setWakeMode(BACKGROUND_PLAYBACK_WAKE_MODE)
+            .setDeviceVolumeControlEnabled(true)
             .build()
             .apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)

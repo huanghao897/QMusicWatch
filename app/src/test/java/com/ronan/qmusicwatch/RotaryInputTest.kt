@@ -1,6 +1,7 @@
 package com.ronan.qmusicwatch
 
 import com.ronan.qmusicwatch.playback.DeviceVolumeState
+import com.ronan.qmusicwatch.playback.hardwareVolumeDirection
 import com.ronan.qmusicwatch.playback.rotaryScrollDelta
 import com.ronan.qmusicwatch.playback.rotaryVolumeDirection
 import org.junit.Assert.assertEquals
@@ -19,6 +20,12 @@ class RotaryInputTest {
         assertEquals(-1, rotaryVolumeDirection(0.1f))
         assertNull(rotaryVolumeDirection(0f))
         assertNull(rotaryVolumeDirection(Float.POSITIVE_INFINITY))
+    }
+
+    @Test fun mapsHardwareVolumeKeysToVolumeSteps() {
+        assertEquals(1, hardwareVolumeDirection(android.view.KeyEvent.KEYCODE_VOLUME_UP))
+        assertEquals(-1, hardwareVolumeDirection(android.view.KeyEvent.KEYCODE_VOLUME_DOWN))
+        assertNull(hardwareVolumeDirection(android.view.KeyEvent.KEYCODE_VOLUME_MUTE))
     }
 
     @Test fun volumeStateReportsAClampedPercentage() {

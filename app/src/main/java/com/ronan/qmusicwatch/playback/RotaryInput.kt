@@ -26,3 +26,14 @@ internal fun rotaryVolumeDirection(delta: Float): Int? = when {
     delta < 0f -> 1
     else -> -1
 }
+
+/**
+ * Some Android watch firmwares expose the crown as regular media volume
+ * keys instead of a Compose rotary event. Keep this translation in one place
+ * so Activity and Compose input use the same direction semantics.
+ */
+internal fun hardwareVolumeDirection(keyCode: Int): Int? = when (keyCode) {
+    android.view.KeyEvent.KEYCODE_VOLUME_UP -> 1
+    android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> -1
+    else -> null
+}

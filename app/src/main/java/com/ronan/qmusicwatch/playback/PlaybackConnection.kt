@@ -30,9 +30,18 @@ data class DeviceVolumeState(
             ?.let { ((current.coerceIn(0, it).toFloat() / it) * 100f).roundToInt() }
 }
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackConnection(context: Context) {
     private val audio = context.getSystemService(AudioManager::class.java)
-    private val future: ListenableFuture<MediaController> = MediaController.Builder(context, SessionToken(context, ComponentName(context, PlaybackService::class.java))).buildAsync()
+    private val future: ListenableFuture<MediaController> = MediaController.Builder(
+        context,
+        SessionToken(context, ComponentName(context, PlaybackService::class.java)),
+    )
+        // Device-volume commands are filtered for local sessions unless this
+        // is explicitly enabled. Without it, crowns that deliver rotary
+        // events reach the app but Media3 silently declines the adjustment.
+        .setAllowDeviceVolumeCommandsForLocalPlayback(true)
+        .buildAsync()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _sleepRemaining = MutableStateFlow(0L)
     val sleepRemaining = _sleepRemaining.asStateFlow()
@@ -173,7 +182,11 @@ class PlaybackConnection(context: Context) {
 
     private fun adjustSystemVolume(direction: Int, reason: String) {
         runCatching {
-            audio.adjustVolume(
+            // Some watch firmwares do not expose Media3's device-volume
+            // commands. Adjust the music stream explicitly instead of using
+            // the suggested stream, which can be a no-op after wake-up.
+            audio.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
                 if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
                 AudioManager.FLAG_SHOW_UI,
             )
