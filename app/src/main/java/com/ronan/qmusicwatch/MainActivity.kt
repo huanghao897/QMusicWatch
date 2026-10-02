@@ -688,10 +688,25 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    chrome.pendingSpeakerTrack?.let { track ->
-        WatchDialog(onDismissRequest = vm::dismissSpeakerPrompt, title = { Text("未检测到耳机") }, text = { Text("建议连接蓝牙或有线耳机，是否仍使用手表扬声器播放？") },
+    chrome.pendingSpeakerTrack?.let {
+        WatchDialog(
+            onDismissRequest = vm::dismissSpeakerPrompt,
+            title = { Text("未检测到耳机") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("建议连接蓝牙或有线耳机，是否仍使用手表扬声器播放？")
+                    TextButton(
+                        onClick = {
+                            vm.dismissSpeakerPrompt()
+                            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                        },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                    ) { Text("连接蓝牙") }
+                }
+            },
             confirmButton = { TextButton(onClick = vm::continueOnSpeaker) { Text("继续外放") } },
-            dismissButton = { TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }) { Text("连接蓝牙") } })
+            dismissButton = { TextButton(onClick = vm::dismissSpeakerPrompt) { Text("关闭") } },
+        )
     }
     val startupAnnouncement = nextStartupAnnouncement(chrome.announcements, seenAnnouncements, dismissedAnnouncements)
     val automaticUpdate = chrome.updateState.takeIf {

@@ -162,7 +162,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** Account-level options for the compact watch quality picker. */
     val qualityEntitlements = state.map { profileQualityOptions(it.profile) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, profileQualityOptions(null))
-    val headphoneWarning = settings.map { it.headphoneWarning }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    // This setting is consulted from playback jobs, not only from a visible
+    // settings screen. Keep it hot so a switch change is observed even when
+    // there is no direct collector for this compatibility flow.
+    val headphoneWarning = settings.map { it.headphoneWarning }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val autoOpenPlayer = settings.map { it.autoOpenPlayer }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     val playMode = settings.map { it.playMode }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "sequential")
     val lyricSize = settings.map { it.lyricSize }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "normal")
@@ -876,7 +879,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         sessionReady.await()
         _state.update { it.copy(playbackLoading = true, message = null) }
         if (!track.playable && !track.requiresVip) return@launch failPlayback(IllegalStateException("这首歌曲当前不可播放"))
-        if (headphoneWarning.value && !allowSpeaker && !com.ronan.qmusicwatch.playback.hasPrivateAudioOutput(getApplication())) {
+        // Read the persisted snapshot for this play request. The previous
+        // lazy compatibility flow could remain at its default `true`, causing
+        // the warning to appear after the user had disabled it in Settings.
+        // Reading the DataStore flow also closes the small race where a user
+        // toggles the switch and starts playback immediately afterwards.
+        val headphoneWarningEnabled = graph.settings.snapshot.first().headphoneWarning
+        if (headphoneWarningEnabled && !allowSpeaker && !com.ronan.qmusicwatch.playback.hasPrivateAudioOutput(getApplication())) {
             pendingQueue = sourceQueue
             _state.update { it.copy(pendingSpeakerTrack = track, playbackLoading = false) }; return@launch
         }
@@ -1131,7 +1140,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    fun setHeadphoneWarning(value: Boolean) = viewModelScope.launch { graph.settings.setHeadphoneWarning(value) }
+    fun setHeadphoneWarning(value: Boolean) = viewModelScope.launch {
+        graph.settings.setHeadphoneWarning(value)
+    }
     fun setAutoOpenPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setAutoOpenPlayer(value) }
     fun setPlayMode(value: String) = viewModelScope.launch { graph.settings.setPlayMode(value) }
     fun setLyricSize(value: String) = viewModelScope.launch { graph.settings.setLyricSize(value) }
