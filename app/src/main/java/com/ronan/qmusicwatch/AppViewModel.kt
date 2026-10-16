@@ -478,9 +478,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     qrMimeType = session.mimeType,
                     qrExpiresAt = session.expiresAt,
                 ) }
+                var pollFailures = 0
                 while (isActive) {
                     delay(session.pollAfterMs.coerceIn(1_000, 30_000))
-                    val result = graph.controlPlane.pollQrLogin(session.id, provider)
+                    if (System.currentTimeMillis() >= session.expiresAt) {
+                        _state.update { it.copy(qrStatus = "二维码已过期，点刷新重试") }
+                        return@launch
+                    }
+                    val result = try {
+                        graph.controlPlane.pollQrLogin(session.id, provider)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Throwable) {
+                        val retryDelay = qrPollRetryDelayMs(error, ++pollFailures, session.expiresAt, System.currentTimeMillis())
+                            ?: throw error
+                        AppLog.write("LOGIN", "server_qr_retry provider=$provider type=${error.javaClass.simpleName} attempt=$pollFailures")
+                        _state.update { it.copy(qrStatus = "网络波动，正在重试…") }
+                        delay(retryDelay)
+                        continue
+                    }
+                    pollFailures = 0
                     AppLog.write("LOGIN", "server_qr provider=$provider status=${result.status}")
                     when (result.status) {
                         "waiting" -> _state.update { it.copy(qrStatus = if (provider == "qq") "使用 QQ 或 QQ音乐扫描" else "使用微信扫描") }

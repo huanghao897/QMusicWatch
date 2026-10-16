@@ -996,21 +996,20 @@ class ApiClient(
         }
     }
 
-    private suspend fun likedTracks(): List<Track> {
-        val likedTracks = mutableListOf<Track>()
-        val likedIds = mutableSetOf<String>()
-        for (page in 0 until 20) {
-            val liked = api(
+    private suspend fun likedTracks(): List<Track> = collectQqTrackPages(
+        fetchPage = { offset, size ->
+            api(
                 "music.srfDissInfo.DissInfo", "CgiGetDiss",
-                obj("disstid" to 0, "dirid" to 201, "tag" to true, "song_begin" to page * 100, "song_num" to 100, "userinfo" to true, "orderlist" to true),
+                obj(
+                    "disstid" to 0, "dirid" to 201, "tag" to true,
+                    "song_begin" to offset, "song_num" to size,
+                    "userinfo" to true, "orderlist" to true,
+                    "enc_host_uin" to cookieValue("euin").orEmpty(),
+                ),
             )
-            val batch = findTracks(liked)
-            val previousSize = likedTracks.size
-            likedTracks += batch.filter { likedIds.add(it.id) }
-            if (batch.size < 100 || likedTracks.size == previousSize) break
-        }
-        return likedTracks
-    }
+        },
+        parseTracks = ::findTracks,
+    )
 
     private suspend fun favoritePlaylists(): List<MusicCollection> {
         val encryptedUin = cookieValue("euin").orEmpty()
@@ -1151,14 +1150,11 @@ class ApiClient(
     }
 
     suspend fun collection(type: String, collection: MusicCollection): CollectionDetail = withContext(Dispatchers.IO) {
-        val tracks = mutableListOf<Track>()
-        val ids = mutableSetOf<String>()
         var title = collection.title.ifBlank { "详情" }
-        for (page in 0 until 20) {
-            val begin = page * 100
+        val tracks = collectQqTrackPages(fetchPage = { begin, size ->
             val data = when (type) {
-                "album" -> api("music.musichallAlbum.AlbumSongList", "GetAlbumSongList", obj("albumMid" to collection.id, "begin" to begin, "num" to 100, "order" to 2))
-                "artist" -> api("musichall.song_list_server", "GetSingerSongList", obj("singerMid" to collection.id, "begin" to begin, "num" to 100, "order" to 1))
+                "album" -> api("music.musichallAlbum.AlbumSongList", "GetAlbumSongList", obj("albumMid" to collection.id, "begin" to begin, "num" to size, "order" to 2))
+                "artist" -> api("musichall.song_list_server", "GetSingerSongList", obj("singerMid" to collection.id, "begin" to begin, "num" to size, "order" to 1))
                 else -> {
                     val identity = qqPlaylistDetailIdentity(collection)
                     if (identity.dissId <= 0 && identity.directoryId <= 0) error("歌单标识无效，请刷新歌单后重试")
@@ -1166,18 +1162,15 @@ class ApiClient(
                         "music.srfDissInfo.DissInfo", "CgiGetDiss",
                         obj(
                             "disstid" to identity.dissId, "dirid" to identity.directoryId,
-                            "tag" to true, "song_begin" to begin, "song_num" to 100,
+                            "tag" to true, "song_begin" to begin, "song_num" to size,
                             "userinfo" to true, "orderlist" to true,
                         ),
                     )
                 }
             }
-            if (page == 0) title = walkObjects(data).firstNotNullOfOrNull { it.string("title").ifBlank { it.string("name") }.takeIf(String::isNotBlank) } ?: title
-            val batch = findTracks(data)
-            val previousSize = tracks.size
-            tracks += batch.filter { ids.add(it.id) }
-            if (batch.size < 100 || tracks.size == previousSize) break
-        }
+            if (begin == 0) title = walkObjects(data).firstNotNullOfOrNull { it.string("title").ifBlank { it.string("name") }.takeIf(String::isNotBlank) } ?: title
+            data
+        }, parseTracks = ::findTracks)
         CollectionDetail(title, tracks)
     }
 

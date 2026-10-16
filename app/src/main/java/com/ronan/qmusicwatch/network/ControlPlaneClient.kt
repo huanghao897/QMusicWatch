@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -14,10 +15,28 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 private const val MAX_JSON_RESPONSE_BYTES = 256 * 1024
 internal const val MAX_DIAGNOSTIC_REQUEST_BYTES = 64 * 1024
+
+internal class ControlPlaneHttpException(
+    val statusCode: Int,
+    val errorCode: String,
+    val retryAfterMs: Long,
+    message: String,
+) : IllegalStateException(message)
+
+internal fun qrPollRetryDelayMs(error: Throwable, failures: Int, expiresAt: Long, now: Long): Long? {
+    if (expiresAt <= now) return null
+    val retryable = error is IOException || error is ControlPlaneHttpException &&
+        error.statusCode in setOf(429, 500, 502, 503, 504) && error.errorCode != "QR_LOGIN_DISABLED"
+    if (!retryable) return null
+    val backoff = 1_000L shl (failures.coerceIn(1, 3) - 1)
+    val retryAfter = (error as? ControlPlaneHttpException)?.retryAfterMs?.coerceIn(0, 10_000) ?: 0L
+    return maxOf(backoff, retryAfter).coerceAtMost(expiresAt - now)
+}
 
 internal fun requireControlPlaneBaseUrl(value: String, allowCleartext: Boolean = false): HttpUrl {
     val url = value.toHttpUrlOrNull() ?: throw IllegalArgumentException("控制面地址无效")
@@ -130,7 +149,15 @@ class ControlPlaneClient(
         http.newCall(request.newBuilder().header("Accept", "application/json").header("User-Agent", userAgent()).build()).execute().use { response ->
             val bytes = response.body?.byteStream()?.use(::readBounded) ?: ByteArray(0)
             AppLog.write("CONTROL", "$path http=${response.code} ms=${System.currentTimeMillis() - started}")
-            if (!response.isSuccessful) throw IllegalStateException("控制面响应 ${response.code}")
+            if (!response.isSuccessful) {
+                val failure = runCatching { json.decodeFromString<ControlApiResult<JsonElement>>(bytes.decodeToString()) }.getOrNull()?.error
+                throw ControlPlaneHttpException(
+                    response.code,
+                    failure?.code.orEmpty(),
+                    response.header("Retry-After")?.toLongOrNull()?.coerceIn(0, 60)?.times(1_000) ?: 0L,
+                    failure?.message?.take(160)?.takeIf(String::isNotBlank) ?: "控制面响应 ${response.code}",
+                )
+            }
             val envelope = runCatching { json.decodeFromString<ControlApiResult<T>>(bytes.decodeToString()) }
                 .getOrElse { throw IllegalStateException("控制面响应格式无效") }
             if (!envelope.ok) throw IllegalStateException(envelope.error?.message?.take(160).orEmpty().ifBlank { "控制面拒绝请求" })
