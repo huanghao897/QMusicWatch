@@ -15,6 +15,8 @@ import com.ronan.qmusicwatch.network.withQqMusicMediaHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -22,6 +24,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.UUID
 
 fun cachedLyricsFile(audioPath: String) = File(audioPath.removeSuffix(".audio") + ".lyrics.json")
 fun cachedArtworkFile(audioPath: String) = File(audioPath.removeSuffix(".audio") + ".cover")
@@ -216,9 +219,34 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     } }
 }
 
+internal fun downloadWorkRequest(
+    track: Track,
+    owner: String,
+    quality: String,
+    wifiOnly: Boolean,
+    groupName: String,
+    existingId: UUID? = null,
+): OneTimeWorkRequest {
+    val data = workDataOf(
+        "id" to track.id, "owner" to owner, "quality" to normalizeQualityId(quality),
+        "title" to track.title, "artists" to track.artists.joinToString(" / "),
+        "artwork" to track.artworkUrl, "group" to groupName,
+        "qualities" to track.qualities.joinToString(","), "numericId" to track.numericId,
+        "mediaMid" to track.mediaMid, "songType" to track.songType, "requiresVip" to track.requiresVip,
+    )
+    return OneTimeWorkRequestBuilder<DownloadWorker>()
+        .setInputData(data)
+        .setConstraints(Constraints.Builder()
+            .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+            .build())
+        .apply { existingId?.let(::setId) }
+        .build()
+}
+
 class DownloadController(private val context: Context, private val db: AppDatabase) {
+    private val schedulingMutex = Mutex()
     val downloads = db.downloads().observeAll()
-    suspend fun enqueue(track: Track, owner: String, quality: String, wifiOnly: Boolean, groupName: String) {
+    suspend fun enqueue(track: Track, owner: String, quality: String, wifiOnly: Boolean, groupName: String) = withContext(Dispatchers.IO) { schedulingMutex.withLock {
         val target = File(context.filesDir, offlineAudioRelativePath(owner, track.id))
         val part = File(target.parentFile, target.name.removeSuffix(".audio") + ".part")
         val existing = db.downloads().find(track.id, owner)
@@ -229,13 +257,37 @@ class DownloadController(private val context: Context, private val db: AppDataba
             track.id, owner, track.title, track.artists.joinToString(" / "), track.artworkUrl, target.absolutePath,
             if (wifiOnly) "queued_wifi" else "queued", part.length(), if (canResume) existing?.totalBytes ?: -1 else -1, groupName = groupName, quality = requestedQuality,
         ))
-        val data = workDataOf(
-            "id" to track.id, "owner" to owner, "quality" to requestedQuality, "title" to track.title, "artists" to track.artists.joinToString(" / "), "artwork" to track.artworkUrl, "group" to groupName,
-            "qualities" to track.qualities.joinToString(","), "numericId" to track.numericId, "mediaMid" to track.mediaMid, "songType" to track.songType, "requiresVip" to track.requiresVip,
-        )
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "download-${owner}-${track.id}", ExistingWorkPolicy.REPLACE,
+            downloadWorkRequest(track, owner, requestedQuality, wifiOnly, groupName),
+        ).result.get(15, TimeUnit.SECONDS)
+    } }
+
+    /** Update waiting tasks in place, preserving IDs, partial files and quality. */
+    suspend fun updateQueuedNetworkPolicy(owner: String, wifiOnly: Boolean) = withContext(Dispatchers.IO) { schedulingMutex.withLock {
+        val manager = WorkManager.getInstance(context)
         val network = if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
-        WorkManager.getInstance(context).enqueueUniqueWork("download-${owner}-${track.id}", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DownloadWorker>().setInputData(data).setConstraints(Constraints.Builder().setRequiredNetworkType(network).build()).build())
-    }
+        val pending = db.downloads().all().filter {
+            it.ownerAccountId == owner && it.status in setOf("queued", "queued_wifi")
+        }
+        for (item in pending) {
+            val info = manager.getWorkInfosForUniqueWork("download-$owner-${item.trackId}")
+                .get(15, TimeUnit.SECONDS)
+                .firstOrNull { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
+                ?: continue
+            if (info.constraints.requiredNetworkType != network) {
+                // Persisted cache metadata is sufficient: the API fills any
+                // missing numeric/media IDs from official track details.
+                val track = Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl)
+                val result = manager.updateWork(downloadWorkRequest(track, owner, item.quality, wifiOnly, item.groupName, info.id))
+                    .get(15, TimeUnit.SECONDS)
+                if (result == WorkManager.UpdateResult.NOT_APPLIED) continue
+            }
+            // The worker may already have started; never overwrite its progress
+            // or revive paused, complete or other-account downloads.
+            db.downloads().updateQueuedStatus(item.trackId, owner, if (wifiOnly) "queued_wifi" else "queued")
+        }
+    } }
     suspend fun pause(trackId: String, owner: String) {
         withContext(Dispatchers.IO) { WorkManager.getInstance(context).cancelUniqueWork("download-$owner-$trackId").result.get(15, TimeUnit.SECONDS) }
         val item = db.downloads().find(trackId, owner)

@@ -770,7 +770,7 @@ class PlaybackService : MediaSessionService() {
             if (!latest.belongsToAccount(owner) || latest.track?.id != currentId) return@withLock false
             graph.settings.setPlaybackSnapshot(json.encodeToString(latest.copy(
                 track = track, positionMs = 0, streamUrl = uri,
-                streamExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE, quality = stream?.quality ?: preferredQuality,
+                streamExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE, quality = stream?.quality ?: local?.quality ?: preferredQuality,
             )))
             true
         }

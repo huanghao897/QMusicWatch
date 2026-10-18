@@ -156,9 +156,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val downloads = graph.downloads.downloads.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     /** One root subscription prevents a cascade of DataStore-driven recompositions. */
     val settings = graph.settings.snapshot.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsSnapshot())
-    // Keep the small individual flows as compatibility accessors for existing
-    // screens/tests. They are lazy now; the root collects the snapshot above.
-    val quality = settings.map { it.quality }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QUALITY_STANDARD)
+    // Compatibility accessors used by business logic must stay current even
+    // when the UI only collects the combined settings snapshot.
+    val quality = settings.map { it.quality }.stateIn(viewModelScope, SharingStarted.Eagerly, QUALITY_STANDARD)
     /** Account-level options for the compact watch quality picker. */
     val qualityEntitlements = state.map { profileQualityOptions(it.profile) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, profileQualityOptions(null))
@@ -177,7 +177,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val pureBlack = settings.map { it.pureBlack }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val lowPowerPlayer = settings.map { it.lowPowerPlayer }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val rotaryVolumeEnabled = settings.map { it.rotaryVolumeEnabled }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
-    val wifiOnlyDownload = settings.map { it.wifiOnlyDownload }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val wifiOnlyDownload = settings.map { it.wifiOnlyDownload }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val lastSleepMinutes = settings.map { it.lastSleepMinutes }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val dailyCount = settings.map { it.dailyCount }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 5)
     val searchHistory = settings.map { it.searchHistory }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -248,6 +248,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     "PERF",
                     "session_load_ms=${android.os.SystemClock.elapsedRealtime() - startedAt} signed_in=${restored != null}",
                 )
+            }
+        }
+        viewModelScope.launch {
+            sessionReady.await()
+            val owner = accountId ?: return@launch
+            runCatching {
+                graph.downloads.updateQueuedNetworkPolicy(owner, graph.settings.wifiOnlyDownload.first())
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                AppLog.write("DOWNLOAD", "network_policy_restore ${error.javaClass.simpleName}")
             }
         }
         viewModelScope.launch {
@@ -428,7 +438,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             lastStreamUrl = uri
             lastStreamExpiresAt = matchingSnapshot?.streamExpiresAt
                 ?: if (uri.startsWith("file:")) Long.MAX_VALUE else 0L
-            lastStreamQuality = reportedQualityId(matchingSnapshot?.quality ?: preferredQuality(track))
+            lastStreamQuality = reportedQualityId(matchingSnapshot?.quality ?: graph.settings.quality.first())
             _state.update { it.copy(currentTrack = track, activeStreamQuality = lastStreamQuality, lyrics = emptyList(), message = null) }
             val localPath = android.net.Uri.parse(uri).takeIf { it.scheme == "file" }?.path
             val lines = runCatching { loadLyrics(track, localPath) }
@@ -901,28 +911,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         // the warning to appear after the user had disabled it in Settings.
         // Reading the DataStore flow also closes the small race where a user
         // toggles the switch and starts playback immediately afterwards.
-        val headphoneWarningEnabled = graph.settings.snapshot.first().headphoneWarning
-        if (headphoneWarningEnabled && !allowSpeaker && !com.ronan.qmusicwatch.playback.hasPrivateAudioOutput(getApplication())) {
+        val playbackSettings = graph.settings.snapshot.first()
+        if (playbackSettings.headphoneWarning && !allowSpeaker && !com.ronan.qmusicwatch.playback.hasPrivateAudioOutput(getApplication())) {
             pendingQueue = sourceQueue
             _state.update { it.copy(pendingSpeakerTrack = track, playbackLoading = false) }; return@launch
         }
         val owner = accountId ?: return@launch failPlayback(IllegalStateException("请先登录后播放"))
         var issuedUrl = ""
         var issuedExpiresAt = 0L
-        var issuedQuality = preferredQuality(track)
+        val requestedQuality = playbackSettings.quality
+        var issuedQuality = requestedQuality
         var resolvedTrack = track
         runCatching {
             val local = graph.db.downloads().find(track.id, owner)?.takeIf { it.status == "complete" && File(it.filePath).exists() }
             if (local == null && !featureEnabled("stream")) error(featureMessage("stream").ifBlank { "在线播放暂时维护，仍可播放已缓存歌曲" })
             val stream = if (local == null) {
-                if (forceFreshStream) graph.api.refreshStream(track, preferredQuality(track))
-                else graph.api.stream(track, preferredQuality(track))
+                if (forceFreshStream) graph.api.refreshStream(track, requestedQuality)
+                else graph.api.stream(track, requestedQuality)
             } else null
             val uri = local?.let { android.net.Uri.fromFile(File(it.filePath)).toString() } ?: stream!!.url
             local?.let { item -> cachedArtworkFile(item.filePath).takeIf(File::exists)?.let { resolvedTrack = track.copy(artworkUrl = android.net.Uri.fromFile(it).toString()) } }
             issuedUrl = uri
             issuedExpiresAt = stream?.expiresAt ?: Long.MAX_VALUE
-            issuedQuality = stream?.quality ?: local?.quality ?: preferredQuality(track)
+            issuedQuality = stream?.quality ?: local?.quality ?: requestedQuality
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             sourceQueue?.takeIf(List<Track>::isNotEmpty)?.let { source ->
                 _queue.value = source.distinctBy(Track::id)
@@ -942,7 +953,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     pendingSpeakerTrack = null,
                     playbackLoading = false,
                     playEvent = System.nanoTime(),
-                    message = qualityFallbackMessage(quality.value, issuedQuality, track, it.profile),
+                    message = qualityFallbackMessage(requestedQuality, issuedQuality, track, it.profile),
                 )
             }
             val initialPosition = restoredPosition.coerceAtLeast(0L)
@@ -996,8 +1007,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun cache(track: Track, groupName: String = "单曲缓存", requestedQuality: String? = null) {
         val owner = accountId ?: return fail(IllegalStateException("请先登录"))
         viewModelScope.launch {
-            runCatching { graph.downloads.enqueue(track, owner, requestedQuality ?: preferredQuality(track), wifiOnlyDownload.value, groupName) }
-                .onSuccess { _state.update { s -> s.copy(message = if (wifiOnlyDownload.value) "已加入缓存，等待 Wi-Fi" else "已加入离线缓存") } }
+            // Read the persisted policy for this request, rather than a UI
+            // compatibility flow that may not have a subscriber yet.
+            val preferences = graph.settings.snapshot.first()
+            runCatching { graph.downloads.enqueue(track, owner, requestedQuality ?: preferences.quality, preferences.wifiOnlyDownload, groupName) }
+                .onSuccess { _state.update { s -> s.copy(message = if (preferences.wifiOnlyDownload) "已加入缓存，仅 Wi-Fi 下载" else "已加入离线缓存") } }
                 .onFailure(::fail)
         }
     }
@@ -1124,8 +1138,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             _state.update { it.copy(message = "正在切换到${qualityLabel(requested)}…") }
             try {
-                val target = resolveQuality(requested, track, profile).resolved
-                val stream = graph.api.stream(track, target)
+                // List metadata can omit higher tiers. Let the official stream
+                // response validate the selected default, just as on next play.
+                val stream = graph.api.stream(track, requested)
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 if (_state.value.currentTrack?.id != track.id || graph.playback.currentMediaId() != track.id) return@launch
                 val position = graph.playback.position()
@@ -1171,7 +1186,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setPureBlack(value: Boolean) = viewModelScope.launch { graph.settings.setPureBlack(value) }
     fun setLowPowerPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setLowPowerPlayer(value) }
     fun setRotaryVolumeEnabled(value: Boolean) = viewModelScope.launch { graph.settings.setRotaryVolumeEnabled(value) }
-    fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch { graph.settings.setWifiOnlyDownload(value) }
+    fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch {
+        runCatching {
+            graph.settings.setWifiOnlyDownload(value)
+            accountId?.let { graph.downloads.updateQueuedNetworkPolicy(it, value) }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            fail(error)
+        }
+    }
     fun setDailyCount(value: Int) = viewModelScope.launch { graph.settings.setDailyCount(value) }
     fun setUiSize(value: String) = viewModelScope.launch { graph.settings.setUiSize(value) }
     fun cacheArtworkAccent(artworkUrl: String, argb: Long) = viewModelScope.launch {
@@ -1326,8 +1349,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
     }
-    private fun preferredQuality(track: Track): String =
-        resolveQuality(quality.value, track, _state.value.profile).resolved
     override fun onCleared() {
         clearServiceRecovery()
         graph.playback.onError = null
