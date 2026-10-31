@@ -113,4 +113,41 @@ class ControlPlaneTest {
             validateQrStatus(complete.copy(status = "waiting"), "qq")
         }
     }
+
+    @Test fun musicAppQrChannelAcceptsBothRealAccountTypes() {
+        val session = ControlQrSession(
+            id = "m".repeat(32), provider = "qqmusic", mimeType = "image/png",
+            imageBase64 = "A".repeat(128), expiresAt = 120_000,
+        )
+        assertEquals(session, validateQrSession(session, "qqmusic"))
+        for (type in listOf("1", "2")) {
+            val result = ControlQrStatus(
+                provider = "qqmusic", status = "complete", expiresAt = 120_000,
+                cookie = "qqmusic_uin=12345; qm_keyst=key; tmeLoginType=$type",
+            )
+            assertEquals(result, validateQrStatus(result, "qqmusic"))
+        }
+    }
+
+    @Test fun musicQrCannotTurnTheQrAuthMethodIntoAnAccountIdentity() {
+        for (cookie in listOf("qqmusic_uin=12345; qm_keyst=key", "qqmusic_uin=12345; tmeLoginType=6", "tmeLoginType=1")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                validateQrStatus(ControlQrStatus("qqmusic", "complete", 120_000, cookie), "qqmusic")
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            validateQrStatus(ControlQrStatus("qq", "waiting", 120_000), "qqmusic")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            validateQrStatus(ControlQrStatus("other", "waiting", 120_000), "other")
+        }
+    }
+
+    @Test fun qrErrorMessagesAreBoundedAndDoNotCarryCredentials() {
+        val error = ControlQrStatus("qqmusic", "error", 120_000, message = "扫码连接中断，请刷新二维码重试")
+        assertEquals(error, validateQrStatus(error, "qqmusic"))
+        for (invalid in listOf(error.copy(message = "A".repeat(161)), error.copy(message = "bad\nmessage"), error.copy(cookie = "secret"))) {
+            assertThrows(IllegalArgumentException::class.java) { validateQrStatus(invalid, "qqmusic") }
+        }
+    }
 }

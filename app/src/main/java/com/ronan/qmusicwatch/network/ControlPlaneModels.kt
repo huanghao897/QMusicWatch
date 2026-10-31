@@ -1,6 +1,7 @@
 package com.ronan.qmusicwatch.network
 
 import kotlinx.serialization.Serializable
+import com.ronan.qmusicwatch.login.MusicCookie
 
 @Serializable
 data class ControlApiResult<T>(
@@ -93,6 +94,7 @@ data class ControlQrSession(
 )
 
 @Serializable data class ControlQrPollRequest(val id: String)
+@Serializable data class ControlQrCancellation(val cancelled: Boolean = false)
 
 @Serializable
 data class ControlQrStatus(
@@ -100,10 +102,11 @@ data class ControlQrStatus(
     val status: String = "waiting",
     val expiresAt: Long = 0,
     val cookie: String = "",
+    val message: String = "",
 )
 
 internal fun validateQrSession(value: ControlQrSession, expectedProvider: String): ControlQrSession {
-    require(expectedProvider in setOf("qq", "wechat") && value.provider == expectedProvider) { "二维码登录方式不匹配" }
+    require(expectedProvider in setOf("qq", "wechat", "qqmusic") && value.provider == expectedProvider) { "二维码登录方式不匹配" }
     require(value.id.matches(Regex("[A-Za-z0-9_-]{24,96}"))) { "二维码会话标识无效" }
     require(value.mimeType in setOf("image/png", "image/jpeg")) { "二维码图片格式无效" }
     require(value.imageBase64.length in 128..700_000 && value.imageBase64.matches(Regex("[A-Za-z0-9+/]*={0,2}"))) { "二维码图片数据无效" }
@@ -112,10 +115,15 @@ internal fun validateQrSession(value: ControlQrSession, expectedProvider: String
 }
 
 internal fun validateQrStatus(value: ControlQrStatus, expectedProvider: String): ControlQrStatus {
-    require(value.provider == expectedProvider) { "二维码登录方式不匹配" }
+    require(expectedProvider in setOf("qq", "wechat", "qqmusic") && value.provider == expectedProvider) { "二维码登录方式不匹配" }
     require(value.status in setOf("waiting", "scanned", "complete", "expired", "rejected", "error")) { "二维码登录状态无效" }
     require(value.expiresAt > 0) { "二维码会话时间无效" }
     require(value.cookie.length <= 32_768 && (value.status == "complete") == value.cookie.isNotBlank()) { "二维码登录凭据无效" }
+    require(value.message.length <= 160 && '\r' !in value.message && '\n' !in value.message) { "二维码状态提示无效" }
+    if (expectedProvider == "qqmusic" && value.status == "complete") {
+        require(MusicCookie.explicitProvider(value.cookie) != null) { "登录结果缺少真实账号类型" }
+        require(MusicCookie.accountId(value.cookie) != null) { "登录结果缺少账号标识" }
+    }
     return value
 }
 

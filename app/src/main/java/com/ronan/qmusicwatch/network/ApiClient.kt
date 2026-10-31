@@ -187,6 +187,14 @@ private fun isLoginCredentialProbe(module: String, method: String): Boolean =
 internal fun requiresNewQrLogin(error: Throwable): Boolean =
     error is QqCredentialExpiredException
 
+internal fun requireSameQqAccount(expectedCookie: String, currentCookie: String?) {
+    val expectedAccount = MusicCookie.accountId(expectedCookie)
+    val currentAccount = currentCookie?.let(MusicCookie::accountId)
+    if (expectedAccount == null || currentAccount != expectedAccount) {
+        throw CancellationException("QQ Music session changed")
+    }
+}
+
 private fun JsonObject.hasPositiveNumber(vararg names: String): Boolean = names.any { name ->
     (this[name] as? JsonPrimitive)?.longOrNull?.let { it > 0 } == true
 }
@@ -939,16 +947,25 @@ class ApiClient(
                     }
                 }
             }
-            if (shouldProbePlaybackCredential(qualityIndex, bestFallback != null, allowCredentialRecovery) &&
-                probePlaybackCredential()
-            ) {
-                AppLog.write("STREAM", "credential refreshed; retry track=${track.id}")
-                return@withContext stream(
-                    track,
-                    quality,
-                    allowCredentialRecovery = false,
-                    allowCached = allowCached,
-                )
+            if (shouldProbePlaybackCredential(qualityIndex, bestFallback != null, allowCredentialRecovery)) {
+                val refreshed = try {
+                    probePlaybackCredential()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    if (!isRecoverableQqReadFailure(error)) throw error
+                    AppLog.write("AUTH", "playback credential probe unavailable ${error.javaClass.simpleName}; continue quality fallback")
+                    false
+                }
+                if (refreshed) {
+                    AppLog.write("STREAM", "credential refreshed; retry track=${track.id}")
+                    return@withContext stream(
+                        track,
+                        quality,
+                        allowCredentialRecovery = false,
+                        allowCached = allowCached,
+                    )
+                }
             }
         }
         bestFallback?.let {
@@ -1118,9 +1135,9 @@ class ApiClient(
 
     suspend fun like(track: Track, liked: Boolean): Ack = withContext(Dispatchers.IO) {
         requireLogin()
+        val sessionCookie = cookie().orEmpty()
         val complete = if (track.numericId > 0) track else trackDetail(track.id)
         if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改喜欢状态")
-        val authCookie = normalizedAuthCookie()
         val primary = qqFavoriteTrackWrite(complete, liked)
         try {
             requireWriteAccepted(
@@ -1129,7 +1146,8 @@ class ApiClient(
                     primary.module,
                     primary.method,
                     primary.param,
-                    requestCookie = authCookie,
+                    requestCookie = sessionCookie,
+                    normalizeRequestCookie = true,
                 )
             )
         } catch (error: QqBusinessException) {
@@ -1142,7 +1160,8 @@ class ApiClient(
                     fallback.module,
                     fallback.method,
                     fallback.param,
-                    requestCookie = authCookie,
+                    requestCookie = sessionCookie,
+                    normalizeRequestCookie = true,
                 )
             )
         }
@@ -1197,6 +1216,7 @@ class ApiClient(
 
     suspend fun changePlaylistTrack(id: String, track: Track, add: Boolean): Ack = withContext(Dispatchers.IO) {
         requireLogin()
+        val sessionCookie = cookie().orEmpty()
         val complete = if (track.numericId > 0) track else trackDetail(track.id)
         if (complete.numericId <= 0) error("QQ 音乐未返回歌曲数字标识，无法修改歌单")
         val write = qqPlaylistTrackWrite(playlistDirectoryNumber(id), complete, add)
@@ -1206,7 +1226,8 @@ class ApiClient(
                 write.module,
                 write.method,
                 write.param,
-                requestCookie = normalizedAuthCookie(),
+                requestCookie = sessionCookie,
+                normalizeRequestCookie = true,
             )
         )
         Ack(true)
@@ -1246,7 +1267,7 @@ class ApiClient(
             module,
             method,
             param,
-            requestCookie = normalizedAuthCookie(),
+            normalizeRequestCookie = true,
         )
 
     private suspend fun webApi(
@@ -1266,16 +1287,20 @@ class ApiClient(
 
     private suspend fun post(
         comm: JsonObject, module: String, method: String, param: JsonObject,
+        // Keep the raw session snapshot for refresh/CAS; normalize only its HTTP header.
         requestCookie: String? = cookie(), tolerateBusinessError: Boolean = false,
+        normalizeRequestCookie: Boolean = false,
         allowCredentialRefresh: Boolean = true,
         callTimeoutMs: Long? = null,
         requestKey: String = "req_0",
         formEncodedJson: Boolean = false,
     ): JsonObject {
+        requireCurrentCredentialAccount(requestCookie)
+        val httpCookie = if (normalizeRequestCookie) normalizedAuthCookie(requestCookie.orEmpty()) else requestCookie
         val payload = qqMusicuPayload(comm, module, method, param, requestKey)
         val started = System.currentTimeMillis()
         val result = try {
-            musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs, requestKey, formEncodedJson)
+            musicuRequest(payload, httpCookie, comm.int("ct") == 11, callTimeoutMs, requestKey, formEncodedJson)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -1283,8 +1308,9 @@ class ApiClient(
                 val delayMs = qqReadRetryDelayMs(error)
                 AppLog.write("API", "$module/$method transient=${error.javaClass.simpleName} retry=1 delay_ms=$delayMs")
                 delay(delayMs)
+                requireCurrentCredentialAccount(requestCookie)
                 try {
-                    musicuRequest(payload, requestCookie, comm.int("ct") == 11, callTimeoutMs, requestKey, formEncodedJson)
+                    musicuRequest(payload, httpCookie, comm.int("ct") == 11, callTimeoutMs, requestKey, formEncodedJson)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (retryError: Throwable) {
@@ -1296,28 +1322,25 @@ class ApiClient(
                 throw error
             }
         }
+        requireCurrentCredentialAccount(requestCookie)
         val code = result.int("code")
         AppLog.write("API", "$module/$method code=$code ms=${System.currentTimeMillis() - started}")
         if (shouldRefreshCredential(module, method, code)) {
             val staleCookie = requestCookie.orEmpty()
             val refreshed = if (allowCredentialRefresh && staleCookie.isNotBlank()) {
-                try {
-                    refreshCredentialBlocking(staleCookie, MusicCookie.provider(staleCookie, "qq"))
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Throwable) {
-                    AppLog.write("AUTH", "credential refresh failed ${error.javaClass.simpleName}")
-                    false
-                }
+                refreshCredentialBlocking(staleCookie, MusicCookie.provider(staleCookie, "qq"))
             } else false
             if (refreshed) {
+                val refreshedCookie = cookie()
+                requireSameQqAccount(staleCookie, refreshedCookie)
                 return post(
                     comm = requestCommAfterCredentialRefresh(module),
                     module = module,
                     method = method,
                     param = param,
-                    requestCookie = cookie(),
+                    requestCookie = refreshedCookie,
                     tolerateBusinessError = tolerateBusinessError,
+                    normalizeRequestCookie = normalizeRequestCookie,
                     allowCredentialRefresh = false,
                     callTimeoutMs = callTimeoutMs,
                     requestKey = requestKey,
@@ -1480,6 +1503,7 @@ class ApiClient(
             requestCookie = staleCookie,
         )
         val currentCookie = cookie().orEmpty()
+        requireSameQqAccount(staleCookie, currentCookie)
         markCredentialVerified(currentCookie)
         return currentCookie.isNotBlank() && currentCookie != staleCookie
     }
@@ -1493,7 +1517,10 @@ class ApiClient(
     private suspend fun refreshCredentialBlocking(staleCookie: String, provider: String): Boolean =
         credentialRefreshLock.withLock {
             val currentCookie = cookie().orEmpty()
-            if (currentCookie.isNotBlank() && currentCookie != staleCookie) return@withLock true
+            requireSameQqAccount(staleCookie, currentCookie)
+            // A parallel request may already have rotated this account's cookie.
+            // A different account or logout must never replay the old request.
+            if (currentCookie != staleCookie) return@withLock true
             val now = System.currentTimeMillis()
             if (staleCookie == recentlyRefreshedCookie && now - recentlyRefreshedAt < 60_000L) {
                 AppLog.write("AUTH", "credential refresh suppressed after recent rotation")
@@ -1505,7 +1532,10 @@ class ApiClient(
             val refreshToken = values["refresh_token"].orEmpty()
             val refreshKey = values["refresh_key"].orEmpty()
             val openId = firstCookieValue(values, "wxopenid", "openid")
-            if (!musicId.matches(Regex("\\d{1,24}")) || musicKey.isBlank() || refreshToken.isBlank() || openId.isBlank()) {
+            val accessToken = values["access_token"].orEmpty()
+            if (!musicId.matches(Regex("\\d{1,24}")) || musicKey.isBlank() || refreshToken.isBlank() || openId.isBlank() ||
+                provider == "qq" && accessToken.isBlank()
+            ) {
                 throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
             }
             val qqRequest = if (provider == "qq") {
@@ -1513,7 +1543,7 @@ class ApiClient(
                     musicId = musicId,
                     musicKey = musicKey,
                     openId = openId,
-                    accessToken = values["access_token"].orEmpty(),
+                    accessToken = accessToken,
                     refreshToken = refreshToken,
                     refreshKey = refreshKey,
                     unionId = values["unionid"].orEmpty(),
@@ -1527,7 +1557,7 @@ class ApiClient(
             }
             val param = qqRequest?.param ?: obj(
                     "openid" to openId,
-                    "access_token" to values["access_token"].orEmpty(),
+                    "access_token" to accessToken,
                     "refresh_token" to refreshToken,
                     "expired_in" to (values["expired_at"]?.toLongOrNull() ?: 0L),
                     "musicid" to musicId.toLong(),
@@ -1544,20 +1574,16 @@ class ApiClient(
                 "tmeLoginType" to if (provider == "qq") 2 else 1,
             )
             AppLog.write("AUTH", "credential refresh contract=${if (qqRequest != null) "desktop" else "mobile"} provider=$provider")
-            val data = try {
-                post(
-                    refreshComm,
-                    "music.login.LoginServer",
-                    "Login",
-                    param,
-                    requestCookie = null,
-                    allowCredentialRefresh = false,
-                    requestKey = "QQRefreshKey",
-                    formEncodedJson = true,
-                )
-            } catch (error: QqBusinessException) {
-                throw QqCredentialExpiredException("登录状态已失效，请重新扫码登录一次")
-            }
+            val data = post(
+                refreshComm,
+                "music.login.LoginServer",
+                "Login",
+                param,
+                requestCookie = null,
+                allowCredentialRefresh = false,
+                requestKey = "QQRefreshKey",
+                formEncodedJson = true,
+            )
             val refreshed = validateRefreshedCookie(
                 staleCookie,
                 buildMusicCookie(provider, values, data),
@@ -1565,9 +1591,11 @@ class ApiClient(
             // Persistence must succeed before the rotation is considered done;
             // otherwise the next request still presents the stale cookie while the
             // refresh is suppressed for 60s, kicking the user out for no reason.
+            requireCurrentCredentialAccount(staleCookie)
             if (!persistRefreshedCookie(staleCookie, refreshed)) {
+                requireCurrentCredentialAccount(staleCookie)
                 AppLog.write("AUTH", "credential persistence failed provider=$provider")
-                throw QqCredentialExpiredException("登录状态保存失败，请重新扫码登录一次")
+                error("登录状态保存失败，请稍后重试")
             }
             streamCache.clear()
             verifiedCredentialCookie = ""
@@ -1587,8 +1615,11 @@ class ApiClient(
             false
         }
 
-    private fun normalizedAuthCookie(): String {
-        val source = cookie().orEmpty()
+    private fun requireCurrentCredentialAccount(expectedCookie: String?) {
+        if (!expectedCookie.isNullOrBlank()) requireSameQqAccount(expectedCookie, cookie())
+    }
+
+    private fun normalizedAuthCookie(source: String): String {
         val values = cookieValues(source)
         val id = MusicCookie.accountId(source).orEmpty()
         val key = firstCookieValue(values, "qqmusic_key", "qm_keyst", "p_lskey", "p_skey", "skey")

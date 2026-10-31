@@ -10,6 +10,7 @@ import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
@@ -72,20 +73,41 @@ internal data class PlaybackRecoveryRequest(
     val mediaId: String,
     val failedUri: String,
     val positionMs: Long,
-    val playWhenReady: Boolean,
 )
 
 internal class PlaybackRecoveryTracker {
     private var nextGeneration = 0L
     private var pending: PlaybackRecoveryRequest? = null
     private var expectedReplacement: Pair<Long, String>? = null
+    private var attemptMediaId: String? = null
+    private var attempts = 0
 
     @Synchronized
-    fun replace(candidate: PlaybackRecoveryRequest): PlaybackRecoveryRequest =
-        candidate.copy(generation = ++nextGeneration).also {
+    fun replace(candidate: PlaybackRecoveryRequest): PlaybackRecoveryRequest {
+        resetAttemptBudgetFor(candidate.mediaId)
+        return candidate.copy(generation = ++nextGeneration).also {
             pending = it
             expectedReplacement = null
         }
+    }
+
+    @Synchronized
+    fun tryStartAttempt(request: PlaybackRecoveryRequest): Boolean {
+        if (!isCurrent(request) || attempts >= BACKGROUND_RECOVERY_ATTEMPTS) return false
+        attempts++
+        return true
+    }
+
+    @Synchronized
+    fun markPlaybackReady(mediaId: String?) {
+        if (mediaId != null && mediaId == attemptMediaId) attempts = 0
+    }
+
+    private fun resetAttemptBudgetFor(mediaId: String?) {
+        if (attemptMediaId == mediaId) return
+        attemptMediaId = mediaId
+        attempts = 0
+    }
 
     @Synchronized
     fun current(): PlaybackRecoveryRequest? = pending
@@ -97,6 +119,8 @@ internal class PlaybackRecoveryTracker {
     @Synchronized
     fun clearIfCurrent(request: PlaybackRecoveryRequest): Boolean {
         if (!isCurrent(request)) return false
+        // A new URL is not proof that its CDN can play. Keep the attempt budget
+        // until the player reaches READY, even after this request is complete.
         pending = null
         expectedReplacement = null
         return true
@@ -115,6 +139,7 @@ internal class PlaybackRecoveryTracker {
         uri: String,
         applyingGeneration: Long?,
     ): PlaybackRecoveryRequest? {
+        resetAttemptBudgetFor(mediaId)
         val request = pending ?: return null
         if (applyingGeneration == request.generation && mediaId == request.mediaId) return null
         if (mediaId == request.mediaId && uri == request.failedUri) return null
@@ -125,6 +150,12 @@ internal class PlaybackRecoveryTracker {
         expectedReplacement = null
         return request
     }
+}
+
+/** Keep the live pause/audio-focus intent; a fault-time play() would override it. */
+internal fun prepareRecoveryReplacement(player: Player, mediaItem: MediaItem, positionMs: Long) {
+    player.setMediaItem(mediaItem, positionMs)
+    player.prepare()
 }
 
 internal fun mergeRecoveredPlaybackSnapshot(
@@ -251,6 +282,11 @@ class PlaybackService : MediaSessionService() {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY &&
+                        player.playbackState == Player.STATE_READY && player.playerError == null
+                    ) {
+                        recoveryTracker.markPlaybackReady(player.currentMediaItem?.mediaId)
+                    }
                     if (playbackState != Player.STATE_ENDED) return
                     val stopAfterCurrent = (application as? QMusicApplication)?.playback?.consumeStopAfterCurrentAtEnd() == true
                     if (stopAfterCurrent) {
@@ -277,7 +313,6 @@ class PlaybackService : MediaSessionService() {
                             mediaId = mediaItem.mediaId,
                             failedUri = uri,
                             positionMs = player.currentPosition.coerceAtLeast(0L),
-                            playWhenReady = player.playWhenReady,
                         ),
                     )
                 }
@@ -441,6 +476,10 @@ class PlaybackService : MediaSessionService() {
                 val track = snapshot.track?.takeIf { it.id == request.mediaId }
                     ?: snapshot.queue.firstOrNull { it.id == request.mediaId }
                     ?: error("Playback snapshot no longer contains the failed track")
+                if (!recoveryTracker.tryStartAttempt(request)) {
+                    notifyRecoveryExhausted(request, lastError)
+                    return
+                }
                 val stream = graph.api.refreshStream(track, snapshot.quality)
                 if (!failedItemStillCurrent(request)) {
                     clearRecoveryIfCurrent(request)
@@ -455,7 +494,7 @@ class PlaybackService : MediaSessionService() {
                 if (!clearRecoveryIfCurrent(request)) return
                 AppLog.write(
                     "PLAYER_SERVICE",
-                    "recovered track=${track.id} position_ms=${request.positionMs} attempt=${attempt + 1}",
+                    "recovery-stream-replaced track=${track.id} position_ms=${request.positionMs} attempt=${attempt + 1}",
                 )
                 return
             } catch (cancelled: CancellationException) {
@@ -481,7 +520,8 @@ class PlaybackService : MediaSessionService() {
             if (!recoveryTracker.expectReplacement(request, stream.url)) return@synchronized false
             applyingRecoveryGeneration = request.generation
             try {
-                player.setMediaItem(
+                prepareRecoveryReplacement(
+                    player,
                     playbackMediaItem(
                         track.id,
                         stream.url,
@@ -491,8 +531,6 @@ class PlaybackService : MediaSessionService() {
                     ),
                     request.positionMs,
                 )
-                player.prepare()
-                if (request.playWhenReady) player.play()
             } finally {
                 applyingRecoveryGeneration = null
             }

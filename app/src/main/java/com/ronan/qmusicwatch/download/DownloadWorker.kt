@@ -64,6 +64,23 @@ internal fun canResumePartialDownload(storedQuality: String?, nextQuality: Strin
     storedQuality != null && storedQuality != QUALITY_LEGACY_UNKNOWN &&
         normalizeQualityId(storedQuality) == normalizeQualityId(nextQuality)
 
+internal fun resetPartialAfterRangeFailure(
+    statusCode: Int,
+    requestedStart: Long,
+    part: File,
+    retriedFromStart: Boolean,
+): Boolean {
+    if (statusCode != 416 || requestedStart <= 0 || retriedFromStart) return false
+    check(part.delete() || !part.exists()) { "无法重置下载分片" }
+    return true
+}
+
+internal suspend fun cacheDownloadLyrics(audioPath: String, loadLyrics: suspend () -> LyricsData) {
+    runCatching {
+        cachedLyricsFile(audioPath).writeText(downloadJson.encodeToString(loadLyrics()))
+    }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+}
+
 class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = downloadSlots.withPermit { withContext(Dispatchers.IO) {
         val id = inputData.getString("id") ?: return@withContext Result.failure()
@@ -111,6 +128,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
             )?.let { db.downloads().upsert(it) }
             var complete = false
             var totalBytes = -1L
+            var retriedFromStart = false
             while (!complete) {
                 if (graph.vault.load()?.accountId != owner) {
                     db.downloads().progress(id, owner, "locked", part.length(), totalBytes)
@@ -120,6 +138,12 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 val request = Request.Builder().url(streamUrl).withQqMusicMediaHeaders()
                     .apply { if (start > 0) header("Range", "bytes=$start-") }.build()
                 downloadHttp.newCall(request).execute().use { response ->
+                    if (resetPartialAfterRangeFailure(response.code, start, part, retriedFromStart)) {
+                        retriedFromStart = true
+                        totalBytes = -1L
+                        db.downloads().progress(id, owner, "downloading", 0, totalBytes)
+                        return@use
+                    }
                     if (!response.isSuccessful) error("download ${response.code}")
                     val body = response.body ?: error("下载响应为空")
                     val bodyLength = body.contentLength()
@@ -191,10 +215,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
             if (target.exists()) target.delete()
             if (!part.renameTo(target)) error("cannot finalize download")
             db.downloads().progress(id, owner, "complete", target.length(), target.length())
-            runCatching { graph.api.lyrics(id) }
-                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-                .getOrNull()
-                ?.let { cachedLyricsFile(target.absolutePath).writeText(downloadJson.encodeToString(it)) }
+            cacheDownloadLyrics(target.absolutePath) { graph.api.lyrics(id) }
             trustedQMusicImageUrl(track.artworkUrl).takeIf(String::isNotBlank)?.let { artwork ->
                 val cover = cachedArtworkFile(target.absolutePath)
                 val coverPart = File("${cover.absolutePath}.part")
@@ -211,7 +232,10 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 }
             }
         }.fold(onSuccess = { Result.success() }, onFailure = { error ->
-            if (error is kotlinx.coroutines.CancellationException && !isStopped) throw error
+            // Cancellation must also escape after the audio is complete: a
+            // stopped lyrics/artwork fetch must not downgrade it to paused.
+            // Explicit user pauses are recorded by DownloadController.pause.
+            if (error is kotlinx.coroutines.CancellationException) throw error
             val status = when { isStopped -> "paused"; error is StorageReserveException -> "failed_storage"; error is AccountChangedException -> "locked"; else -> "failed" }
             db.downloads().progress(id, owner, status, part.length(), -1)
             if (!isStopped && error !is StorageReserveException && error !is AccountChangedException && runAttemptCount < 2) Result.retry() else Result.failure(workDataOf("reason" to error.message.orEmpty()))
@@ -267,8 +291,10 @@ class DownloadController(private val context: Context, private val db: AppDataba
     suspend fun updateQueuedNetworkPolicy(owner: String, wifiOnly: Boolean) = withContext(Dispatchers.IO) { schedulingMutex.withLock {
         val manager = WorkManager.getInstance(context)
         val network = if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+        // A worker awaiting a retry or its network constraint can still carry
+        // failed/downloading metadata. WorkManager owns the scheduling state.
         val pending = db.downloads().all().filter {
-            it.ownerAccountId == owner && it.status in setOf("queued", "queued_wifi")
+            it.ownerAccountId == owner && it.status !in setOf("paused", "complete", "locked")
         }
         for (item in pending) {
             val info = manager.getWorkInfosForUniqueWork("download-$owner-${item.trackId}")
@@ -281,7 +307,9 @@ class DownloadController(private val context: Context, private val db: AppDataba
                 val track = Track(item.trackId, item.title, item.artists.split(" / "), artworkUrl = item.artworkUrl)
                 val result = manager.updateWork(downloadWorkRequest(track, owner, item.quality, wifiOnly, item.groupName, info.id))
                     .get(15, TimeUnit.SECONDS)
-                if (result == WorkManager.UpdateResult.NOT_APPLIED) continue
+                // If the work started after our query, only its next run was
+                // updated; do not replace the running worker's UI state.
+                if (result != WorkManager.UpdateResult.APPLIED_IMMEDIATELY) continue
             }
             // The worker may already have started; never overwrite its progress
             // or revive paused, complete or other-account downloads.

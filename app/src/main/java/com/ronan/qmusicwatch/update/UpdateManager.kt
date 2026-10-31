@@ -14,8 +14,12 @@ import com.ronan.qmusicwatch.network.ControlPlaneClient
 import com.ronan.qmusicwatch.network.ControlUpdate
 import com.ronan.qmusicwatch.network.MAX_UPDATE_APK_BYTES
 import com.ronan.qmusicwatch.network.normalizedSha256
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -146,8 +150,12 @@ internal fun validateApkMetadata(
 class UpdateManager(
     private val context: Context,
     private val client: ControlPlaneClient,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    internal suspend fun recover(release: ControlUpdate): RecoveredUpdate = withContext(Dispatchers.IO) {
+    private val artifactMutex = Mutex()
+
+    internal suspend fun recover(release: ControlUpdate): RecoveredUpdate = withContext(ioDispatcher) { artifactMutex.withLock {
+        coroutineContext.ensureActive()
         validateReleaseForDownload(release)
         val directory = updateDirectory()
         val artifacts = updateArtifacts(directory, release)
@@ -161,13 +169,14 @@ class UpdateManager(
         cleanupOtherArtifacts(directory, setOf(artifacts.part, artifacts.metadata, artifacts.ready))
         val partialBytes = validatedPartialBytes(artifacts, release)
         RecoveredUpdate(partialBytes = partialBytes)
-    }
+    } }
 
     suspend fun downloadAndVerify(
         release: ControlUpdate,
         onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit,
         onVerifying: () -> Unit,
-    ): File = withContext(Dispatchers.IO) {
+    ): File = withContext(ioDispatcher) { artifactMutex.withLock {
+        coroutineContext.ensureActive()
         validateReleaseForDownload(release)
         val directory = updateDirectory()
         val artifacts = updateArtifacts(directory, release)
@@ -184,7 +193,9 @@ class UpdateManager(
 
         var partialBytes = validatedPartialBytes(artifacts, release)
         if (partialBytes == release.apk.sizeBytes) {
-            val promoted = runCatching { promoteVerifiedPart(artifacts, release, onVerifying) }.getOrNull()
+            val promoted = runCatching { promoteVerifiedPart(artifacts, release, onVerifying) }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
             if (promoted != null) {
                 cleanupOtherArtifacts(directory, setOf(promoted))
                 return@withContext promoted
@@ -211,6 +222,10 @@ class UpdateManager(
             ensurePartialMetadata(artifacts, release)
             val start = artifacts.part.length()
             client.download(client.downloadRequest(release.apk.url, start)).use { response ->
+                // OkHttp's synchronous execute/read do not observe coroutine
+                // cancellation. Never open (and possibly truncate) a part
+                // after a cancelled call finally returns its response.
+                coroutineContext.ensureActive()
                 val plan = try {
                     planDownloadResponse(
                         statusCode = response.code,
@@ -244,6 +259,7 @@ class UpdateManager(
                         throw IllegalArgumentException("服务器返回的安装包大小不一致")
                     }
                 }
+                coroutineContext.ensureActive()
                 FileOutputStream(artifacts.part, plan.append).use { output ->
                     body.byteStream().use { input ->
                         val buffer = ByteArray(64 * 1024)
@@ -252,6 +268,7 @@ class UpdateManager(
                         while (true) {
                             coroutineContext.ensureActive()
                             val read = input.read(buffer)
+                            coroutineContext.ensureActive()
                             if (read < 0) break
                             total += read
                             if (total > release.apk.sizeBytes || total > MAX_UPDATE_APK_BYTES) {
@@ -275,8 +292,11 @@ class UpdateManager(
                     return@use
                 }
                 require(artifacts.part.length() == release.apk.sizeBytes) { "安装包下载不完整" }
+                coroutineContext.ensureActive()
                 val ready = try {
                     promoteVerifiedPart(artifacts, release, onVerifying)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (error: Throwable) {
                     discardPartial(artifacts)
                     throw error
@@ -287,7 +307,7 @@ class UpdateManager(
             if (retriedFromStart && !artifacts.part.exists()) continue
         }
         @Suppress("UNREACHABLE_CODE") error("更新下载失败")
-    }
+    } }
 
     private fun validateReleaseForDownload(release: ControlUpdate) {
         require(release.hasUpdate) { "没有可下载的新版本" }

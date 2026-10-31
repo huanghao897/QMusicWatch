@@ -18,13 +18,15 @@ internal data class QqTrackPage(
     val hasMore: Boolean?,
 ) {
     fun nextOffset(offset: Int, requestedSize: Int): Int? {
-        if (items.isEmpty()) return null
-        val next = offset + consumedCount
+        if (consumedCount <= 0) return null
+        val nextValue = offset.toLong() + consumedCount
+        if (nextValue > Int.MAX_VALUE) throw QqResponseException("QQ 音乐歌曲列表分页位置无效，请稍后重试")
+        val next = nextValue.toInt()
         return next.takeIf {
             when {
                 total != null -> next < total
                 hasMore != null -> hasMore
-                else -> items.size >= requestedSize
+                else -> consumedCount >= requestedSize
             }
         }
     }
@@ -62,7 +64,7 @@ internal suspend fun collectQqTrackPages(
     var offset = 0
     repeat(maxPages) {
         val page = parseQqTrackPage(fetchPage(offset, pageSize))
-        if (page.items.isEmpty()) {
+        if (page.consumedCount == 0) {
             if ((page.total ?: 0) > offset || page.hasMore == true) {
                 throw QqResponseException("QQ 音乐歌曲列表未完整返回，请稍后重试")
             }

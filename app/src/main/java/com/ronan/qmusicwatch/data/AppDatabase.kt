@@ -29,7 +29,7 @@ data class DownloadEntity(
     @Query("SELECT * FROM downloads") suspend fun all(): List<DownloadEntity>
     @Query("SELECT * FROM downloads WHERE trackId = :id AND ownerAccountId = :owner LIMIT 1") suspend fun find(id: String, owner: String): DownloadEntity?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(item: DownloadEntity)
-    @Query("UPDATE downloads SET status = :status WHERE trackId = :id AND ownerAccountId = :owner AND status IN ('queued', 'queued_wifi')")
+    @Query("UPDATE downloads SET status = :status WHERE trackId = :id AND ownerAccountId = :owner AND status IN ('queued', 'queued_wifi', 'failed')")
     suspend fun updateQueuedStatus(id: String, owner: String, status: String)
     @Query("UPDATE downloads SET status = :status, downloadedBytes = :bytes, totalBytes = :total, updatedAt = :now WHERE trackId = :id AND ownerAccountId = :owner")
     suspend fun progress(id: String, owner: String, status: String, bytes: Long, total: Long, now: Long = System.currentTimeMillis())

@@ -90,15 +90,15 @@ class DownloadPolicyRobolectricTest {
         assertEquals("hq", db.downloads().find(track.id, "owner")!!.quality)
     }
 
-    @Test fun policyChangeDoesNotResumePausedOrCompletedOrOtherAccountDownloads() = runBlocking {
-        for ((id, status) in listOf("paused-song" to "paused", "complete-song" to "complete", "running-song" to "downloading")) {
+    @Test fun policyChangeDoesNotResumePausedOrCompletedOrLockedOrOtherAccountDownloads() = runBlocking {
+        for ((id, status) in listOf("paused-song" to "paused", "complete-song" to "complete", "locked-song" to "locked")) {
             controller.enqueue(track.copy(id = id), "owner", "sq", true, "Playlist")
             db.downloads().progress(id, "owner", status, 10, 20)
         }
         controller.enqueue(track, "other-owner", "sq", true, "Playlist")
         controller.updateQueuedNetworkPolicy("owner", false)
 
-        for ((id, status) in listOf("paused-song" to "paused", "complete-song" to "complete", "running-song" to "downloading")) {
+        for ((id, status) in listOf("paused-song" to "paused", "complete-song" to "complete", "locked-song" to "locked")) {
             assertEquals(status, db.downloads().find(id, "owner")!!.status)
             assertEquals(NetworkType.UNMETERED, work(id = id).constraints.requiredNetworkType)
             db.downloads().updateQueuedStatus(id, "owner", "queued")
@@ -106,5 +106,38 @@ class DownloadPolicyRobolectricTest {
         }
         assertEquals("queued_wifi", db.downloads().find(track.id, "other-owner")!!.status)
         assertEquals(NetworkType.UNMETERED, work("other-owner").constraints.requiredNetworkType)
+    }
+
+    @Test fun policyChangeUpdatesRetryWaitingWorkWithoutLosingProgress() = runBlocking {
+        controller.enqueue(track, "owner", "sq", true, "Liked")
+        val original = work()
+        // This is the persisted state after a failed attempt returns Result.retry().
+        db.downloads().progress(track.id, "owner", "failed", 123, 999)
+
+        controller.updateQueuedNetworkPolicy("owner", false)
+
+        assertEquals(original.id, work().id)
+        assertEquals(NetworkType.CONNECTED, work().constraints.requiredNetworkType)
+        val row = db.downloads().find(track.id, "owner")!!
+        assertEquals("queued", row.status)
+        assertEquals(123L, row.downloadedBytes)
+        assertEquals(999L, row.totalBytes)
+        assertEquals("sq", row.quality)
+    }
+
+    @Test fun policyChangeUsesWorkStateForPreviouslyStartedConstraintWaitingWork() = runBlocking {
+        controller.enqueue(track, "owner", "hq", true, "Liked")
+        // A constraint-stopped worker can leave downloading metadata while
+        // WorkManager has already put its work back into ENQUEUED.
+        db.downloads().progress(track.id, "owner", "downloading", 456, 999)
+
+        controller.updateQueuedNetworkPolicy("owner", false)
+
+        assertEquals(NetworkType.CONNECTED, work().constraints.requiredNetworkType)
+        val row = db.downloads().find(track.id, "owner")!!
+        // A concurrent worker may also have started: do not overwrite its state.
+        assertEquals("downloading", row.status)
+        assertEquals(456L, row.downloadedBytes)
+        assertEquals(999L, row.totalBytes)
     }
 }

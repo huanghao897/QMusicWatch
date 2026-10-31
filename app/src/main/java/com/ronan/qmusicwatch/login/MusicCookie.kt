@@ -12,10 +12,12 @@ object MusicCookie {
         .firstOrNull { it[0] in setOf("qqmusic_uin", "uin", "wxuin") }
         ?.get(1)?.removePrefix("o")?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) }
 
-    fun provider(cookie: String, fallback: String): String = cookie.split(';')
+    fun explicitProvider(cookie: String): String? = cookie.split(';')
         .mapNotNull { part -> part.trim().split('=', limit = 2).takeIf { it.size == 2 } }
         .firstOrNull { it[0] == "tmeLoginType" }
         ?.get(1)?.let { when (it) { "1" -> "wechat"; "2" -> "qq"; else -> null } }
+
+    fun provider(cookie: String, fallback: String): String = explicitProvider(cookie)
         ?: fallback.takeIf { it == "qq" || it == "wechat" } ?: "qq"
 
     fun fromQrMessage(message: String): String? = runCatching {

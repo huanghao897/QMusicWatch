@@ -26,4 +26,11 @@ class MusicCookieTest {
         assertEquals("wechat", MusicCookie.provider("uin=1", "wechat"))
         assertEquals("qq", MusicCookie.provider("uin=1; tmeLoginType=99", "invalid"))
     }
+
+    @Test fun appQrChannelNeverBecomesTheSavedAccountProvider() {
+        assertEquals("wechat", MusicCookie.provider("qqmusic_uin=12345; tmeLoginType=1", "qqmusic"))
+        assertEquals("qq", MusicCookie.provider("qqmusic_uin=12345; tmeLoginType=2", "qqmusic"))
+        assertNull(MusicCookie.explicitProvider("qqmusic_uin=12345; tmeLoginType=6"))
+        assertNull(MusicCookie.explicitProvider("qqmusic_uin=12345"))
+    }
 }

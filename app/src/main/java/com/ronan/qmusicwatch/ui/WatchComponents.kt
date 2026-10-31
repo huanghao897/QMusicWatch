@@ -58,6 +58,16 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
+internal fun watchLongClickAction(
+    action: (() -> Unit)?,
+    hapticFeedback: () -> Unit,
+): (() -> Unit)? = action?.let { onLongClick ->
+    {
+        hapticFeedback()
+        onLongClick()
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WatchIconButton(
@@ -80,9 +90,8 @@ fun WatchIconButton(
             .combinedClickable(
                 role = Role.Button,
                 onClick = onClick,
-                onLongClick = {
+                onLongClick = watchLongClickAction(onLongClick) {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onLongClick?.invoke()
                 },
             ),
         contentAlignment = Alignment.Center,

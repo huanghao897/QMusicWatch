@@ -112,7 +112,7 @@ class ControlPlaneClient(
     }
 
     suspend fun createQrLogin(provider: String): ControlQrSession {
-        require(provider in setOf("qq", "wechat")) { "不支持的二维码登录方式" }
+        require(provider in setOf("qq", "wechat", "qqmusic")) { "不支持的二维码登录方式" }
         return validateQrSession(
             post(endpoint("api/qmusic-watch/auth/$provider/qr"), "{}".encodeToByteArray()),
             provider,
@@ -123,6 +123,16 @@ class ControlPlaneClient(
         require(id.matches(Regex("[A-Za-z0-9_-]{24,96}"))) { "二维码会话标识无效" }
         val bytes = json.encodeToString(ControlQrPollRequest(id)).encodeToByteArray()
         return validateQrStatus(post(endpoint("api/qmusic-watch/auth/qr/poll"), bytes), provider)
+    }
+
+    suspend fun cancelQrLogin(id: String) {
+        require(id.matches(Regex("[A-Za-z0-9_-]{24,96}"))) { "二维码会话标识无效" }
+        val bytes = json.encodeToString(ControlQrPollRequest(id)).encodeToByteArray()
+        request<ControlQrCancellation>(
+            Request.Builder().url(endpoint("api/qmusic-watch/auth/qr/cancel"))
+                .post(bytes.toRequestBody("application/json; charset=utf-8".toMediaType())).build(),
+            timeoutMs = 3_000,
+        )
     }
 
     fun download(request: Request): Response = http.newCall(request).execute()
@@ -143,10 +153,12 @@ class ControlPlaneClient(
         Request.Builder().url(url).post(bytes.toRequestBody("application/json; charset=utf-8".toMediaType())).build(),
     )
 
-    private suspend inline fun <reified T> request(request: Request): T = withContext(Dispatchers.IO) {
+    private suspend inline fun <reified T> request(request: Request, timeoutMs: Long? = null): T = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
         val path = request.url.encodedPath
-        http.newCall(request.newBuilder().header("Accept", "application/json").header("User-Agent", userAgent()).build()).execute().use { response ->
+        val call = http.newCall(request.newBuilder().header("Accept", "application/json").header("User-Agent", userAgent()).build())
+        if (timeoutMs != null) call.timeout().timeout(timeoutMs, TimeUnit.MILLISECONDS)
+        call.execute().use { response ->
             val bytes = response.body?.byteStream()?.use(::readBounded) ?: ByteArray(0)
             AppLog.write("CONTROL", "$path http=${response.code} ms=${System.currentTimeMillis() - started}")
             if (!response.isSuccessful) {

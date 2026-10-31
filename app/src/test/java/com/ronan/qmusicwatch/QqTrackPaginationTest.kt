@@ -87,6 +87,59 @@ class QqTrackPaginationTest {
         assertNull(parseQqTrackPage(data).nextOffset(400, 100))
     }
 
+    @Test fun declaredFullPageWithoutTotalContinuesAfterServerFiltering() = runBlocking {
+        val offsets = mutableListOf<Int>()
+        val tracks = collectQqTrackPages(fetchPage = { offset, _ ->
+            offsets += offset
+            buildJsonObject {
+                put("songlist", JsonArray(listOf(rawTrack("song-$offset"))))
+                put("songlist_size", if (offset == 0) 100 else 1)
+            }
+        }, parseTracks = ::parseTracks)
+        assertEquals(listOf(0, 100), offsets)
+        assertEquals(listOf("song-0", "song-100"), tracks.map(Track::id))
+    }
+
+    @Test fun emptyFilteredPagesWithConsumedSlotsDoNotHideLaterSongs() = runBlocking {
+        val offsets = mutableListOf<Int>()
+        val tracks = collectQqTrackPages(fetchPage = { offset, _ ->
+            offsets += offset
+            buildJsonObject {
+                put("songlist", JsonArray(if (offset < 200) emptyList() else listOf(rawTrack("last-song"))))
+                put("songlist_size", if (offset < 200) 100 else 1)
+                put("total_song_num", 201)
+            }
+        }, parseTracks = ::parseTracks)
+        assertEquals(listOf(0, 100, 200), offsets)
+        assertEquals(listOf("last-song"), tracks.map(Track::id))
+    }
+
+    @Test fun anEmptyFilteredLastPageMayFinishAtTheDeclaredTotal() = runBlocking {
+        val tracks = collectQqTrackPages(fetchPage = { offset, _ ->
+            buildJsonObject {
+                put("songlist", JsonArray(if (offset == 0) listOf(rawTrack("first-song")) else emptyList()))
+                put("songlist_size", 100)
+                put("total_song_num", 200)
+            }
+        }, parseTracks = ::parseTracks)
+        assertEquals(listOf("first-song"), tracks.map(Track::id))
+    }
+
+    @Test fun consumedSlotsCannotOverflowTheNextOffset() {
+        val data = Json.parseToJsonElement("""{"songlist":[],"songlist_size":2147483647,"hasmore":1}""").jsonObject
+        assertThrows(QqResponseException::class.java) { parseQqTrackPage(data).nextOffset(100, 100) }
+    }
+
+    @Test fun endlessFilteredPagesStillHitThePageLimit() {
+        assertThrows(QqResponseException::class.java) {
+            runBlocking {
+                collectQqTrackPages(maxPages = 2, fetchPage = { _, _ ->
+                    Json.parseToJsonElement("""{"songlist":[],"songlist_size":100,"hasmore":1}""").jsonObject
+                }, parseTracks = ::parseTracks)
+            }
+        }
+    }
+
     @Test fun supportsLibrariesLargerThanTheOldTwentyPageLimit() = runBlocking {
         val tracks = collectQqTrackPages(fetchPage = { offset, size ->
             page((offset until minOf(offset + size, 2101)).map { rawTrack("song-$it") }, total = 2101)

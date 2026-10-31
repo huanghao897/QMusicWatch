@@ -12,11 +12,21 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.ronan.qmusicwatch.data.DownloadEntity
 import com.ronan.qmusicwatch.model.SessionTokens
 import com.ronan.qmusicwatch.model.Track
+import com.ronan.qmusicwatch.model.PlaybackSnapshot
+import com.ronan.qmusicwatch.model.CollectionDetail
+import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.network.ControlPlaneClient
 import com.ronan.qmusicwatch.update.UpdateManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executor
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -57,6 +67,8 @@ class PlaybackSettingsRobolectricTest {
     private val app get() = RuntimeEnvironment.getApplication() as QMusicApplication
     private val stores = mutableListOf<ViewModelStore>()
     private val streamRequests = CopyOnWriteArrayList<String>()
+    @Volatile private var requestHook: ((String) -> Unit)? = null
+    @Volatile private var responseData: ((String) -> String?)? = null
     // Deliberately minimal quality metadata: old lists can omit SQ support.
     private val track = Track("00485V8K4InqbZ", "Song", artists = listOf("Artist"), mediaMid = "media-mid")
 
@@ -74,9 +86,10 @@ class PlaybackSettingsRobolectricTest {
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
             val body = request.body?.let { Buffer().apply(it::writeTo).readUtf8() }.orEmpty()
+            requestHook?.invoke(body)
             val isStream = body.contains("CgiGetVkey") || body.contains("UrlGetVkey")
             if (isStream) streamRequests += body
-            val data = if (isStream) {
+            val data = responseData?.invoke(body) ?: if (isStream) {
                 """{"midurlinfo":[{"purl":"F000media-mid.flac","filename":"F000media-mid.flac"}],"sip":["https://dl.stream.qqmusic.qq.com/"],"expiration":3600}"""
             } else """{"songlist":[],"lyric":"","trans":""}"""
             val payload = if (request.url.host == "heyboxlite.xyz") {
@@ -120,6 +133,12 @@ class PlaybackSettingsRobolectricTest {
 
     private fun work(id: String = track.id) = WorkManager.getInstance(app)
         .getWorkInfosForUniqueWork("download-test-owner-$id").get().first { !it.state.isFinished }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun uiState(vm: AppViewModel) = AppViewModel::class.java.getDeclaredField("_state")
+        .apply { isAccessible = true }.get(vm) as MutableStateFlow<AppUiState>
+
+    private suspend fun savedPlayback() = Json.decodeFromString<PlaybackSnapshot>(app.settings.playbackSnapshot.first())
 
     @Test fun savedDefaultsRemainCurrentWithoutIndividualUiCollectors() = runBlocking {
         val vm = viewModel()
@@ -202,5 +221,179 @@ class PlaybackSettingsRobolectricTest {
         awaitCondition { app.db.downloads().find(track.id, "test-owner")!!.status == "queued" }
         assertEquals(id, work().id)
         assertEquals(NetworkType.CONNECTED, work().constraints.requiredNetworkType)
+    }
+
+    @Test fun foregroundSkipUsesSavedLoopModeWithoutAnIndividualCollector() = runBlocking {
+        val other = track.copy(id = "003OUlho2HcRHC", title = "Other")
+        app.settings.setPlayMode("loop_all")
+        app.settings.setPlaybackSnapshot(Json.encodeToString(PlaybackSnapshot(
+            track = other, queue = listOf(track, other), ownerAccountId = "test-owner",
+        )))
+        val vm = viewModel()
+        awaitCondition { vm.state.value.currentTrack?.id == other.id }
+        vm.skipNext()
+        awaitCondition { vm.state.value.currentTrack?.id == track.id }
+        assertEquals("loop_all", vm.settings.value.playMode)
+    }
+
+    @Test fun selectingAnotherTrackDoesNotInheritTheRestoredPosition() = runBlocking {
+        app.settings.setPlaybackSnapshot(Json.encodeToString(PlaybackSnapshot(
+            track = track, queue = listOf(track), positionMs = 42_000, ownerAccountId = "test-owner",
+        )))
+        val vm = viewModel()
+        awaitCondition { vm.state.value.currentTrack?.id == track.id }
+        val other = track.copy(id = "003OUlho2HcRHC", title = "Other")
+        vm.requestPlay(other, allowSpeaker = true)
+        awaitCondition { savedPlayback().track?.id == other.id }
+        assertEquals(0L, savedPlayback().positionMs)
+    }
+
+    @Test fun savingAnIdleRestoredPlayerDoesNotEraseItsPosition() = runBlocking {
+        app.settings.setPlaybackSnapshot(Json.encodeToString(PlaybackSnapshot(
+            track = track, queue = listOf(track), positionMs = 42_000, ownerAccountId = "test-owner",
+        )))
+        val vm = viewModel()
+        awaitCondition { vm.state.value.currentTrack?.id == track.id }
+        val save = vm.savePlaybackState()
+        awaitCondition { save.isCompleted }
+        save.join()
+        assertEquals(42_000L, savedPlayback().positionMs)
+        vm.requestPlay(track, allowSpeaker = true)
+        awaitCondition { savedPlayback().streamUrl.isNotBlank() }
+        assertEquals(42_000L, savedPlayback().positionMs)
+    }
+
+    @Test fun consumingAnOldSnackbarDoesNotClearANewerMessage() = runBlocking {
+        val vm = viewModel()
+        uiState(vm).value = vm.state.value.copy(message = "new message")
+        vm.consumeMessage("old message")
+        assertEquals("new message", vm.state.value.message)
+        vm.consumeMessage("new message")
+        assertNull(vm.state.value.message)
+    }
+
+    @Test fun aLateLyricsReloadCannotReplaceTheNewTracksLyrics() = runBlocking {
+        val vm = viewModel()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        requestHook = { body ->
+            if (body.contains("GetPlayLyricInfo") && body.contains("\"crypt\":0")) {
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+            }
+        }
+        responseData = { body -> if (body.contains("GetPlayLyricInfo")) """{"lyric":"[00:01]Old lyric","trans":""}""" else null }
+        uiState(vm).value = vm.state.value.copy(currentTrack = track)
+        val reload = vm.reloadLyrics()
+        try {
+            awaitCondition { entered.count == 0L }
+            val other = track.copy(id = "003OUlho2HcRHC")
+            val currentLyrics = listOf(LyricLine(1_000, "New lyric"))
+            uiState(vm).value = vm.state.value.copy(currentTrack = other, lyrics = currentLyrics)
+            release.countDown()
+            awaitCondition { reload.isCompleted }
+            reload.join()
+            assertEquals(currentLyrics, vm.state.value.lyrics)
+            assertEquals(other.id, vm.state.value.currentTrack?.id)
+        } finally { release.countDown() }
+    }
+
+    @Test fun aLatePlaylistRemovalCannotRemoveSongsFromAnotherOpenPlaylist() = runBlocking {
+        val vm = viewModel()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        requestHook = { body ->
+            if (body.contains("DelSonglist")) {
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+            }
+        }
+        val song = track.copy(numericId = 123)
+        uiState(vm).value = vm.state.value.copy(detail = CollectionDetail("A", listOf(song)), detailDirectoryId = "101")
+        val remove = vm.removeFromPlaylist(song, "101")
+        try {
+            awaitCondition { entered.count == 0L }
+            val otherDetail = CollectionDetail("B", listOf(song, song.copy(id = "003OUlho2HcRHC")))
+            uiState(vm).value = vm.state.value.copy(detail = otherDetail, detailDirectoryId = "202")
+            release.countDown()
+            awaitCondition { remove.isCompleted }
+            remove.join()
+            assertEquals(otherDetail, vm.state.value.detail)
+        } finally { release.countDown() }
+    }
+
+    @Test fun wifiSettingCannotOvertakeAnEnqueueUsingThePreviousPolicy() = runBlocking {
+        app.settings.setWifiOnlyDownload(true)
+        val vm = viewModel()
+        val scheduling = app.downloads.javaClass.getDeclaredField("schedulingMutex")
+            .apply { isAccessible = true }.get(app.downloads) as Mutex
+        val policy = AppViewModel::class.java.getDeclaredField("downloadPolicyMutex")
+            .apply { isAccessible = true }.get(vm) as Mutex
+        awaitCondition { !policy.isLocked }
+        scheduling.lock()
+        var released = false
+        try {
+            vm.cache(track)
+            awaitCondition { policy.isLocked }
+            val changed = vm.setWifiOnlyDownload(false)
+            shadowOf(Looper.getMainLooper()).idle()
+            delay(50)
+            assertTrue(app.settings.wifiOnlyDownload.first())
+            scheduling.unlock()
+            released = true
+            awaitCondition { changed.isCompleted }
+            changed.join()
+            assertEquals(NetworkType.CONNECTED, work().constraints.requiredNetworkType)
+            assertFalse(app.settings.wifiOnlyDownload.first())
+        } finally { if (!released) scheduling.unlock() }
+    }
+
+    @Test fun logoutClearsCancelledPlaybackAndDetailLoadingStates() = runBlocking {
+        val vm = viewModel()
+        uiState(vm).value = vm.state.value.copy(playbackLoading = true, detailLoading = true, detailError = "old error")
+        vm.logout()
+        assertFalse(vm.state.value.playbackLoading)
+        assertFalse(vm.state.value.detailLoading)
+        assertNull(vm.state.value.detailError)
+        assertNull(vm.state.value.currentTrack)
+    }
+
+    @Test fun anOldQueuedSnapshotCannotOverwriteANewTrackAndPosition() = runBlocking {
+        val original = PlaybackSnapshot(track = track, queue = listOf(track), positionMs = 42_000, ownerAccountId = "test-owner")
+        app.settings.setPlaybackSnapshot(Json.encodeToString(original))
+        val vm = viewModel()
+        awaitCondition { vm.state.value.currentTrack?.id == track.id }
+        val snapshotMutex = AppViewModel::class.java.getDeclaredField("playbackSnapshotMutex")
+            .apply { isAccessible = true }.get(vm) as Mutex
+        snapshotMutex.lock()
+        var released = false
+        try {
+            val oldSave = vm.savePlaybackState()
+            val other = track.copy(id = "003OUlho2HcRHC")
+            val latest = original.copy(track = other, queue = listOf(other), positionMs = 9_000)
+            uiState(vm).value = vm.state.value.copy(currentTrack = other)
+            app.settings.setPlaybackSnapshot(Json.encodeToString(latest))
+            snapshotMutex.unlock()
+            released = true
+            awaitCondition { oldSave.isCompleted }
+            oldSave.join()
+            assertEquals(latest, savedPlayback())
+        } finally { if (!released) snapshotMutex.unlock() }
+    }
+
+    @Test fun logoutCancelsAnOldAccountsCacheRequestWaitingForThePolicyLock() = runBlocking {
+        val vm = viewModel()
+        val policy = AppViewModel::class.java.getDeclaredField("downloadPolicyMutex")
+            .apply { isAccessible = true }.get(vm) as Mutex
+        awaitCondition { !policy.isLocked }
+        policy.lock()
+        try {
+            vm.cache(track)
+            vm.logout()
+        } finally { policy.unlock() }
+        shadowOf(Looper.getMainLooper()).idle()
+        delay(50)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(app.db.downloads().find(track.id, "test-owner"))
     }
 }

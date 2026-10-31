@@ -1,6 +1,8 @@
 package com.ronan.qmusicwatch
 
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.session.MediaSession
 import com.ronan.qmusicwatch.playback.BACKGROUND_RECOVERY_ATTEMPTS
 import com.ronan.qmusicwatch.playback.BACKGROUND_RECOVERY_DELAY_MS
@@ -14,6 +16,7 @@ import com.ronan.qmusicwatch.playback.PlaybackRecoveryTracker
 import com.ronan.qmusicwatch.playback.PlaybackService
 import com.ronan.qmusicwatch.playback.mergePlaybackProgressSnapshot
 import com.ronan.qmusicwatch.playback.mergeRecoveredPlaybackSnapshot
+import com.ronan.qmusicwatch.playback.prepareRecoveryReplacement
 import com.ronan.qmusicwatch.model.PlaybackSnapshot
 import com.ronan.qmusicwatch.model.StreamData
 import com.ronan.qmusicwatch.model.Track
@@ -27,6 +30,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
+import java.lang.reflect.Proxy
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = android.app.Application::class)
@@ -49,7 +53,6 @@ class PlaybackServiceRobolectricTest {
                 mediaId = "track-a",
                 failedUri = "https://heyboxlite.xyz/media/old",
                 positionMs = 1_000,
-                playWhenReady = true,
             ),
         )
         val second = tracker.replace(
@@ -57,7 +60,6 @@ class PlaybackServiceRobolectricTest {
                 mediaId = "track-a",
                 failedUri = "https://heyboxlite.xyz/media/new",
                 positionMs = 2_000,
-                playWhenReady = true,
             ),
         )
 
@@ -74,7 +76,6 @@ class PlaybackServiceRobolectricTest {
                 mediaId = "track-a",
                 failedUri = "https://heyboxlite.xyz/media/expired",
                 positionMs = 1_000,
-                playWhenReady = true,
             ),
         )
         val refreshed = "https://heyboxlite.xyz/media/refreshed"
@@ -97,7 +98,6 @@ class PlaybackServiceRobolectricTest {
                 mediaId = "track-a",
                 failedUri = "https://heyboxlite.xyz/media/a",
                 positionMs = 4_000,
-                playWhenReady = true,
             ),
         )
         val invalidated = tracker.invalidateUnlessMatches(
@@ -141,7 +141,6 @@ class PlaybackServiceRobolectricTest {
             mediaId = current.id,
             failedUri = snapshot.streamUrl,
             positionMs = 7_000,
-            playWhenReady = true,
         )
 
         val recovered = mergeRecoveredPlaybackSnapshot(
@@ -188,6 +187,95 @@ class PlaybackServiceRobolectricTest {
 
         assertEquals(refreshed, changed.streamUrl)
         assertEquals(0L, changed.streamExpiresAt)
+    }
+
+    @Test fun successfulUrlRefreshesDoNotResetTheConsecutivePlaybackFailureBudget() {
+        val tracker = PlaybackRecoveryTracker()
+        repeat(BACKGROUND_RECOVERY_ATTEMPTS) { attempt ->
+            val request = tracker.replace(recoveryRequest(uri = "https://dl.stream.qqmusic.qq.com/failed-$attempt"))
+            assertTrue(tracker.tryStartAttempt(request))
+            val replacement = "https://dl.stream.qqmusic.qq.com/replacement-$attempt"
+            assertTrue(tracker.expectReplacement(request, replacement))
+            assertNull(tracker.invalidateUnlessMatches(request.mediaId, replacement, applyingGeneration = null))
+            // The refresh API and snapshot commit succeeded, but the replacement
+            // immediately fails at the CDN without ever reaching STATE_READY.
+            assertTrue(tracker.clearIfCurrent(request))
+        }
+
+        val nextFailure = tracker.replace(recoveryRequest(uri = "https://dl.stream.qqmusic.qq.com/final"))
+        assertFalse(tracker.tryStartAttempt(nextFailure))
+    }
+
+    @Test fun onlyReadyForTheCurrentTrackResetsItsRecoveryBudget() {
+        val tracker = PlaybackRecoveryTracker()
+        val request = tracker.replace(recoveryRequest())
+        repeat(BACKGROUND_RECOVERY_ATTEMPTS) { assertTrue(tracker.tryStartAttempt(request)) }
+        assertFalse(tracker.tryStartAttempt(request))
+
+        tracker.markPlaybackReady("track-b")
+        assertFalse(tracker.tryStartAttempt(request))
+        tracker.markPlaybackReady(request.mediaId)
+        assertTrue(tracker.tryStartAttempt(request))
+    }
+
+    @Test fun changingTracksStartsANewBudgetEvenWhenThePreviousRequestWasCleared() {
+        val tracker = PlaybackRecoveryTracker()
+        val request = tracker.replace(recoveryRequest())
+        repeat(BACKGROUND_RECOVERY_ATTEMPTS) { assertTrue(tracker.tryStartAttempt(request)) }
+        assertTrue(tracker.clearIfCurrent(request))
+
+        assertNull(tracker.invalidateUnlessMatches("track-b", "https://dl.stream.qqmusic.qq.com/b", null))
+        val replayed = tracker.replace(recoveryRequest())
+        assertTrue(tracker.tryStartAttempt(replayed))
+    }
+
+    @Test fun supersededRecoveriesDoNotConsumeTheCurrentAttempts() {
+        val tracker = PlaybackRecoveryTracker()
+        val old = tracker.replace(recoveryRequest())
+        val current = tracker.replace(recoveryRequest(uri = "https://dl.stream.qqmusic.qq.com/new"))
+        assertFalse(tracker.tryStartAttempt(old))
+        repeat(BACKGROUND_RECOVERY_ATTEMPTS) { assertTrue(tracker.tryStartAttempt(current)) }
+        assertFalse(tracker.tryStartAttempt(current))
+    }
+
+    @Test fun aUserOrNoisyPauseDuringRecoveryIsNotOverriddenByTheReplacement() {
+        assertRecoveryReplacementIntent(playWhenReady = false)
+    }
+
+    @Test fun aRecoveryWithoutALaterPauseKeepsItsPlayingIntent() {
+        assertRecoveryReplacementIntent(playWhenReady = true)
+    }
+
+    private fun recoveryRequest(uri: String = "https://dl.stream.qqmusic.qq.com/failed") =
+        PlaybackRecoveryRequest(mediaId = "track-a", failedUri = uri, positionMs = 7_000)
+
+    private fun assertRecoveryReplacementIntent(playWhenReady: Boolean) {
+        var liveIntent = playWhenReady
+        var replacementPosition = -1L
+        val calls = mutableListOf<String>()
+        val item = MediaItem.Builder().setMediaId("track-a")
+            .setUri("https://dl.stream.qqmusic.qq.com/replacement").build()
+        val player = Proxy.newProxyInstance(Player::class.java.classLoader, arrayOf(Player::class.java)) { _, method, args ->
+            calls += method.name
+            when (method.name) {
+                "setMediaItem" -> {
+                    assertEquals(item, args!![0])
+                    replacementPosition = args[1] as Long
+                    null
+                }
+                "prepare" -> null
+                "play" -> { liveIntent = true; null }
+                "pause" -> { liveIntent = false; null }
+                "setPlayWhenReady" -> { liveIntent = args!![0] as Boolean; null }
+                else -> error("Unexpected player action: ${method.name}")
+            }
+        } as Player
+
+        prepareRecoveryReplacement(player, item, positionMs = 7_000)
+
+        assertEquals(playWhenReady, liveIntent)
+        assertEquals(7_000L, replacementPosition)
+        assertEquals(listOf("setMediaItem", "prepare"), calls)
     }
 
     @Test fun mediaSessionPublishesPreviousAndNextNotificationButtons() {

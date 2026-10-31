@@ -182,6 +182,15 @@ internal fun lyricTime(ms: Long): String {
     val safe = ms.coerceAtLeast(0)
     return "${(safe / 60_000).toString().padStart(2, '0')}:${((safe / 1000) % 60).toString().padStart(2, '0')}"
 }
+// Positive values already advance position + offset in the player. Preserve
+// stored values and describe that existing behavior consistently in settings.
+internal val lyricOffsetChoices = listOf(
+    "-1000" to "延后 1 秒",
+    "-500" to "延后 0.5 秒",
+    "0" to "无偏移",
+    "500" to "提前 0.5 秒",
+    "1000" to "提前 1 秒",
+)
 internal fun lyricLayers(showOriginal: Boolean, showTranslation: Boolean, hasTranslation: Boolean): Pair<Boolean, Boolean> =
     (showOriginal || !hasTranslation) to (showTranslation && hasTranslation)
 internal fun fitSingleLineFontSp(requestedSp: Float, measuredWidthPx: Float, availableWidthPx: Float): Float {
@@ -544,12 +553,14 @@ class MainActivity : ComponentActivity() {
     }
     LaunchedEffect(chrome.message) {
         chrome.message?.let { message ->
-            vm.consumeMessage()
             if (message.contains("重新扫码登录") && backStack?.destination?.route != "login") {
                 nav.navigate("login") { launchSingleTop = true }
             } else {
                 snackbar.showSnackbar(message)
             }
+            // Clearing this effect's key while showSnackbar is suspended would
+            // cancel the display. Also avoid consuming a newer pending message.
+            vm.consumeMessage(message)
         }
     }
     LaunchedEffect(installLaunchError) {
@@ -925,7 +936,7 @@ class MainActivity : ComponentActivity() {
 @Composable private fun LoginScreen(state: AppUiState, vm: AppViewModel, onSuccess: () -> Unit) {
     val dimensions = LocalWatchDimensions.current
     LaunchedEffect(state.qrStatus) { if (state.qrStatus == "登录成功") onSuccess() }
-    LaunchedEffect(Unit) { vm.startQrLogin("qq") }
+    LaunchedEffect(Unit) { vm.startQrLogin() }
     DisposableEffect(Unit) { onDispose(vm::cancelQrLogin) }
     BoxWithConstraints(Modifier.fillMaxSize().padding(dimensions.screenPadding)) {
         if (!vm.featureEnabled("qrLogin")) {
@@ -949,16 +960,16 @@ class MainActivity : ComponentActivity() {
                 ) {
                     WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.size(30.dp), onClick = onSuccess)
                     Spacer(Modifier.width(3.dp))
-                    Text("扫码登录", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("QQ音乐扫码", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    WatchIconButton(Icons.Default.Refresh, "刷新二维码", Modifier.size(32.dp)) { vm.startQrLogin("qq") }
+                    WatchIconButton(Icons.Default.Refresh, "刷新二维码", Modifier.size(32.dp)) { vm.startQrLogin() }
                 }
                 ServerQrLogin(
                     imageBase64 = state.qrImageBase64,
                     modifier = Modifier.size(qrSide),
                 )
                 Text(
-                    if (state.qrStatus.isBlank()) "使用 QQ 或 QQ音乐扫描" else state.qrStatus,
+                    if (state.qrStatus.isBlank()) "使用 QQ音乐扫一扫" else state.qrStatus,
                     color = if (state.qrStatus.startsWith("登录失败")) MaterialTheme.colorScheme.error else WatchTextSecondary,
                     fontSize = 10.sp,
                     maxLines = 1,
@@ -1006,8 +1017,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
 
 @Composable private fun SearchScreen(nav: NavHostController, state: AppUiState, vm: AppViewModel, history: List<String>) {
     val dimensions = LocalWatchDimensions.current
-    var query by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("track") }
+    var query by rememberSaveable { mutableStateOf(state.searchQuery) }
+    var type by rememberSaveable { mutableStateOf(state.searchType) }
     val names = linkedMapOf("track" to "歌曲", "playlist" to "歌单", "artist" to "歌手", "album" to "专辑")
     Column(Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         WatchSearchField(query, { query = it }, "搜索", Modifier.fillMaxWidth(), leadingIcon = Icons.Default.Search, trailingIcon = Icons.AutoMirrored.Filled.ArrowForward, onSearch = { vm.search(query, type) })
@@ -1035,7 +1046,31 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 }
             }
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) { if (type == "track") items(state.searchTracks, key = { it.id }) { TrackRow(it, vm, queue = state.searchTracks, playlists = writablePlaylists(state.library?.playlists.orEmpty())) } else items(state.searchCollections, key = { "${it.directoryId}:${it.id}" }) { CollectionRow(it) { vm.loadDetail(type, it); nav.navigate("detail") } }; if (state.searchCursor != null) item { TextButton({ vm.search(state.searchQuery, type, loadMore = true) }, Modifier.fillMaxWidth(), enabled = !state.searchLoading) { if (state.searchLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text("加载更多") } } }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // A tab change without a submitted query must not reinterpret old
+            // playlist results as albums/artists or reuse their cursor.
+            if (type == state.searchType) {
+                if (state.searchType == "track") {
+                    items(state.searchTracks, key = { it.id }) {
+                        TrackRow(it, vm, queue = state.searchTracks, playlists = writablePlaylists(state.library?.playlists.orEmpty()))
+                    }
+                } else {
+                    items(state.searchCollections, key = { "${it.directoryId}:${it.id}" }) {
+                        CollectionRow(it) { vm.loadDetail(state.searchType, it); nav.navigate("detail") }
+                    }
+                }
+                if (state.searchCursor != null) item {
+                    TextButton(
+                        { vm.search(state.searchQuery, state.searchType, loadMore = true) },
+                        Modifier.fillMaxWidth(),
+                        enabled = !state.searchLoading,
+                    ) {
+                        if (state.searchLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Text("加载更多")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2197,7 +2232,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         "offset" -> SettingsSelectionSheet(
             "歌词时间偏移",
             lyricOffset.toString(),
-            listOf("-1000" to "提前 1 秒", "-500" to "提前 0.5 秒", "0" to "无偏移", "500" to "延后 0.5 秒", "1000" to "延后 1 秒"),
+            lyricOffsetChoices,
             { vm.setLyricOffset(it.toLong()); selector = null },
         ) { selector = null }
     }
