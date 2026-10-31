@@ -4,18 +4,26 @@ import android.app.Application
 import android.view.KeyEvent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import com.ronan.qmusicwatch.input.WatchRotaryDispatcher
 import com.ronan.qmusicwatch.playback.DeviceVolumeState
 import com.ronan.qmusicwatch.ui.LocalWatchRotaryDispatcher
@@ -89,6 +97,82 @@ class WatchVolumeRobolectricTest {
         compose.onNodeWithContentDescription("减小音量").assertIsNotEnabled()
         assertFalse(canStepDeviceVolume(DeviceVolumeState(1, 0), 1))
         assertFalse(canStepDeviceVolume(DeviceVolumeState(1, 2), 0))
+    }
+
+    @Test
+    @Config(qualifiers = "w240dp-h240dp-round-xhdpi")
+    fun rightSwipeClosesTheModalAndReturnsToThePlayerWithoutChangingVolume() {
+        val visible = mutableStateOf(true)
+        var adjustments = 0
+        compose.setContent {
+            QMusicWatchTheme("compact", true) {
+                Text("播放器")
+                if (visible.value) {
+                    WatchVolumeDialog(DeviceVolumeState(5, 10), true, {}, { adjustments++; true }, { visible.value = false })
+                }
+            }
+        }
+        compose.onNode(isDialog()).performTouchInput { swipeRight() }
+        compose.onNodeWithText("音量").assertDoesNotExist()
+        compose.onNodeWithText("播放器").assertIsDisplayed()
+        assertEquals(0, adjustments)
+    }
+
+    @Test fun shortReverseVerticalAndCancelledSwipesDoNotDismissOrChangeVolume() {
+        var dismissals = 0
+        var adjustments = 0
+        compose.setContent {
+            QMusicWatchTheme("compact", true) {
+                WatchVolumeContent(DeviceVolumeState(5, 10), { adjustments++; true }, { dismissals++ })
+            }
+        }
+        compose.onRoot().performTouchInput {
+            swipe(center, center + Offset(width * .1f, 0f))
+            swipeLeft()
+            swipeDown()
+            down(centerLeft)
+            moveTo(centerRight)
+            cancel()
+        }
+        assertEquals(0, dismissals)
+        assertEquals(0, adjustments)
+        compose.onRoot().performTouchInput { swipeRight() }
+        assertEquals(1, dismissals)
+    }
+
+    @Test fun swipeStartingOnAVolumeButtonDoesNotAlsoPressTheButton() {
+        var dismissals = 0
+        var adjustments = 0
+        compose.setContent {
+            QMusicWatchTheme("compact", true) {
+                WatchVolumeContent(DeviceVolumeState(5, 10), { adjustments++; true }, { dismissals++ })
+            }
+        }
+        compose.onNodeWithContentDescription("减小音量").performTouchInput {
+            swipe(center, center + Offset(width.toFloat(), 0f))
+        }
+        assertEquals(1, dismissals)
+        assertEquals(0, adjustments)
+    }
+
+    @Test fun volumeRefreshDuringASwipeDoesNotCancelTheReturnGesture() {
+        val volume = mutableStateOf(DeviceVolumeState(5, 10))
+        var dismissals = 0
+        compose.setContent {
+            QMusicWatchTheme("compact", true) {
+                WatchVolumeContent(volume.value, { true }, { dismissals++ })
+            }
+        }
+        compose.onRoot().performTouchInput {
+            down(centerLeft)
+            moveTo(center)
+        }
+        compose.runOnIdle { volume.value = DeviceVolumeState(6, 10) }
+        compose.onRoot().performTouchInput {
+            moveTo(centerRight)
+            up()
+        }
+        assertEquals(1, dismissals)
     }
 
     @Test

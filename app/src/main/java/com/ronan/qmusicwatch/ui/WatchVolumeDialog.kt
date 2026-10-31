@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +42,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -119,6 +121,8 @@ internal fun WatchVolumeContent(
     onDismiss: () -> Unit,
 ) {
     val dimensions = LocalWatchDimensions.current
+    val dismiss by rememberUpdatedState(onDismiss)
+    val swipeThreshold = with(LocalDensity.current) { 48.dp.toPx() }
     val fraction = volume?.takeIf { it.max > 0 }
         ?.let { it.current.toFloat() / it.max }?.coerceIn(0f, 1f) ?: 0f
     val animatedFraction by animateFloatAsState(
@@ -126,7 +130,25 @@ internal fun WatchVolumeContent(
         tween(160, easing = FastOutSlowInEasing),
         label = "touchVolumeProgress",
     )
-    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(Color.Black)
+            .pointerInput(swipeThreshold) {
+                var totalDx = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { totalDx = 0f },
+                    onHorizontalDrag = { change, amount ->
+                        totalDx += amount
+                        // Cancel any pressed volume button once a drag wins.
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        if (totalDx >= swipeThreshold) dismiss()
+                        totalDx = 0f
+                    },
+                    onDragCancel = { totalDx = 0f },
+                )
+            },
+    ) {
         Text(
             "音量",
             Modifier.align(Alignment.TopCenter).padding(top = if (dimensions.isRound) maxHeight * .075f else 12.dp),
