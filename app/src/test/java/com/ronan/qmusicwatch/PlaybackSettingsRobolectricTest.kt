@@ -3,6 +3,11 @@ package com.ronan.qmusicwatch
 import android.os.Looper
 import android.content.Intent
 import android.content.ServiceConnection
+import android.media.AudioManager
+import androidx.media3.session.MediaController
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
+import java.time.Duration
 import androidx.lifecycle.ViewModelStore
 import androidx.work.Configuration
 import androidx.work.NetworkType
@@ -45,9 +50,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.LooperMode
-import org.robolectric.annotation.Implements
 import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowAudioManager
+import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowContextImpl
 
 /** These tests inspect requests and settings, not the Media3 Binder protocol. */
@@ -105,6 +111,9 @@ class PlaybackSettingsRobolectricTest {
         app.settings.setQuality("sq")
         app.settings.setWifiOnlyDownload(false)
         app.settings.setHeadphoneWarning(false)
+        app.settings.setRotaryVolumeEnabled(true)
+        app.settings.setRotaryReversed(false)
+        app.settings.setRotaryVolumeKeysScroll(false)
         app.settings.setPlaybackSnapshot("")
     }
 
@@ -148,6 +157,89 @@ class PlaybackSettingsRobolectricTest {
         awaitCondition { changed.isCompleted }
         changed.join()
         awaitCondition { vm.settings.value.quality == "hq" && vm.quality.value == "hq" && vm.wifiOnlyDownload.value }
+    }
+
+    @Test fun rotaryCompatibilitySettingsPersistWithoutChangingExistingDefaults() = runBlocking {
+        val vm = viewModel()
+        assertTrue(vm.settings.value.rotaryVolumeEnabled)
+        assertFalse(vm.settings.value.rotaryReversed)
+        assertFalse(vm.settings.value.rotaryVolumeKeysScroll)
+        vm.setRotaryReversed(true)
+        vm.setRotaryVolumeKeysScroll(true)
+        vm.setRotaryVolumeEnabled(false)
+        awaitCondition { vm.settings.value.rotaryReversed && vm.settings.value.rotaryVolumeKeysScroll && !vm.settings.value.rotaryVolumeEnabled }
+        val stored = app.settings.snapshot.first()
+        assertTrue(stored.rotaryReversed)
+        assertTrue(stored.rotaryVolumeKeysScroll)
+        assertFalse(stored.rotaryVolumeEnabled)
+        assertEquals("sq", stored.quality)
+    }
+
+    @Test fun volumeTurnsNeverQueueBehindAPendingControllerConnection() {
+        val backing = SettableFuture.create<MediaController>()
+        var queued = 0
+        val pending = object : ListenableFuture<MediaController> by backing {
+            override fun addListener(listener: Runnable, executor: Executor) {
+                queued++
+                backing.addListener(listener, executor)
+            }
+        }
+        setFixtureField(app.playback, "future", pending)
+        val audio = app.getSystemService(AudioManager::class.java)
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, 2, 0)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+        assertTrue(app.playback.adjustVolume(1))
+        assertEquals(3, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+        assertFalse("Rapid duplicate events must remain throttled", app.playback.adjustVolume(1))
+        assertEquals(3, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(60))
+        assertTrue(app.playback.adjustVolume(-1))
+        assertEquals(2, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+        assertEquals("No delayed volume operations may be registered", 0, queued)
+        assertFalse(backing.isDone)
+    }
+
+    @Test
+    @Config(shadows = [RecordingAudioManager::class])
+    fun touchVolumeAndLiveReadbackWorkWithCrownVolumeDisabled() = runBlocking {
+        app.settings.setRotaryVolumeEnabled(false)
+        val vm = viewModel()
+        awaitCondition { !vm.settings.value.rotaryVolumeEnabled }
+        setFixtureField(app.playback, "future", SettableFuture.create<MediaController>())
+        val audio = app.getSystemService(AudioManager::class.java)
+        val audioCalls = shadowOf(audio) as RecordingAudioManager
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, 2, 0)
+        vm.refreshDeviceVolume()
+        assertEquals(2, vm.deviceVolume.value!!.current)
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+        assertTrue(vm.adjustVolume(1, showSystemUi = false))
+        assertEquals(3, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+        assertEquals(3, vm.deviceVolume.value!!.current)
+        // Robolectric 4.16 adjusts all shadow streams via its one-argument
+        // setter. Check the requested stream/flags instead of that shadow bug.
+        assertEquals(AudioManager.STREAM_MUSIC, audioCalls.lastAdjustedStream)
+        assertEquals(0, audioCalls.lastAdjustmentFlags)
+
+        // A headset/system change must be read back rather than keeping an
+        // optimistic percentage or restoring an earlier absolute volume.
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, 1, 0)
+        vm.refreshDeviceVolume()
+        assertEquals(1, vm.deviceVolume.value!!.current)
+        assertFalse(vm.settings.value.rotaryVolumeEnabled)
+    }
+
+    @Implements(AudioManager::class)
+    class RecordingAudioManager : ShadowAudioManager() {
+        var lastAdjustedStream: Int = -1
+        var lastAdjustmentFlags: Int = -1
+
+        @Implementation
+        public override fun adjustStreamVolume(streamType: Int, direction: Int, flags: Int) {
+            lastAdjustedStream = streamType
+            lastAdjustmentFlags = flags
+            super.adjustStreamVolume(streamType, direction, flags)
+        }
     }
 
     @Test fun playbackRequestsPersistedSqWithoutAQualityCollectorOrCompleteTrackMetadata() = runBlocking {

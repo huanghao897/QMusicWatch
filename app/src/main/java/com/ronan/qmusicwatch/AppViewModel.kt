@@ -185,7 +185,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val seenAnnouncements = settings.map { it.seenAnnouncements }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     val uiSize = settings.map { it.uiSize }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "compact")
     val artworkAccent = settings.map { it.artworkAccent }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
-    /** Current system/output volume used by the watch crown feedback overlay. */
+    /** Shared real device volume for touch controls and the crown overlay. */
     val deviceVolume = graph.playback.deviceVolume
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue = _queue.asStateFlow()
@@ -1270,6 +1270,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setPureBlack(value: Boolean) = viewModelScope.launch { graph.settings.setPureBlack(value) }
     fun setLowPowerPlayer(value: Boolean) = viewModelScope.launch { graph.settings.setLowPowerPlayer(value) }
     fun setRotaryVolumeEnabled(value: Boolean) = viewModelScope.launch { graph.settings.setRotaryVolumeEnabled(value) }
+    fun setRotaryReversed(value: Boolean) = viewModelScope.launch { graph.settings.setRotaryReversed(value) }
+    fun setRotaryVolumeKeysScroll(value: Boolean) = viewModelScope.launch { graph.settings.setRotaryVolumeKeysScroll(value) }
     fun setWifiOnlyDownload(value: Boolean) = viewModelScope.launch {
         runCatching {
             downloadPolicyMutex.withLock {
@@ -1383,7 +1385,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun seek(position: Long) = graph.playback.seek(position)
-    fun adjustVolume(direction: Int): Boolean = graph.playback.adjustVolume(direction)
+    fun refreshDeviceVolume() = graph.playback.refreshDeviceVolume()
+    fun adjustVolume(direction: Int, showSystemUi: Boolean = true): Boolean =
+        graph.playback.adjustVolume(direction, showSystemUi)
     fun savePlaybackState() = persistSnapshot()
     private fun playbackPositionForSnapshot(): Long =
         if (graph.playback.currentMediaId().isBlank() && restoredTrackId == _state.value.currentTrack?.id) restoredPosition

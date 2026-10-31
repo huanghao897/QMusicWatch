@@ -16,6 +16,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -69,10 +71,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -108,9 +107,9 @@ import com.ronan.qmusicwatch.lyrics.lyricRenderProgress
 import com.ronan.qmusicwatch.model.*
 import com.ronan.qmusicwatch.network.*
 import com.ronan.qmusicwatch.performance.FramePerformanceMonitor
-import com.ronan.qmusicwatch.playback.hardwareVolumeDirection
-import com.ronan.qmusicwatch.playback.rotaryScrollDelta
-import com.ronan.qmusicwatch.playback.rotaryVolumeDirection
+import com.ronan.qmusicwatch.input.RotaryInputKind
+import com.ronan.qmusicwatch.input.RotaryVolumeAccumulator
+import com.ronan.qmusicwatch.input.WatchRotaryDispatcher
 import com.ronan.qmusicwatch.ui.*
 import com.ronan.qmusicwatch.update.UpdateInstaller
 import kotlinx.coroutines.Dispatchers
@@ -389,48 +388,16 @@ internal fun automaticInstallCandidate(pendingReleaseId: Long, update: UpdateUiS
     (update as? UpdateUiState.Ready)?.takeIf { pendingReleaseId > 0 && it.release.releaseId == pendingReleaseId }
 
 class MainActivity : ComponentActivity() {
-    /**
-     * Xiaomi and several non-Wear watch firmwares deliver a crown as a
-     * generic motion event or as VOLUME_UP/VOLUME_DOWN key events. Compose's
-     * rotary modifier only receives the former when its focus target is
-     * active, so the player registers a short-lived Activity-level handler as
-     * a reliable fallback.
-     */
-    private var hardwareVolumeHandler: ((Int) -> Boolean)? = null
-
-    internal fun setHardwareVolumeHandler(handler: ((Int) -> Boolean)?) {
-        hardwareVolumeHandler = handler
-    }
-
-    internal fun clearHardwareVolumeHandler(handler: (Int) -> Boolean) {
-        if (hardwareVolumeHandler === handler) hardwareVolumeHandler = null
-    }
-
-    private fun dispatchHardwareVolume(direction: Int): Boolean =
-        hardwareVolumeHandler?.invoke(direction) == true
+    internal val rotaryInput by lazy { WatchRotaryDispatcher(this) }
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-            hardwareVolumeDirection(event.keyCode)?.let { direction ->
-                if (dispatchHardwareVolume(direction)) return true
-            }
-        }
+        if (rotaryInput.dispatchKey(event, window.rotaryTextInputActive())) return true
         return super.dispatchKeyEvent(event)
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_SCROLL) {
-            val vertical = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-            val horizontal = event.getAxisValue(MotionEvent.AXIS_HSCROLL)
-            val generic = event.getAxisValue(MotionEvent.AXIS_SCROLL)
-            val delta = rotaryScrollDelta(vertical, horizontal).let { selected ->
-                if (selected != 0f) selected else generic
-            }
-            rotaryVolumeDirection(delta)?.let { direction ->
-                if (dispatchHardwareVolume(direction)) return true
-            }
-        }
+        if (rotaryInput.dispatchMotion(event)) return true
         return super.dispatchGenericMotionEvent(event)
     }
 
@@ -456,7 +423,7 @@ class MainActivity : ComponentActivity() {
         setVolumeControlStream(AudioManager.STREAM_MUSIC)
         FramePerformanceMonitor.start()
     }
-    override fun onPause() { FramePerformanceMonitor.stop(); super.onPause() }
+    override fun onPause() { rotaryInput.clearPressedKeys(); FramePerformanceMonitor.stop(); super.onPause() }
 
     private fun hideStatusBar() = WindowCompat.getInsetsController(window, window.decorView).apply {
         hide(WindowInsetsCompat.Type.systemBars())
@@ -487,11 +454,18 @@ class MainActivity : ComponentActivity() {
     val uiSize = watchSettings.uiSize
     val lowPowerPlayer = watchSettings.lowPowerPlayer
     val rotaryVolumeEnabled = watchSettings.rotaryVolumeEnabled
+    val rotaryReversed = watchSettings.rotaryReversed
+    val rotaryVolumeKeysScroll = watchSettings.rotaryVolumeKeysScroll
     val wifiOnlyDownload = watchSettings.wifiOnlyDownload
     val lastSleepMinutes = watchSettings.lastSleepMinutes
     val dailyCount = watchSettings.dailyCount
     val searchHistory = watchSettings.searchHistory
     val seenAnnouncements = watchSettings.seenAnnouncements
+    CompositionLocalProvider(
+        LocalWatchRotaryDispatcher provides (LocalActivity.current as? MainActivity)?.rotaryInput,
+        LocalWatchRotaryReversed provides rotaryReversed,
+        LocalVolumeKeysScroll provides rotaryVolumeKeysScroll,
+    ) {
     QMusicWatchTheme(uiSize = uiSize, pureBlack = pureBlack) {
     val appDimensions = LocalWatchDimensions.current
     val density = LocalDensity.current
@@ -684,7 +658,7 @@ class MainActivity : ComponentActivity() {
             composable("settings/playback") {
                 val pageState by vm.state.collectAsStateWithLifecycle()
                 val sleepRemaining by vm.sleepRemaining.collectAsStateWithLifecycle()
-                PlaybackSettingsScreen(vm, quality, pageState.profile, pageState.profileLoaded, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, rotaryVolumeEnabled, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() }
+                PlaybackSettingsScreen(vm, quality, pageState.profile, pageState.profileLoaded, headphoneWarning, autoOpenPlayer, playMode, sleepRemaining, rotaryVolumeEnabled, rotaryReversed, rotaryVolumeKeysScroll, wifiOnlyDownload, lastSleepMinutes) { nav.popBackStack() }
             }
             composable("settings/network") {
                 val pageState by vm.state.collectAsStateWithLifecycle()
@@ -816,6 +790,7 @@ class MainActivity : ComponentActivity() {
         )
     }
     }
+    }
 }
 
 @Composable private fun HomeScreen(nav: NavHostController, state: AppUiState, vm: AppViewModel, dailyCount: Int) {
@@ -833,8 +808,9 @@ class MainActivity : ComponentActivity() {
     }
     Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 0) { page ->
-            if (page == 0) LazyColumn(
+            if (page == 0) WatchLazyColumn(
                 Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding),
+                rotaryEnabled = pager.settledPage == page && !pager.isScrollInProgress,
                 contentPadding = PaddingValues(top = 4.dp, bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(dimensions.itemSpacing),
             ) {
@@ -855,8 +831,9 @@ class MainActivity : ComponentActivity() {
                 }
                 item { WatchSectionHeader("每日推荐", action = "换一换") { if (daily.isNotEmpty()) dailyOffset = (dailyOffset + dailyCount) % daily.size } }
                 items(shown, key = { it.id }) { TrackRow(it, vm, queue = shown, playlists = writablePlaylists(state.library?.playlists.orEmpty())) }
-            } else LazyColumn(
+            } else WatchLazyColumn(
                 Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding),
+                rotaryEnabled = pager.settledPage == page && !pager.isScrollInProgress,
                 contentPadding = PaddingValues(top = 4.dp, bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(dimensions.itemSpacing),
             ) {
@@ -1046,7 +1023,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                 }
             }
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        WatchLazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             // A tab change without a submitted query must not reinterpret old
             // playlist results as albums/artists or reuse their cursor.
             if (type == state.searchType) {
@@ -1088,7 +1065,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         LibrarySection.Created -> "我创建的歌单"
         LibrarySection.Collected -> "收藏歌单"
     }
-    LazyColumn(
+    WatchLazyColumn(
         Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding),
         contentPadding = PaddingValues(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -1147,7 +1124,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     deleting?.let { playlist -> WatchDialog(onDismissRequest = { deleting = null }, title = { Text("删除歌单？") }, text = { Text("将从 QQ 音乐永久删除“${playlist.title}”，歌曲本身不会删除。") }, confirmButton = { TextButton({ vm.deletePlaylist(playlist.directoryId); deleting = null }) { Text("确认删除", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ deleting = null }) { Text("取消") } }) }
 }
 
-@Composable private fun TrackListScreen(title: String, tracks: List<Track>, playlists: List<MusicCollection>, vm: AppViewModel, onBack: () -> Unit) = LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding)) {
+@Composable private fun TrackListScreen(title: String, tracks: List<Track>, playlists: List<MusicCollection>, vm: AppViewModel, onBack: () -> Unit) = WatchLazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding)) {
     item { SettingsHeader(title, onBack) }; items(tracks, key = { it.id }) { TrackRow(it, vm, queue = tracks, playlists = playlists) }
 }
 
@@ -1160,7 +1137,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     val locked = downloads.filter { it.ownerAccountId != vm.accountId }
     val totalBytes = own.sumOf { item -> maxOf(item.downloadedBytes, java.io.File(item.filePath).takeIf { item.status == "complete" && it.exists() }?.length() ?: 0L) }
     val lockedBytes = locked.sumOf { item -> maxOf(item.downloadedBytes, java.io.File(item.filePath).takeIf { item.status == "complete" && it.exists() }?.length() ?: 0L) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    WatchLazyColumn(Modifier.fillMaxSize().padding(horizontal = dimensions.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item { SettingsHeader("离线缓存", onBack) }
         item { Row(Modifier.fillMaxWidth().height(30.dp), verticalAlignment = Alignment.CenterVertically) { Text("%.1f MB · ${own.size} 首".format(totalBytes / 1024f / 1024f), Modifier.weight(1f), color = WatchTextSecondary, fontSize = 10.sp); TextButton(vm::deleteInvalidDownloads, contentPadding = PaddingValues(horizontal = 5.dp)) { Text("清理失效", fontSize = 10.sp) } } }
         if (locked.isNotEmpty()) item { WatchListRow("其他账号缓存已锁定", "${locked.size} 首 · %.1f MB".format(lockedBytes / 1024f / 1024f), trailing = { WatchIconButton(Icons.Default.Delete, "删除全部锁定缓存", tint = MaterialTheme.colorScheme.error) { confirmDeleteLocked = true } }) }
@@ -1242,6 +1219,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     var showQualityDialog by remember(track.id) { mutableStateOf(false) }
     var showModeDialog by remember(track.id) { mutableStateOf(false) }
     var showOptionsDialog by remember(track.id) { mutableStateOf(false) }
+    var showVolumeDialog by remember { mutableStateOf(false) }
     val effectiveLiked = selectedLike ?: liked
     val playerAccent = WatchAccent
     val centeredLyricIndex by remember(listState) {
@@ -1260,12 +1238,14 @@ private fun decodeServerQrImage(value: String) = runCatching {
         centeredLyricIndex.takeIf { it >= 0 } ?: active
     } else active
     val pager = rememberPagerState(initialPage = 0) { 2 }
-    val scope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
+    val scrollLyrics = rememberWatchRotaryScroll(listState)
+    val rotaryReversed = LocalWatchRotaryReversed.current
+    val volumeStepPx = with(LocalDensity.current) { 16.dp.toPx() }
     val deviceVolume by vm.deviceVolume.collectAsStateWithLifecycle()
     var volumeFeedbackTick by remember(track.id) { mutableIntStateOf(0) }
     var showVolumeFeedback by remember(track.id) { mutableStateOf(false) }
     var locked by rememberSaveable { mutableStateOf(false) }
+    val volumeAccumulator = remember(track.id, rotaryVolumeEnabled, pager.currentPage, locked, rotaryReversed) { RotaryVolumeAccumulator() }
     var lyricChromeVisible by remember(track.id) { mutableStateOf(true) }
     var lyricChromeInteraction by remember(track.id) { mutableIntStateOf(0) }
     val revealLyricChrome: () -> Unit = {
@@ -1295,30 +1275,28 @@ private fun decodeServerQrImage(value: String) = runCatching {
         }
         return true
     }
-    val hardwareVolumeAction = rememberUpdatedState(newValue = { direction: Int ->
-        handleHardwareVolume(direction)
-    })
-    @SuppressLint("ContextCastToActivity")
-    val activity = LocalContext.current as? MainActivity
-    DisposableEffect(activity) {
-        if (activity == null) {
-            onDispose { }
-        } else {
-            val handler: (Int) -> Boolean = { direction -> hardwareVolumeAction.value(direction) }
-            activity.setHardwareVolumeHandler(handler)
-            onDispose { activity.clearHardwareVolumeHandler(handler) }
+    WatchRotaryHandler { event ->
+        if (!locked && !pager.isScrollInProgress) {
+            val pixels = event.pixels * if (rotaryReversed && event.kind != RotaryInputKind.VolumeKey) -1f else 1f
+            if (pager.currentPage == 0) {
+                if (rotaryVolumeEnabled) volumeAccumulator.step(event.copy(pixels = pixels), volumeStepPx)?.let {
+                    handleHardwareVolume(it)
+                }
+            } else {
+                manualLyricSelection = true
+                manualLyricInteraction++
+                scrollLyrics(pixels)
+                performRotaryTick()
+            }
         }
+        // Locked/disabled input stays consumed, rather than falling through to
+        // the OS and unexpectedly changing volume on key-emitting crowns.
+        true
     }
     DisposableEffect(locked) {
         val previous = view.keepScreenOn
         if (locked) view.keepScreenOn = true
         onDispose { view.keepScreenOn = previous }
-    }
-    LaunchedEffect(track.id, pager.currentPage, locked) {
-        // A tap on a player control can move focus away from the rotary target.
-        // Reclaim it whenever the player/lyrics page changes or lock mode ends.
-        delay(80)
-        focusRequester.requestFocus()
     }
     LaunchedEffect(track.id, volumeFeedbackTick) {
         if (volumeFeedbackTick == 0) return@LaunchedEffect
@@ -1393,33 +1371,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         }
     }
     BoxWithConstraints(
-        Modifier.fillMaxSize()
-            .background(Color.Black)
-            // Rotary input must sit outside the focus target in the modifier
-            // chain; this keeps it active after a control has been tapped.
-            .onRotaryScrollEvent { event ->
-                val delta = rotaryScrollDelta(event.verticalScrollPixels, event.horizontalScrollPixels)
-        if (!locked) {
-            if (pager.currentPage == 0) {
-                if (rotaryVolumeEnabled) {
-                    rotaryVolumeDirection(delta)?.let { direction ->
-                        handleHardwareVolume(direction)
-                    }
-                }
-            }
-            else {
-                if (delta != 0f) {
-                    manualLyricSelection = true
-                    manualLyricInteraction++
-                    scope.launch { listState.scrollBy(delta) }
-                    performRotaryTick()
-                }
-            }
-        }
-        true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
+        Modifier.fillMaxSize().background(Color.Black),
     ) {
         val horizontalControlInset = if (dimensions.isRound) maxWidth * .15f else 3.dp
         val verticalControlInset = if (dimensions.isRound) maxHeight * .15f else 3.dp
@@ -1654,6 +1606,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
                                 }
                             },
                             onQueue = openQueue,
+                            onVolume = { showVolumeDialog = true },
                             onMore = { showOptionsDialog = true },
                         )
                     }
@@ -1774,6 +1727,17 @@ private fun decodeServerQrImage(value: String) = runCatching {
     if (showPlaylistDialog) PlayerPlaylistDialog(track, playlists, vm) { showPlaylistDialog = false }
     if (showQualityDialog) QualityDialog(track, quality, activeQuality, profile, vm) { showQualityDialog = false }
     if (showModeDialog) PlayModeDialog(playMode, vm) { showModeDialog = false }
+    if (showVolumeDialog) WatchVolumeDialog(
+        volume = deviceVolume,
+        rotaryEnabled = rotaryVolumeEnabled,
+        onRefresh = vm::refreshDeviceVolume,
+        onAdjustVolume = { direction ->
+            vm.adjustVolume(direction, showSystemUi = false).also { adjusted ->
+                if (adjusted) performRotaryTick()
+            }
+        },
+        onDismiss = { showVolumeDialog = false },
+    )
     if (showOptionsDialog) PlayerOptionsDialog(
         qualityLabel = qualityShortLabel(
             activeQuality.takeUnless { it == QUALITY_LEGACY_UNKNOWN }.orEmpty().ifBlank { quality },
@@ -1795,15 +1759,16 @@ private fun decodeServerQrImage(value: String) = runCatching {
     )
 }
 
-@Composable private fun PlayerQuickActions(
+@Composable internal fun PlayerQuickActions(
     liked: Boolean,
     onLike: () -> Unit,
     onQueue: () -> Unit,
+    onVolume: () -> Unit,
     onMore: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     Surface(
-        modifier = Modifier.width(146.dp).height(40.dp),
+        modifier = Modifier.width(168.dp).height(40.dp),
         shape = RoundedCornerShape(20.dp),
         color = Color.White.copy(alpha = .08f),
         contentColor = Color.White,
@@ -1834,6 +1799,13 @@ private fun decodeServerQrImage(value: String) = runCatching {
                     tint = if (liked) WatchLike else Color.White.copy(alpha = .9f),
                 )
             }
+            PlayerActionDivider()
+            PlayerQuickAction(
+                Icons.AutoMirrored.Filled.VolumeUp,
+                "调节音量",
+                Modifier.weight(1f),
+                onVolume,
+            )
             PlayerActionDivider()
             PlayerQuickAction(
                 Icons.Default.MoreVert,
@@ -1971,7 +1943,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
 }
 
-@Composable private fun DetailScreen(detail: CollectionDetail?, editableDirectoryId: String?, loading: Boolean, error: String?, playlists: List<MusicCollection>, vm: AppViewModel, onBack: () -> Unit) = LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp)) {
+@Composable private fun DetailScreen(detail: CollectionDetail?, editableDirectoryId: String?, loading: Boolean, error: String?, playlists: List<MusicCollection>, vm: AppViewModel, onBack: () -> Unit) = WatchLazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp)) {
     item {
         Row(
             Modifier.fillMaxWidth()
@@ -2189,7 +2161,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
 }
 
-@Composable private fun SettingsCenter(nav: NavHostController, onBack: () -> Unit) = LazyColumn(
+@Composable private fun SettingsCenter(nav: NavHostController, onBack: () -> Unit) = WatchLazyColumn(
     Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp),
 ) {
     item { SettingsHeader("设置中心", onBack) }
@@ -2206,7 +2178,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     val lyricSizeName = when (lyricSize) { "small" -> "小"; "large" -> "大"; else -> "标准" }
     val animationName = when (lyricAnimation) { "off" -> "关闭"; "strong" -> "明显"; else -> "柔和" }
     val offsetName = if (lyricOffset == 0L) "无偏移" else "${if (lyricOffset > 0) "+" else ""}${lyricOffset} ms"
-    LazyColumn(
+    WatchLazyColumn(
         Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding),
         contentPadding = PaddingValues(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -2238,7 +2210,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     }
 }
 
-@Composable private fun PlaybackSettingsScreen(vm: AppViewModel, quality: String, profile: UserProfile?, profileLoaded: Boolean, headphoneWarning: Boolean, autoOpenPlayer: Boolean, playMode: String, sleepRemaining: Long, rotaryVolumeEnabled: Boolean, wifiOnlyDownload: Boolean, lastSleepMinutes: Int?, onBack: () -> Unit) {
+@Composable private fun PlaybackSettingsScreen(vm: AppViewModel, quality: String, profile: UserProfile?, profileLoaded: Boolean, headphoneWarning: Boolean, autoOpenPlayer: Boolean, playMode: String, sleepRemaining: Long, rotaryVolumeEnabled: Boolean, rotaryReversed: Boolean, rotaryVolumeKeysScroll: Boolean, wifiOnlyDownload: Boolean, lastSleepMinutes: Int?, onBack: () -> Unit) {
     val context = LocalContext.current
     var customTimer by rememberSaveable { mutableStateOf(false) }
     var customMinutes by rememberSaveable { mutableStateOf("") }
@@ -2251,7 +2223,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         profile?.isVipActive() == true -> "${qualityLabel(quality)} · ${profile.vipName.ifBlank { "音乐会员" }}"
         else -> "${qualityLabel(quality)} · 以歌曲可用资源为准"
     }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    WatchLazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         item { SettingsHeader("播放与缓存", onBack) }
         item { SettingsSectionLabel("音频") }
         item { SettingsValueRow("默认音质", qualitySummary, Icons.Default.Tune) { showQualityDialog = true } }
@@ -2259,6 +2231,8 @@ private fun decodeServerQrImage(value: String) = runCatching {
         item { SettingsSwitchRow("无耳机播放提醒", null, Icons.Default.Headphones, headphoneWarning, vm::setHeadphoneWarning) }
         item { SettingsSwitchRow("自动进入播放器", null, Icons.Default.OpenInFull, autoOpenPlayer, vm::setAutoOpenPlayer) }
         item { SettingsSwitchRow("表冠调节音量", null, Icons.Default.Tune, rotaryVolumeEnabled, vm::setRotaryVolumeEnabled) }
+        item { SettingsSwitchRow("表冠方向反转", null, Icons.Default.SwapVert, rotaryReversed, vm::setRotaryReversed) }
+        item { SettingsSwitchRow("音量键滚动列表", null, Icons.Default.UnfoldMore, rotaryVolumeKeysScroll, vm::setRotaryVolumeKeysScroll) }
         item { SettingsSectionLabel("定时关闭") }
         item {
             SettingsValueRow(
@@ -2303,7 +2277,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     var confirmUpload by remember { mutableStateOf(false) }
     var showDailyDialog by rememberSaveable { mutableStateOf(false) }
     val saveLog = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri -> uri?.let { runCatching { AppLog.copyTo(context, it) } } }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    WatchLazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         item { SettingsHeader("内容与网络", onBack) }
         item { SettingsSectionLabel("推荐") }
         item { SettingsValueRow("每日推荐显示数量", "$dailyCount 首", Icons.Default.Recommend) { showDailyDialog = true } }
@@ -2355,7 +2329,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
 
 @Composable private fun AnnouncementsScreen(items: List<ControlAnnouncement>, seen: Set<String>, vm: AppViewModel, onBack: () -> Unit) {
     LaunchedEffect(items.map(ControlAnnouncement::id)) { items.forEach { vm.markAnnouncementSeen(it.id) } }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    WatchLazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         item { SettingsHeader("公告", onBack) }
         if (items.isEmpty()) item { Box(Modifier.fillParentMaxHeight(.7f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("暂无公告", color = Color.Gray) } }
         items(items, key = ControlAnnouncement::id) { announcement ->
@@ -2384,7 +2358,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             .onSuccess { externalError = null }
             .onFailure { error -> AppLog.write("INTENT", "${error.javaClass.simpleName}:${error.message.orEmpty()}"); externalError = failureMessage }
     }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    WatchLazyColumn(Modifier.fillMaxSize().padding(horizontal = LocalWatchDimensions.current.screenPadding), contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
     item { SettingsHeader("关于", onBack) }
     item { WatchListRow("QMusic Watch", "版本 ${BuildConfig.VERSION_NAME} · 第三方非官方客户端", leading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Default.MusicNote, null, Modifier.size(19.dp), tint = WatchAccent) } }) }
     item { WatchListRow("开发者", "Ronan", leading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Default.Code, null, Modifier.size(19.dp), tint = WatchAccent) } }) }
@@ -2410,7 +2384,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
     externalError?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) } }
     item { TextButton({ openExternal(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/huanghao897/QMusicWatch/releases")), "系统没有可用的浏览器") }, Modifier.fillMaxWidth()) { Icon(Icons.Default.OpenInBrowser, null); Spacer(Modifier.width(6.dp)); Text("手动打开 GitHub 发布页") } }
     item { Text("本项目与腾讯或 QQ 音乐无隶属、赞助或认可关系。不绕过会员、地区、付费或 DRM 限制。", color = WatchTextSecondary, fontSize = 10.sp) }
-    item { Text("开源与致谢", fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("QQMusicApi · QQmusic-API · LX Music · Tides-WearOS · Horologist · HeyWear", color = WatchTextSecondary, fontSize = 10.sp) }
+    item { Text("开源与致谢", fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("QQMusicApi · QQmusic-API · LX Music · Tides-WearOS · Horologist · HeyWear · WatchAgents（仅表冠方案研究）", color = WatchTextSecondary, fontSize = 10.sp) }
     }
 }
 
@@ -2495,7 +2469,7 @@ private fun formatFileSize(bytes: Long): String = when {
         onDismissRequest = { choosePlaylist = false },
         title = { Text("加入歌单") },
         text = {
-            LazyColumn(Modifier.heightIn(max = 180.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            WatchLazyColumn(Modifier.heightIn(max = 180.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 items(playlists.filter { it.owned != false && it.directoryId != "201" }, key = { it.directoryId }) { playlist ->
                     WatchListRow(
                         title = playlist.title,
@@ -2579,9 +2553,10 @@ private fun formatFileSize(bytes: Long): String = when {
             leadingIcon = Icons.Default.Search,
             heightOverride = 34.dp,
         )
-        LazyColumn(
+        WatchLazyColumn(
             Modifier.fillMaxWidth().weight(1f),
             state = listState,
+            rotaryEnabled = !dragInProgress,
             contentPadding = PaddingValues(top = 1.dp, bottom = 4.dp),
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
@@ -2729,7 +2704,7 @@ private fun formatFileSize(bytes: Long): String = when {
         title = { Text(state.queueImportTitle.ifBlank { "选择歌曲来源" }) },
         text = {
             when {
-                state.queueImportTitle.isBlank() -> LazyColumn(Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                state.queueImportTitle.isBlank() -> WatchLazyColumn(Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     item {
                         WatchListRow(
                             title = "我喜欢",
@@ -2750,7 +2725,7 @@ private fun formatFileSize(bytes: Long): String = when {
                 state.queueImportLoading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 else -> Column {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("已选 ${selectedIds.size} 首", Modifier.weight(1f), color = WatchTextPrimary); TextButton({ if (selectedIds.size == state.queueImportTracks.size) selectedIds.clear() else { selectedIds.clear(); selectedIds.addAll(state.queueImportTracks.map(Track::id)) } }) { Text(if (selectedIds.size == state.queueImportTracks.size) "取消全选" else "全选") } }
-                    LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    WatchLazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         items(state.queueImportTracks, key = { it.id }) { track ->
                             val selected = track.id in selectedIds
                             WatchListRow(

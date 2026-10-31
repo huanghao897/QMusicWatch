@@ -5,11 +5,14 @@ import com.ronan.qmusicwatch.data.normalizeUiSize
 import com.ronan.qmusicwatch.data.SettingsSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class SettingsStoreTest {
     @Test fun rotaryVolumeControlDefaultsToEnabledForExistingInstalls() {
         assertTrue(SettingsSnapshot().rotaryVolumeEnabled)
+        assertFalse(SettingsSnapshot().rotaryReversed)
+        assertFalse(SettingsSnapshot().rotaryVolumeKeysScroll)
     }
 
     @Test fun uiSizeDefaultsToCompactAndAcceptsOnlySupportedModes() {

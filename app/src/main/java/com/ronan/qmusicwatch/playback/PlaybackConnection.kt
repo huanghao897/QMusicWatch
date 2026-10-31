@@ -152,20 +152,23 @@ class PlaybackConnection(context: Context) {
      * stream. Media3 is attempted first, with the Android audio manager as a
      * compatibility fallback for players that do not implement device volume.
      */
-    fun adjustVolume(direction: Int): Boolean {
+    fun refreshDeviceVolume() = publishSystemVolume()
+
+    fun adjustVolume(direction: Int, showSystemUi: Boolean = true): Boolean {
         if (direction == 0 || !acceptVolumeAdjustment()) return false
+        val flags = if (showSystemUi) C.VOLUME_FLAG_SHOW_UI else 0
         val run: () -> Unit = run@{
             val controller = controllerOrNull()
             if (controller == null) {
-                adjustSystemVolume(direction, "controller-unavailable")
+                adjustSystemVolume(direction, "controller-unavailable", showSystemUi)
                 return@run
             }
             val adjusted = runCatching {
                 when {
                     controller.deviceInfo.maxVolume > 0 &&
                         controller.isCommandAvailable(Player.COMMAND_ADJUST_DEVICE_VOLUME_WITH_FLAGS) -> {
-                        if (direction > 0) controller.increaseDeviceVolume(C.VOLUME_FLAG_SHOW_UI)
-                        else controller.decreaseDeviceVolume(C.VOLUME_FLAG_SHOW_UI)
+                        if (direction > 0) controller.increaseDeviceVolume(flags)
+                        else controller.decreaseDeviceVolume(flags)
                         publishControllerVolume(controller)
                         refreshVolumeSoon()
                         true
@@ -183,9 +186,11 @@ class PlaybackConnection(context: Context) {
             }.onFailure {
                 AppLog.write("PLAYER", "device-volume ${it.javaClass.simpleName}:${it.message.orEmpty()}")
             }.getOrDefault(false)
-            if (!adjusted) adjustSystemVolume(direction, "device-command-unavailable")
+            if (!adjusted) adjustSystemVolume(direction, "device-command-unavailable", showSystemUi)
         }
-        if (future.isDone) run() else future.addListener(run, mainExecutor)
+        // A slow controller connection must not queue crown turns and then
+        // replay them as a sudden loud burst. The system stream is ready now.
+        if (future.isDone) run() else adjustSystemVolume(direction, "controller-connecting", showSystemUi)
         return true
     }
 
@@ -196,7 +201,7 @@ class PlaybackConnection(context: Context) {
         return true
     }
 
-    private fun adjustSystemVolume(direction: Int, reason: String) {
+    private fun adjustSystemVolume(direction: Int, reason: String, showSystemUi: Boolean) {
         runCatching {
             // Some watch firmwares do not expose Media3's device-volume
             // commands. Adjust the music stream explicitly instead of using
@@ -204,7 +209,7 @@ class PlaybackConnection(context: Context) {
             audio.adjustStreamVolume(
                 AudioManager.STREAM_MUSIC,
                 if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-                AudioManager.FLAG_SHOW_UI,
+                if (showSystemUi) AudioManager.FLAG_SHOW_UI else 0,
             )
             publishSystemVolume()
             refreshVolumeSoon()

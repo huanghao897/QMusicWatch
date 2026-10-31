@@ -11,8 +11,7 @@ import kotlin.math.abs
  * discard a real crown turn.
  */
 internal fun rotaryScrollDelta(vertical: Float, horizontal: Float): Float = when {
-    !vertical.isFinite() && !horizontal.isFinite() -> 0f
-    abs(vertical) >= abs(horizontal) && vertical.isFinite() -> vertical
+    vertical.isFinite() && (!horizontal.isFinite() || abs(vertical) >= abs(horizontal)) -> vertical
     horizontal.isFinite() -> horizontal
     else -> 0f
 }

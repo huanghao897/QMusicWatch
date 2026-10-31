@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
@@ -285,35 +284,37 @@ fun WatchDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        BoxWithConstraints(
-            Modifier.fillMaxSize().padding(dimensions.screenPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            val horizontalInset = if (dimensions.isRound) maxWidth * .08f else 0.dp
-            val verticalInset = if (dimensions.isRound) maxHeight * .08f else 0.dp
-            Surface(
-                modifier = modifier.fillMaxWidth()
-                    .padding(horizontal = horizontalInset, vertical = verticalInset)
-                    .heightIn(max = maxHeight * if (dimensions.isRound) .78f else .82f)
-                    .navigationBarsPadding().imePadding(),
-                shape = RoundedCornerShape(if (dimensions.isRound) 20.dp else 18.dp),
-                color = WatchSurfaceRaised,
-                tonalElevation = 0.dp,
+        WatchRotaryDialogContent {
+            BoxWithConstraints(
+                Modifier.fillMaxSize().padding(dimensions.screenPadding),
+                contentAlignment = Alignment.Center,
             ) {
-                Column(
-                    Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                val horizontalInset = if (dimensions.isRound) maxWidth * .08f else 0.dp
+                val verticalInset = if (dimensions.isRound) maxHeight * .08f else 0.dp
+                Surface(
+                    modifier = modifier.fillMaxWidth()
+                        .padding(horizontal = horizontalInset, vertical = verticalInset)
+                        .heightIn(max = maxHeight * if (dimensions.isRound) .78f else .82f)
+                        .navigationBarsPadding().imePadding(),
+                    shape = RoundedCornerShape(if (dimensions.isRound) 20.dp else 18.dp),
+                    color = WatchSurfaceRaised,
+                    tonalElevation = 0.dp,
                 ) {
-                    icon?.invoke()
-                    title?.let { Box(Modifier.fillMaxWidth()) { it() } }
-                    text?.let { Box(Modifier.fillMaxWidth().weight(1f, fill = false)) { it() } }
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically,
+                    Column(
+                        Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        dismissButton?.invoke()
-                        confirmButton()
+                        icon?.invoke()
+                        title?.let { Box(Modifier.fillMaxWidth()) { it() } }
+                        text?.let { Box(Modifier.fillMaxWidth().weight(1f, fill = false)) { it() } }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            dismissButton?.invoke()
+                            confirmButton()
+                        }
                     }
                 }
             }
@@ -332,49 +333,51 @@ fun WatchSelectionDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        BoxWithConstraints(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .97f)),
-        ) {
-            val horizontalInset = if (dimensions.isRound) maxWidth * .12f else dimensions.screenPadding
-            val topInset = if (dimensions.isRound) maxHeight * .21f else 42.dp
-            val bottomInset = if (dimensions.isRound) maxHeight * .12f else 8.dp
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = horizontalInset,
-                    end = horizontalInset,
-                    top = topInset,
-                    bottom = bottomInset,
-                ),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                content = content,
-            )
-            Text(
-                text = title,
-                modifier = Modifier.align(Alignment.TopCenter)
-                    .padding(
-                        top = if (dimensions.isRound) maxHeight * .055f else 9.dp,
-                        start = 42.dp,
-                        end = 42.dp,
+        WatchRotaryDialogContent {
+            BoxWithConstraints(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = .97f)),
+            ) {
+                val horizontalInset = if (dimensions.isRound) maxWidth * .12f else dimensions.screenPadding
+                val topInset = if (dimensions.isRound) maxHeight * .21f else 42.dp
+                val bottomInset = if (dimensions.isRound) maxHeight * .12f else 8.dp
+                WatchLazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = horizontalInset,
+                        end = horizontalInset,
+                        top = topInset,
+                        bottom = bottomInset,
                     ),
-                color = WatchTextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            WatchIconButton(
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "返回",
-                modifier = Modifier.align(Alignment.TopStart)
-                    .padding(
-                        start = if (dimensions.isRound) maxWidth * .11f else 6.dp,
-                        top = if (dimensions.isRound) maxHeight * .07f else 5.dp,
-                    )
-                    .size(30.dp),
-                containerColor = WatchSurface.copy(alpha = .82f),
-                onClick = onDismissRequest,
-            )
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    content = content,
+                )
+                Text(
+                    text = title,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                        .padding(
+                            top = if (dimensions.isRound) maxHeight * .055f else 9.dp,
+                            start = 42.dp,
+                            end = 42.dp,
+                        ),
+                    color = WatchTextPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                WatchIconButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    modifier = Modifier.align(Alignment.TopStart)
+                        .padding(
+                            start = if (dimensions.isRound) maxWidth * .11f else 6.dp,
+                            top = if (dimensions.isRound) maxHeight * .07f else 5.dp,
+                        )
+                        .size(30.dp),
+                    containerColor = WatchSurface.copy(alpha = .82f),
+                    onClick = onDismissRequest,
+                )
+            }
         }
     }
 }

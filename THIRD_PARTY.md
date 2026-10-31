@@ -12,6 +12,8 @@ These projects informed behavior, product research, or compatible protocol imple
 | [gabrielluizone/Svartifoss](https://github.com/gabrielluizone/Svartifoss) | GPL-3.0 | Immersive watch-player visual research only; no source code copied |
 | [AdamNiederer/cassette](https://github.com/AdamNiederer/cassette) | AGPL-3.0 | Compact watch-player and lyrics-page visual research only; no source code copied |
 | [m16a4666/HeyWear](https://github.com/m16a4666/HeyWear) | MIT | Square-watch layout and QR usability research only |
+| [Yuanzer/WatchAgents](https://github.com/Yuanzer/WatchAgents) | PolyForm Noncommercial 1.0.0 | Research into rotary-event coverage, source-less vendor events and opt-in volume-key scrolling only; no source code copied or dependency introduced |
+| [Ghz114514/yuque-wear](https://github.com/Ghz114514/yuque-wear) | MIT | Research into Xiaomi Watch 5 non-Wear-OS rotary haptics compatibility only; no source code copied or dependency introduced |
 | [fovepig/QQmusic-API](https://github.com/fovepig/QQmusic-API) | Apache-2.0 | QQ Music request/module shapes informed the Kotlin client; no Node runtime code is bundled |
 | [BeyondtheApex/ChillPatcher](https://github.com/BeyondtheApex/ChillPatcher) | No license declared | VIP endpoint behavior research only; no source code copied |
 | [Hjdd14/Mconnect-Music_connect](https://github.com/Hjdd14/Mconnect-Music_connect) | MIT | VIP module/method compatibility research only; no source code copied |

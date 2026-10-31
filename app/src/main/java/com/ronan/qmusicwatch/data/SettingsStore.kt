@@ -32,6 +32,8 @@ data class SettingsSnapshot(
     val pureBlack: Boolean = false,
     val lowPowerPlayer: Boolean = false,
     val rotaryVolumeEnabled: Boolean = true,
+    val rotaryReversed: Boolean = false,
+    val rotaryVolumeKeysScroll: Boolean = false,
     val wifiOnlyDownload: Boolean = true,
     val lastSleepMinutes: Int? = null,
     val dailyCount: Int = 5,
@@ -55,6 +57,8 @@ class SettingsStore(private val context: Context) {
     private val pureBlackKey = booleanPreferencesKey("pure_black")
     private val lowPowerPlayerKey = booleanPreferencesKey("low_power_player")
     private val rotaryVolumeEnabledKey = booleanPreferencesKey("rotary_volume_enabled")
+    private val rotaryReversedKey = booleanPreferencesKey("rotary_reversed")
+    private val rotaryVolumeKeysScrollKey = booleanPreferencesKey("rotary_volume_keys_scroll")
     private val wifiOnlyDownloadKey = booleanPreferencesKey("wifi_only_download")
     private val lastSleepMinutesKey = stringPreferencesKey("last_sleep_minutes")
     private val playbackSnapshotKey = stringPreferencesKey("playback_snapshot")
@@ -82,6 +86,8 @@ class SettingsStore(private val context: Context) {
             pureBlack = prefs[pureBlackKey] ?: false,
             lowPowerPlayer = prefs[lowPowerPlayerKey] ?: false,
             rotaryVolumeEnabled = prefs[rotaryVolumeEnabledKey] ?: true,
+            rotaryReversed = prefs[rotaryReversedKey] ?: false,
+            rotaryVolumeKeysScroll = prefs[rotaryVolumeKeysScrollKey] ?: false,
             wifiOnlyDownload = prefs[wifiOnlyDownloadKey] ?: true,
             lastSleepMinutes = prefs[lastSleepMinutesKey]?.toIntOrNull()?.coerceIn(1, 1440),
             dailyCount = if (prefs[dailyCountKey] == "10") 10 else 5,
@@ -133,6 +139,8 @@ class SettingsStore(private val context: Context) {
     suspend fun setPureBlack(value: Boolean) = context.settingsDataStore.edit { it[pureBlackKey] = value }
     suspend fun setLowPowerPlayer(value: Boolean) = context.settingsDataStore.edit { it[lowPowerPlayerKey] = value }
     suspend fun setRotaryVolumeEnabled(value: Boolean) = context.settingsDataStore.edit { it[rotaryVolumeEnabledKey] = value }
+    suspend fun setRotaryReversed(value: Boolean) = context.settingsDataStore.edit { it[rotaryReversedKey] = value }
+    suspend fun setRotaryVolumeKeysScroll(value: Boolean) = context.settingsDataStore.edit { it[rotaryVolumeKeysScrollKey] = value }
     suspend fun setWifiOnlyDownload(value: Boolean) = context.settingsDataStore.edit { it[wifiOnlyDownloadKey] = value }
     suspend fun setLastSleepMinutes(value: Int) = context.settingsDataStore.edit { it[lastSleepMinutesKey] = value.coerceIn(1, 1440).toString() }
     suspend fun setPlaybackSnapshot(value: String) = context.settingsDataStore.edit { it[playbackSnapshotKey] = value }
