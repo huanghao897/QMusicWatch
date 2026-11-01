@@ -218,6 +218,7 @@ fun QMusicWatchTheme(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalWatchDimensions provides resolveWatchDimensions(maxWidth, selectedSize, isRound),
+                LocalWatchScreenBounds provides WatchScreenBounds(maxWidth, maxHeight),
                 content = content,
             )
         }

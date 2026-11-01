@@ -19,6 +19,10 @@ import com.ronan.qmusicwatch.model.SessionTokens
 import com.ronan.qmusicwatch.model.Track
 import com.ronan.qmusicwatch.model.PlaybackSnapshot
 import com.ronan.qmusicwatch.model.CollectionDetail
+import com.ronan.qmusicwatch.model.CachedAccountSnapshot
+import com.ronan.qmusicwatch.model.CachedAccountSnapshots
+import com.ronan.qmusicwatch.model.LibraryData
+import com.ronan.qmusicwatch.model.MusicCollection
 import com.ronan.qmusicwatch.lyrics.LyricLine
 import com.ronan.qmusicwatch.network.ControlPlaneClient
 import com.ronan.qmusicwatch.update.UpdateManager
@@ -115,6 +119,7 @@ class PlaybackSettingsRobolectricTest {
         app.settings.setRotaryReversed(false)
         app.settings.setRotaryVolumeKeysScroll(false)
         app.settings.setPlaybackSnapshot("")
+        app.settings.setAccountSnapshots("")
     }
 
     @After fun tearDown() {
@@ -362,6 +367,91 @@ class PlaybackSettingsRobolectricTest {
         assertEquals("new message", vm.state.value.message)
         vm.consumeMessage("new message")
         assertNull(vm.state.value.message)
+    }
+
+    @Test fun failedLibraryRefreshPreservesTheAccountSnapshotAndExistingPlaylists() = runBlocking {
+        val library = LibraryData(listOf(track), listOf(MusicCollection("9988", "收藏歌单", owned = false)))
+        val saved = Json.encodeToString(CachedAccountSnapshots(listOf(
+            CachedAccountSnapshot("test-owner", library = library, updatedAt = 100L),
+        )))
+        app.settings.setAccountSnapshots(saved)
+        responseData = { body ->
+            if (body.contains("GetPlaylistFavInfo")) throw java.io.IOException("synthetic favorite failure")
+            """{"v_playlist":[],"songlist":[]}"""
+        }
+        val vm = viewModel()
+        val refresh = vm.loadLibrary()
+        awaitCondition { refresh.isCompleted }
+        refresh.join()
+        assertEquals(library, vm.state.value.library)
+        assertNotNull(vm.state.value.libraryError)
+        assertFalse(vm.state.value.libraryLoading)
+        assertTrue(vm.state.value.offlineSnapshot)
+        assertEquals(saved, app.settings.accountSnapshots.first())
+    }
+
+    @Test fun initialLibraryFailureIsNotEmptySuccessAndCanBeRetried() = runBlocking {
+        responseData = { body ->
+            if (body.contains("GetPlaylistFavInfo")) throw java.io.IOException("synthetic favorite failure")
+            """{"v_playlist":[],"songlist":[]}"""
+        }
+        val vm = viewModel()
+        val failed = vm.loadLibrary()
+        awaitCondition { failed.isCompleted }
+        failed.join()
+        assertNull(vm.state.value.library)
+        assertNotNull(vm.state.value.libraryError)
+        assertFalse(vm.state.value.libraryLoading)
+
+        responseData = { body ->
+            if (body.contains("GetPlaylistFavInfo")) """{"v_list":[{"tid":"9988","dissname":"重新读取的歌单","songnum":42}]}"""
+            else """{"v_playlist":[],"songlist":[]}"""
+        }
+        val retry = vm.loadLibrary()
+        awaitCondition { retry.isCompleted }
+        retry.join()
+        assertNull(vm.state.value.libraryError)
+        assertFalse(vm.state.value.libraryLoading)
+        assertFalse(vm.state.value.offlineSnapshot)
+        assertEquals(listOf("9988"), vm.state.value.library!!.playlists.map(MusicCollection::id))
+        val saved = Json.decodeFromString<CachedAccountSnapshots>(app.settings.accountSnapshots.first())
+        assertEquals(vm.state.value.library, saved.items.single { it.accountId == "test-owner" }.library)
+    }
+
+    @Test fun repeatedLibraryRefreshReusesTheInFlightRequest() = runBlocking {
+        val vm = viewModel()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        requestHook = { body ->
+            if (body.contains("GetPlaylistFavInfo")) {
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+            }
+        }
+        responseData = { """{"v_playlist":[],"v_list":[],"songlist":[]}""" }
+        val first = vm.loadLibrary()
+        try {
+            awaitCondition { entered.count == 0L }
+            assertTrue(vm.state.value.libraryLoading)
+            assertSame(first, vm.loadLibrary())
+        } finally { release.countDown() }
+        awaitCondition { first.isCompleted }
+        first.join()
+        assertFalse(vm.state.value.libraryLoading)
+        assertNull(vm.state.value.libraryError)
+    }
+
+    @Test fun removingATrackAlsoUpdatesTheDeclaredPlaylistCount() = runBlocking {
+        val vm = viewModel()
+        val song = track.copy(numericId = 123)
+        uiState(vm).value = vm.state.value.copy(
+            detail = CollectionDetail("歌单", listOf(song), trackCount = 400), detailDirectoryId = "101",
+        )
+        val remove = vm.removeFromPlaylist(song, "101")
+        awaitCondition { remove.isCompleted }
+        remove.join()
+        assertEquals(399, vm.state.value.detail!!.trackCount)
+        assertTrue(vm.state.value.detail!!.tracks.isEmpty())
     }
 
     @Test fun aLateLyricsReloadCannotReplaceTheNewTracksLyrics() = runBlocking {

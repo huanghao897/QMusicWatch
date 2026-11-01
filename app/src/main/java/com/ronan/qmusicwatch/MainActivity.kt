@@ -711,7 +711,7 @@ class MainActivity : ComponentActivity() {
         WatchDialog(
             onDismissRequest = dismiss,
             title = { Text(announcement.title.take(80), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            text = { Box(Modifier.heightIn(max = 165.dp).verticalScroll(rememberScrollState())) { Text(announcement.content.take(1200)) } },
+            text = { Text(announcement.content.take(1200)) },
             confirmButton = { TextButton(dismiss) { Text("知道了") } },
         )
     }
@@ -770,7 +770,7 @@ class MainActivity : ComponentActivity() {
             onDismissRequest = { dismissedUpdateId = update.releaseId },
             title = { Text("发现新版本 ${update.versionName}", maxLines = 2, overflow = TextOverflow.Ellipsis) },
             text = {
-                Column(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (update.title.isNotBlank()) Text(update.title, fontWeight = FontWeight.Bold)
                     if (update.changelog.isNotBlank()) Text(update.changelog.take(1200), color = Color.LightGray, fontSize = 14.sp)
                     Text(formatFileSize(update.apk.sizeBytes), color = Color.Gray, fontSize = 12.sp)
@@ -1070,19 +1070,35 @@ private fun decodeServerQrImage(value: String) = runCatching {
         contentPadding = PaddingValues(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        item {
+            SettingsHeader(pageTitle, { nav.popBackStack() }, action = "新建".takeIf { section == LibrarySection.Created }) {
+                title = ""; creating = true
+            }
+        }
+        if (state.libraryLoading && state.library == null) item {
+            Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+            }
+        }
+        state.libraryError?.let { error -> item {
+            WatchListRow(
+                title = if (state.library == null) "读取失败，点击重试" else "刷新失败，点击重试",
+                subtitle = error,
+                trailing = { Icon(Icons.Default.Refresh, null, Modifier.size(18.dp)) },
+                onClick = { vm.loadLibrary() },
+            )
+        } }
         when (section) {
             LibrarySection.Liked -> {
-                item { SettingsHeader(pageTitle, { nav.popBackStack() }) }
                 items(state.library?.liked.orEmpty(), key = { it.id }) { TrackRow(it, vm, liked = true, queue = state.library?.liked.orEmpty(), playlists = created) }
-                if (state.library != null && state.library.liked.isEmpty()) item { Text("还没有喜欢的歌曲", color = Color.Gray) }
+                if (state.library != null && state.library.liked.isEmpty() && state.libraryError == null && !state.libraryLoading) item { Text("还没有喜欢的歌曲", color = Color.Gray) }
             }
             LibrarySection.Created -> {
-                item { SettingsHeader(pageTitle, { nav.popBackStack() }, action = "新建") { title = ""; creating = true } }
                 items(created, key = { "${it.directoryId}:${it.id}" }) { item ->
                     val artwork = rememberArtworkImageRequest(item.artworkUrl, 96)
                     WatchListRow(
                         title = item.title,
-                        subtitle = "${item.trackCount} 首",
+                        subtitle = collectionCountLabel(item.trackCount),
                         leading = {
                             if (artwork != null) AsyncImage(
                                 model = artwork,
@@ -1098,27 +1114,22 @@ private fun decodeServerQrImage(value: String) = runCatching {
                         onClick = { vm.loadDetail("playlist", item, editable = true); nav.navigate("detail") },
                     )
                 }
-                if (state.library != null && created.isEmpty()) item { Text("还没有创建歌单", color = Color.Gray) }
+                if (state.library != null && created.isEmpty() && state.libraryError == null && !state.libraryLoading) item { Text("还没有创建歌单", color = Color.Gray) }
             }
             LibrarySection.Collected -> {
-                item { SettingsHeader(pageTitle, { nav.popBackStack() }) }
                 items(collected, key = { "${it.directoryId}:${it.id}" }) { item -> CollectionRow(item) { vm.loadDetail("playlist", item); nav.navigate("detail") } }
-                if (state.library != null && collected.isEmpty()) item { Text("还没有收藏歌单", color = Color.Gray) }
+                if (state.library != null && collected.isEmpty() && state.libraryError == null && !state.libraryLoading) item { Text("还没有收藏歌单", color = Color.Gray) }
             }
         }
     }
     actionPlaylist?.let { playlist ->
-        WatchDialog(
+        WatchSelectionDialog(
             onDismissRequest = { actionPlaylist = null },
-            title = { Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    WatchActionRow(Icons.Default.Edit, "重命名") { title = playlist.title; editing = playlist; actionPlaylist = null }
-                    WatchActionRow(Icons.Default.Delete, "删除歌单", MaterialTheme.colorScheme.error) { deleting = playlist; actionPlaylist = null }
-                }
-            },
-            confirmButton = { TextButton({ actionPlaylist = null }) { Text("关闭") } },
-        )
+            title = playlist.title,
+        ) {
+            item { WatchActionRow(Icons.Default.Edit, "重命名") { title = playlist.title; editing = playlist; actionPlaylist = null } }
+            item { WatchActionRow(Icons.Default.Delete, "删除歌单", MaterialTheme.colorScheme.error) { deleting = playlist; actionPlaylist = null } }
+        }
     }
     if (creating || editing != null) WatchDialog(onDismissRequest = { creating = false; editing = null }, title = { Text(if (creating) "新建歌单" else "重命名歌单") }, text = { WatchSearchField(title, { title = it.take(50) }, "歌单名称") }, confirmButton = { TextButton({ if (creating) vm.createPlaylist(title.trim()) else vm.renamePlaylist(editing!!.directoryId, title.trim()); creating = false; editing = null }, enabled = title.isNotBlank()) { Text("保存") } }, dismissButton = { TextButton({ creating = false; editing = null }) { Text("取消") } })
     deleting?.let { playlist -> WatchDialog(onDismissRequest = { deleting = null }, title = { Text("删除歌单？") }, text = { Text("将从 QQ 音乐永久删除“${playlist.title}”，歌曲本身不会删除。") }, confirmButton = { TextButton({ vm.deletePlaylist(playlist.directoryId); deleting = null }) { Text("确认删除", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ deleting = null }) { Text("取消") } }) }
@@ -1153,19 +1164,21 @@ private fun decodeServerQrImage(value: String) = runCatching {
             }
         }
     }
-    actionDownload?.let { item ->
-        WatchDialog(
+    actionDownload?.let { download ->
+        WatchSelectionDialog(
             onDismissRequest = { actionDownload = null },
-            title = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    if (item.status in setOf("downloading", "queued", "queued_wifi")) WatchActionRow(Icons.Default.Pause, "暂停下载") { vm.pauseDownload(item.trackId); actionDownload = null }
-                    else if (item.status == "paused" || item.status == "locked" || item.status.startsWith("failed")) WatchActionRow(Icons.Default.PlayArrow, "继续下载", if (vm.accountId == item.ownerAccountId) WatchTextPrimary else WatchTextSecondary) { if (vm.accountId == item.ownerAccountId) vm.resumeDownload(item); actionDownload = null }
-                    WatchActionRow(Icons.Default.Delete, "删除缓存", MaterialTheme.colorScheme.error) { vm.deleteDownload(item.trackId, item.ownerAccountId); actionDownload = null }
+            title = download.title,
+        ) {
+            if (download.status in setOf("downloading", "queued", "queued_wifi")) item {
+                WatchActionRow(Icons.Default.Pause, "暂停下载") { vm.pauseDownload(download.trackId); actionDownload = null }
+            } else if (download.status == "paused" || download.status == "locked" || download.status.startsWith("failed")) item {
+                WatchActionRow(Icons.Default.PlayArrow, "继续下载", if (vm.accountId == download.ownerAccountId) WatchTextPrimary else WatchTextSecondary) {
+                    if (vm.accountId == download.ownerAccountId) vm.resumeDownload(download)
+                    actionDownload = null
                 }
-            },
-            confirmButton = { TextButton({ actionDownload = null }) { Text("关闭") } },
-        )
+            }
+            item { WatchActionRow(Icons.Default.Delete, "删除缓存", MaterialTheme.colorScheme.error) { vm.deleteDownload(download.trackId, download.ownerAccountId); actionDownload = null } }
+        }
     }
     if (confirmDeleteLocked) WatchDialog(onDismissRequest = { confirmDeleteLocked = false }, title = { Text("删除全部锁定缓存？") }, text = { Text("将永久删除其他账号的 ${locked.size} 首离线歌曲；歌曲名称和账号信息不会显示。") }, confirmButton = { TextButton({ vm.deleteLockedDownloads(); confirmDeleteLocked = false }) { Text("确认删除", color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ confirmDeleteLocked = false }) { Text("取消") } })
     deletingGroup?.let { group ->
@@ -1953,7 +1966,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
         ) {
             WatchIconButton(Icons.AutoMirrored.Filled.ArrowBack, "返回", Modifier.size(34.dp), onClick = onBack)
             AsyncImage(
-                model = detail?.tracks?.firstOrNull()?.artworkUrl?.let(::safeLocalOrArtworkUri)?.ifBlank { null },
+                model = rememberArtworkImageRequest(detail?.artworkUrl.orEmpty(), 128),
                 contentDescription = null,
                 modifier = Modifier.size(50.dp).clip(CircleShape).background(WatchSurface),
                 contentScale = ContentScale.Crop,
@@ -1961,7 +1974,7 @@ private fun decodeServerQrImage(value: String) = runCatching {
             Spacer(Modifier.width(7.dp))
             Column(Modifier.weight(1f)) {
                 Text(detail?.title ?: if (loading) "加载中" else "歌单详情", fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (detail != null) Text("${detail.tracks.size} 首", color = WatchTextSecondary, fontSize = 10.sp)
+                if (detail != null) Text(collectionCountLabel(detail.trackCount.takeIf { it >= 0 } ?: detail.tracks.size), color = WatchTextSecondary, fontSize = 10.sp)
                 Row {
                     detail?.tracks?.firstOrNull()?.let { first ->
                         WatchIconButton(Icons.Default.PlayArrow, "播放全部", Modifier.size(30.dp)) { vm.requestPlay(first, sourceQueue = detail.tracks) }
@@ -2394,7 +2407,7 @@ private fun formatFileSize(bytes: Long): String = when {
     else -> "${bytes / 1024} KB"
 }
 
-@Composable private fun WatchActionRow(
+@Composable internal fun WatchActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     tint: Color = WatchTextPrimary,
@@ -2442,46 +2455,39 @@ private fun formatFileSize(bytes: Long): String = when {
             WatchIconButton(Icons.Default.MoreVert, "更多") { menu = true }
         }
     }
-    if (menu) WatchDialog(
+    if (menu) WatchSelectionDialog(
         onDismissRequest = { menu = false },
-        title = { Text(track.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        text = {
-            Column {
-                WatchActionRow(if (effectiveLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, if (effectiveLiked) "取消喜欢" else "喜欢", if (effectiveLiked) WatchLike else WatchTextPrimary) {
-                    if (!likePending) {
-                        val target = !effectiveLiked
-                        selectedLike = target
-                        likePending = true
-                        vm.like(track, target) { success -> likePending = false; selectedLike = target.takeIf { success } }
-                    }
-                    menu = false
+        title = track.title,
+    ) {
+        item {
+            WatchActionRow(if (effectiveLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, if (effectiveLiked) "取消喜欢" else "喜欢", if (effectiveLiked) WatchLike else WatchTextPrimary) {
+                if (!likePending) {
+                    val target = !effectiveLiked
+                    selectedLike = target
+                    likePending = true
+                    vm.like(track, target) { success -> likePending = false; selectedLike = target.takeIf { success } }
                 }
-                WatchActionRow(Icons.Default.Download, "缓存歌曲") { vm.cache(track); menu = false }
-                WatchActionRow(Icons.Default.SkipNext, "下一首播放") { vm.enqueueNext(track); menu = false }
-                WatchActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "添加到播放列表") { vm.addToQueue(track); menu = false }
-                if (playlists.isNotEmpty()) WatchActionRow(Icons.Default.LibraryAdd, "加入我的歌单") { menu = false; choosePlaylist = true }
-                if (removeFromPlaylist && playlistId != null) WatchActionRow(Icons.Default.RemoveCircleOutline, "从此歌单移除", MaterialTheme.colorScheme.error) { vm.removeFromPlaylist(track, playlistId); menu = false }
+                menu = false
             }
-        },
-        confirmButton = { TextButton({ menu = false }) { Text("关闭") } },
-    )
-    if (choosePlaylist) WatchDialog(
+        }
+        item { WatchActionRow(Icons.Default.Download, "缓存歌曲") { vm.cache(track); menu = false } }
+        item { WatchActionRow(Icons.Default.SkipNext, "下一首播放") { vm.enqueueNext(track); menu = false } }
+        item { WatchActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "添加到播放列表") { vm.addToQueue(track); menu = false } }
+        if (playlists.isNotEmpty()) item { WatchActionRow(Icons.Default.LibraryAdd, "加入我的歌单") { menu = false; choosePlaylist = true } }
+        if (removeFromPlaylist && playlistId != null) item { WatchActionRow(Icons.Default.RemoveCircleOutline, "从此歌单移除", MaterialTheme.colorScheme.error) { vm.removeFromPlaylist(track, playlistId); menu = false } }
+    }
+    if (choosePlaylist) WatchSelectionDialog(
         onDismissRequest = { choosePlaylist = false },
-        title = { Text("加入歌单") },
-        text = {
-            WatchLazyColumn(Modifier.heightIn(max = 180.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items(playlists.filter { it.owned != false && it.directoryId != "201" }, key = { it.directoryId }) { playlist ->
-                    WatchListRow(
-                        title = playlist.title,
-                        subtitle = if (playlist.trackCount >= 0) "${playlist.trackCount} 首" else "我的歌单",
-                        onClick = { vm.addToPlaylist(track, playlist.directoryId); choosePlaylist = false },
-                    )
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton({ choosePlaylist = false }) { Text("取消") } },
-    )
+        title = "加入歌单",
+    ) {
+        items(playlists.filter { it.owned != false && it.directoryId != "201" }, key = { it.directoryId }) { playlist ->
+            WatchListRow(
+                title = playlist.title,
+                subtitle = if (playlist.trackCount >= 0) "${playlist.trackCount} 首" else "我的歌单",
+                onClick = { vm.addToPlaylist(track, playlist.directoryId); choosePlaylist = false },
+            )
+        }
+    }
 }
 
 @Composable private fun QueueScreen(queue: List<Track>, currentIndex: Int, reversed: Boolean, state: AppUiState, vm: AppViewModel, onBack: () -> Unit) {
@@ -2680,83 +2686,84 @@ private fun formatFileSize(bytes: Long): String = when {
             }
         }
     }
-    if (queueMenu) WatchDialog(
+    if (queueMenu) WatchSelectionDialog(
         onDismissRequest = { queueMenu = false },
-        title = { Text("播放列表操作", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                WatchActionRow(
-                    if (reversed) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
-                    if (reversed) "切换为正序" else "切换为倒序",
-                ) { vm.reverseQueue(); queueMenu = false }
-                WatchActionRow(Icons.Default.Download, "缓存全部") { vm.cacheAll(queue, "当前播放列表"); queueMenu = false }
-                WatchActionRow(Icons.Default.LibraryAdd, "选歌添加") { vm.clearQueueImport(); importDialog = true; queueMenu = false }
-                WatchActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "保存为歌单") { saveDialog = true; queueMenu = false }
-                WatchActionRow(Icons.Default.FilterAltOff, "移除重复歌曲") { vm.removeQueueDuplicates(); queueMenu = false }
-                WatchActionRow(Icons.Default.DeleteSweep, "清空播放列表", MaterialTheme.colorScheme.error) { vm.clearQueue(); queueMenu = false }
-            }
-        },
-        confirmButton = { TextButton({ queueMenu = false }) { Text("关闭") } },
-    )
+        title = "播放列表操作",
+    ) {
+        item { WatchActionRow(
+            if (reversed) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+            if (reversed) "切换为正序" else "切换为倒序",
+        ) { vm.reverseQueue(); queueMenu = false } }
+        item { WatchActionRow(Icons.Default.Download, "缓存全部") { vm.cacheAll(queue, "当前播放列表"); queueMenu = false } }
+        item { WatchActionRow(Icons.Default.LibraryAdd, "选歌添加") { vm.clearQueueImport(); importDialog = true; queueMenu = false } }
+        item { WatchActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "保存为歌单") { saveDialog = true; queueMenu = false } }
+        item { WatchActionRow(Icons.Default.FilterAltOff, "移除重复歌曲") { vm.removeQueueDuplicates(); queueMenu = false } }
+        item { WatchActionRow(Icons.Default.DeleteSweep, "清空播放列表", MaterialTheme.colorScheme.error) { vm.clearQueue(); queueMenu = false } }
+    }
     if (saveDialog) WatchDialog(onDismissRequest = { saveDialog = false }, title = { Text("保存为我的歌单") }, text = { WatchSearchField(playlistTitle, { playlistTitle = it.take(50) }, "歌单名称") }, confirmButton = { TextButton({ if (playlistTitle.isNotBlank()) vm.saveQueueAsPlaylist(playlistTitle); saveDialog = false }) { Text("保存") } }, dismissButton = { TextButton({ saveDialog = false }) { Text("取消") } })
-    if (importDialog) WatchDialog(
-        onDismissRequest = { importDialog = false; vm.clearQueueImport() },
-        title = { Text(state.queueImportTitle.ifBlank { "选择歌曲来源" }) },
-        text = {
-            when {
-                state.queueImportTitle.isBlank() -> WatchLazyColumn(Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    item {
-                        WatchListRow(
-                            title = "我喜欢",
-                            subtitle = "${library?.liked?.size ?: 0} 首",
-                            leading = { Icon(Icons.Default.Favorite, null, Modifier.align(Alignment.Center), tint = WatchLike) },
-                            onClick = vm::loadQueueImportLiked,
-                        )
-                    }
-                    items(library?.playlists.orEmpty(), key = { "${it.directoryId}:${it.id}" }) { playlist ->
-                        WatchListRow(
-                            title = playlist.title,
-                            subtitle = if (playlist.trackCount >= 0) "${playlist.trackCount} 首" else "点击读取",
-                            leading = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.align(Alignment.Center), tint = WatchAccent) },
-                            onClick = { vm.loadQueueImportPlaylist(playlist) },
-                        )
-                    }
-                }
-                state.queueImportLoading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                else -> Column {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("已选 ${selectedIds.size} 首", Modifier.weight(1f), color = WatchTextPrimary); TextButton({ if (selectedIds.size == state.queueImportTracks.size) selectedIds.clear() else { selectedIds.clear(); selectedIds.addAll(state.queueImportTracks.map(Track::id)) } }) { Text(if (selectedIds.size == state.queueImportTracks.size) "取消全选" else "全选") } }
-                    WatchLazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        items(state.queueImportTracks, key = { it.id }) { track ->
-                            val selected = track.id in selectedIds
-                            WatchListRow(
-                                title = track.title,
-                                subtitle = track.artists.joinToString(" / "),
-                                trailing = {
-                                    Checkbox(
-                                        selected,
-                                        { checked -> if (checked) selectedIds.add(track.id) else selectedIds.remove(track.id) },
-                                        Modifier.size(36.dp),
-                                    )
-                                },
-                                onClick = {
-                                    if (selected) selectedIds.remove(track.id) else selectedIds.add(track.id)
-                                },
-                            )
-                        }
-                    }
+    if (importDialog) WatchSelectionDialog(
+        onDismissRequest = { if (state.queueImportTitle.isBlank()) importDialog = false; vm.clearQueueImport() },
+        title = state.queueImportTitle.ifBlank { "选择歌曲来源" },
+        footer = {
+            if (state.queueImportTitle.isNotBlank() && !state.queueImportLoading) {
+                WatchPrimaryButton("添加 ${selectedIds.size} 首", Modifier.fillMaxWidth(), enabled = selectedIds.isNotEmpty()) {
+                    if (selectedIds.isNotEmpty()) { vm.addSelectedQueueTracks(selectedIds.toSet()); importDialog = false }
                 }
             }
         },
-        confirmButton = { if (state.queueImportTitle.isNotBlank() && !state.queueImportLoading) TextButton({ vm.addSelectedQueueTracks(selectedIds.toSet()); importDialog = false }, enabled = selectedIds.isNotEmpty()) { Text("添加 ${selectedIds.size} 首") } },
-        dismissButton = { TextButton({ if (state.queueImportTitle.isBlank()) { importDialog = false; vm.clearQueueImport() } else vm.clearQueueImport() }) { Text(if (state.queueImportTitle.isBlank()) "取消" else "返回") } },
-    )
+    ) {
+        when {
+            state.queueImportTitle.isBlank() -> {
+                item {
+                    WatchListRow(
+                        title = "我喜欢",
+                        subtitle = "${library?.liked?.size ?: 0} 首",
+                        leading = { Icon(Icons.Default.Favorite, null, Modifier.align(Alignment.Center), tint = WatchLike) },
+                        onClick = vm::loadQueueImportLiked,
+                    )
+                }
+                items(library?.playlists.orEmpty(), key = { "${it.directoryId}:${it.id}" }) { playlist ->
+                    WatchListRow(
+                        title = playlist.title,
+                        subtitle = collectionCountLabel(playlist.trackCount),
+                        leading = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.align(Alignment.Center), tint = WatchAccent) },
+                        onClick = { vm.loadQueueImportPlaylist(playlist) },
+                    )
+                }
+            }
+            state.queueImportLoading -> item { Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp)) } }
+            else -> {
+                item { WatchSelectionRow("全选 · 已选 ${selectedIds.size} 首", selectedIds.isNotEmpty() && selectedIds.size == state.queueImportTracks.size) {
+                    if (selectedIds.size == state.queueImportTracks.size) selectedIds.clear()
+                    else { selectedIds.clear(); selectedIds.addAll(state.queueImportTracks.map(Track::id)) }
+                } }
+                items(state.queueImportTracks, key = { it.id }) { track ->
+                    val selected = track.id in selectedIds
+                    WatchListRow(
+                        title = track.title,
+                        subtitle = track.artists.joinToString(" / "),
+                        trailing = {
+                            Checkbox(
+                                selected,
+                                { checked -> if (checked) selectedIds.add(track.id) else selectedIds.remove(track.id) },
+                                Modifier.size(36.dp),
+                            )
+                        },
+                        onClick = {
+                            if (selected) selectedIds.remove(track.id) else selectedIds.add(track.id)
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable private fun CollectionRow(value: MusicCollection, open: () -> Unit = {}) {
     val artwork = rememberArtworkImageRequest(value.artworkUrl, 96)
     WatchListRow(
         title = value.title,
-        subtitle = if (value.trackCount >= 0) "${value.trackCount} 首" else "点击查看",
+        subtitle = collectionCountLabel(value.trackCount),
         leading = {
             if (artwork != null) {
                 AsyncImage(
@@ -2781,7 +2788,6 @@ private fun formatFileSize(bytes: Long): String = when {
 @Composable private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) = WatchSectionHeader(text, action = action, onAction = onAction)
 @Composable private fun MiniPlayer(track: Track?, lyrics: List<LyricLine>, vm: AppViewModel, open: () -> Unit) {
     if (track == null) return
-    val dimensions = LocalWatchDimensions.current
     val artworkRequest = rememberArtworkImageRequest(track.artworkUrl, 96)
     var position by remember(track.id) { mutableLongStateOf(0L) }
     var playing by remember(track.id) { mutableStateOf(false) }
@@ -2797,67 +2803,9 @@ private fun formatFileSize(bytes: Long): String = when {
         ?: lyrics.indexOfFirst { it.timeMs >= 0 }.takeIf { it >= 0 }
         ?: lyrics.indexOfFirst { it.text.isNotBlank() }
     val preview = lyrics.getOrNull(previewIndex)?.text?.takeIf { it.isNotBlank() } ?: "正在播放"
-    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-        val round = dimensions.isRound
-        val miniModifier = if (round) {
-            // Keep the bar inside the lower chord of a round display. A full
-            // width surface puts its leading artwork in the masked corner.
-            Modifier.width(maxWidth * dimensions.miniPlayerWidthFraction)
-                .height(dimensions.miniPlayerHeight)
-        } else {
-            Modifier.fillMaxWidth().padding(horizontal = 6.dp)
-                .height(dimensions.miniPlayerHeight)
-        }
-        Surface(
-            modifier = miniModifier,
-            shape = if (round) RoundMiniPlayerShape else RoundedCornerShape(50),
-            color = WatchSurfaceRaised,
-            tonalElevation = 0.dp,
-        ) {
-            Row(
-                Modifier.fillMaxSize()
-                    .clickable(onClick = open)
-                    .padding(
-                        start = if (round) 12.dp else 6.dp,
-                        end = if (round) 8.dp else 1.dp,
-                        top = if (round) 4.dp else 2.dp,
-                        bottom = if (round) 12.dp else 2.dp,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AsyncImage(
-                    model = artworkRequest,
-                    contentDescription = "当前歌曲封面",
-                    modifier = Modifier.size(if (round) 29.dp else dimensions.artworkSize)
-                        .clip(CircleShape).background(WatchSurface),
-                    contentScale = ContentScale.Crop,
-                )
-                Spacer(Modifier.width(if (round) 5.dp else 7.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                    Text(
-                        track.title,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = if (round) 10.sp else dimensions.bodySp.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        preview,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = WatchTextSecondary,
-                        fontSize = if (round) 8.sp else dimensions.secondarySp.sp,
-                    )
-                }
-                WatchIconButton(
-                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    if (playing) "暂停" else "播放",
-                    modifier = Modifier.size(if (round) 29.dp else dimensions.touchTarget),
-                    containerColor = Color.Transparent,
-                ) {
-                    if (playing) vm.pausePlayback() else vm.resumePlayback()
-                }
-            }
-        }
-    }
+    WatchMiniPlayerContent(
+        title = track.title, preview = preview, artwork = artworkRequest, playing = playing,
+        onPlayPause = { if (playing) vm.pausePlayback() else vm.resumePlayback() },
+        onOpen = open,
+    )
 }

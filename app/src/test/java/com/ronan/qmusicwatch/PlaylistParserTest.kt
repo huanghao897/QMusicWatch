@@ -14,6 +14,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PlaylistParserTest {
+    @Test fun absentCountsRemainUnknownAndAnExplicitZeroIsNotOverwritten() {
+        val root = Json.parseToJsonElement("""{"v_playlist":[{"dirId":202,"tid":1001,"dirName":"未知"},{"dirId":203,"tid":1002,"dirName":"空歌单","songNum":0,"songnum":10}]}""")
+        assertEquals(listOf(-1, 0), parseAccountPlaylists(root).map(MusicCollection::trackCount))
+    }
+
     @Test fun validatesWritablePlaylistDirectoryIds() {
         assertEquals(201L, playlistDirectoryNumber("201"))
         org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { playlistDirectoryNumber("") }

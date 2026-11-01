@@ -44,6 +44,7 @@ private const val PLAYBACK_RECOVERY_NOTICE_TIMEOUT_MS = 65_000L
 data class AppUiState(
     val loading: Boolean = false, val sessionLoaded: Boolean = false, val message: String? = null, val home: HomeData? = null,
     val library: LibraryData? = null, val recent: List<Track> = emptyList(), val recentLoaded: Boolean = false,
+    val libraryLoading: Boolean = false, val libraryError: String? = null,
     val searchTracks: List<Track> = emptyList(),
     val searchCollections: List<MusicCollection> = emptyList(), val searchType: String = "track",
     val searchQuery: String = "", val searchCursor: String? = null, val searchLoading: Boolean = false,
@@ -206,6 +207,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var qualitySwitchJob: Job? = null
     private var searchJob: Job? = null
     private var detailJob: Job? = null
+    private var libraryJob: Job? = null
     private var detailRequest: Triple<String, MusicCollection, Boolean>? = null
     private var queueImportJob: Job? = null
     private var updateJob: Job? = null
@@ -602,10 +604,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             sessionRestoreJob?.cancel(); sessionRestoreJob = null
             if (!sessionReady.isCompleted) sessionReady.complete(Unit)
             searchJob?.cancel(); searchJob = null
+            libraryJob?.cancel(); libraryJob = null
             detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
             _state.update { s -> s.copy(
                 sessionLoaded = true, currentTrack = null, lyrics = emptyList(), playbackLoading = false,
-                home = null, library = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
+                home = null, library = null, libraryLoading = false, libraryError = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
                 detail = null, detailDirectoryId = null, detailLoading = false, detailError = null, offlineSnapshot = false,
                 pendingSpeakerTrack = null,
                 queueImportTitle = "", queueImportTracks = emptyList(), queueImportLoading = false, searchLoading = false,
@@ -632,6 +635,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchJob?.cancel(); searchJob = null; sessionGeneration++
         qrLoginJob?.cancel(); qrLoginJob = null
         detailJob?.cancel(); detailJob = null; queueImportJob?.cancel(); queueImportJob = null
+        libraryJob?.cancel(); libraryJob = null
         graph.playback.stopAndClear(); graph.vault.clear(); currentSession = null
         pendingQueue = null
         _queue.value = emptyList(); _queueIndex.value = -1; _queueReversed.value = false
@@ -643,7 +647,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (logoutGeneration == sessionGeneration) graph.settings.setProfileCache("")
         }
         _state.update { it.copy(
-            home = null, library = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
+            home = null, library = null, libraryLoading = false, libraryError = null, recent = emptyList(), recentLoaded = false, profile = null, profileLoaded = false, profileError = null,
             searchTracks = emptyList(), searchCollections = emptyList(), searchCursor = null, searchLoading = false,
             currentTrack = null, lyrics = emptyList(), playbackLoading = false, pendingSpeakerTrack = null,
             detail = null, detailDirectoryId = null, detailLoading = false, detailError = null,
@@ -653,22 +657,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         ) }
         loadHome()
     }
-    fun loadLibrary() = viewModelScope.launch {
-        sessionReady.await()
-        if (!signedIn) return@launch fail(IllegalStateException("请先登录"))
-        val generation = sessionGeneration
-        restoreAccountSnapshot()
-        if (generation != sessionGeneration) return@launch
-        runCatching { graph.api.library() }.onSuccess { rawValue ->
-            if (generation != sessionGeneration) return@onSuccess
-            val value = normalizeLibraryData(rawValue)
-            _state.update { it.copy(library = value, offlineSnapshot = false) }
-            cacheAccountSnapshot(library = value)
-        }.onFailure { error ->
-            if (generation != sessionGeneration) return@onFailure
-            if (_state.value.library != null) _state.update { it.copy(offlineSnapshot = true, message = "网络不可用，正在显示离线收藏与歌单") }
-            else fail(error)
-        }
+    fun loadLibrary(): Job {
+        libraryJob?.takeIf { it.isActive }?.let { return it }
+        return viewModelScope.launch {
+            sessionReady.await()
+            if (!signedIn) return@launch fail(IllegalStateException("请先登录"))
+            val generation = sessionGeneration
+            _state.update { it.copy(libraryLoading = true, libraryError = null) }
+            try {
+                restoreAccountSnapshot()
+                if (generation != sessionGeneration) return@launch
+                val value = normalizeLibraryData(graph.api.library())
+                if (generation != sessionGeneration) return@launch
+                _state.update { it.copy(library = value, libraryLoading = false, libraryError = null, offlineSnapshot = false) }
+                cacheAccountSnapshot(library = value)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                if (generation != sessionGeneration) return@launch
+                _state.update { it.copy(
+                    libraryLoading = false,
+                    libraryError = error.message?.takeIf(String::isNotBlank) ?: "歌单读取失败，请重试",
+                    offlineSnapshot = it.library != null,
+                ) }
+                AppLog.write("LIBRARY", "refresh failed ${error.javaClass.simpleName}")
+            }
+        }.also { libraryJob = it }
     }
 
     private suspend fun restoreAccountSnapshot() {
@@ -1189,7 +1203,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (generation != sessionGeneration) return@onSuccess
                 _state.update { state ->
                     if (detailRequest === sourceDetailRequest && state.detailDirectoryId == id) {
-                        state.copy(message = "已从歌单移除", detail = state.detail?.let { detail -> detail.copy(tracks = detail.tracks.filterNot { it.id == track.id }) })
+                        state.copy(message = "已从歌单移除", detail = state.detail?.let { detail ->
+                            val remaining = detail.tracks.filterNot { it.id == track.id }
+                            detail.copy(
+                                tracks = remaining,
+                                trackCount = if (detail.trackCount < 0) -1 else
+                                    (detail.trackCount - (detail.tracks.size - remaining.size)).coerceAtLeast(0),
+                            )
+                        })
                     } else state.copy(message = "已从歌单移除")
                 }
             }

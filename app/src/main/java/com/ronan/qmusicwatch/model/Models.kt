@@ -47,7 +47,12 @@ data class QualityResolution(
 )
 @Serializable data class CookieExchange(val provider: String, val cookie: String)
 @Serializable data class Ack(val accepted: Boolean)
-@Serializable data class CollectionDetail(val title: String, val tracks: List<Track>)
+@Serializable data class CollectionDetail(
+    val title: String,
+    val tracks: List<Track>,
+    val artworkUrl: String = "",
+    val trackCount: Int = -1,
+)
 @Serializable data class PlaybackSnapshot(
     val track: Track? = null, val queue: List<Track> = emptyList(), val positionMs: Long = 0,
     val queueReversed: Boolean = false,

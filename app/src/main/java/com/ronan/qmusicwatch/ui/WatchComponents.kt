@@ -5,6 +5,8 @@ import androidx.compose.foundation.BasicTooltipState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +58,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import com.ronan.qmusicwatch.input.RotaryInputKind
 
 internal fun watchLongClickAction(
     action: (() -> Unit)?,
@@ -171,15 +174,16 @@ fun WatchSectionHeader(
     onAction: () -> Unit = {},
 ) {
     val dimensions = LocalWatchDimensions.current
-    Box(
+    Row(
         modifier.fillMaxWidth()
-            .height(34.dp)
-            .padding(horizontal = if (dimensions.isRound) 22.dp else 0.dp),
-        contentAlignment = Alignment.Center,
+            .heightIn(min = 34.dp)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             title,
-            Modifier.padding(horizontal = if (action == null) 8.dp else 58.dp),
+            Modifier.weight(1f),
             color = WatchTextPrimary,
             fontSize = dimensions.titleSp.sp,
             fontWeight = FontWeight.SemiBold,
@@ -189,7 +193,6 @@ fun WatchSectionHeader(
         action?.let {
             Surface(
                 onClick = onAction,
-                modifier = Modifier.align(Alignment.CenterEnd),
                 shape = RoundedCornerShape(50),
                 color = WatchSurfaceRaised,
             ) {
@@ -198,6 +201,7 @@ fun WatchSectionHeader(
                     Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
                     color = WatchTextPrimary,
                     fontSize = (dimensions.secondarySp + 1f).sp,
+                    maxLines = 1,
                 )
             }
         }
@@ -252,11 +256,13 @@ fun WatchPrimaryButton(
     text: String,
     modifier: Modifier = Modifier,
     outlined: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val dimensions = LocalWatchDimensions.current
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(dimensions.touchTarget),
         shape = RoundedCornerShape(50),
         color = if (outlined) WatchSurface else WatchAccent,
@@ -306,7 +312,17 @@ fun WatchDialog(
                     ) {
                         icon?.invoke()
                         title?.let { Box(Modifier.fillMaxWidth()) { it() } }
-                        text?.let { Box(Modifier.fillMaxWidth().weight(1f, fill = false)) { it() } }
+                        text?.let { body ->
+                            val scrollState = rememberScrollState()
+                            val scroll = rememberWatchRotaryScroll(scrollState)
+                            val reversed = LocalWatchRotaryReversed.current
+                            val volumeKeysScroll = LocalVolumeKeysScroll.current
+                            WatchRotaryHandler { event ->
+                                if (event.kind == RotaryInputKind.VolumeKey && !volumeKeysScroll) false
+                                else { scroll(event.pixels * if (reversed) -1f else 1f); true }
+                            }
+                            Box(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(scrollState)) { body() }
+                        }
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
@@ -326,6 +342,7 @@ fun WatchDialog(
 fun WatchSelectionDialog(
     title: String,
     onDismissRequest: () -> Unit,
+    footer: (@Composable () -> Unit)? = null,
     content: LazyListScope.() -> Unit,
 ) {
     val dimensions = LocalWatchDimensions.current
@@ -338,45 +355,44 @@ fun WatchSelectionDialog(
                 Modifier.fillMaxSize().background(Color.Black.copy(alpha = .97f)),
             ) {
                 val horizontalInset = if (dimensions.isRound) maxWidth * .12f else dimensions.screenPadding
-                val topInset = if (dimensions.isRound) maxHeight * .21f else 42.dp
-                val bottomInset = if (dimensions.isRound) maxHeight * .12f else 8.dp
-                WatchLazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = horizontalInset,
-                        end = horizontalInset,
-                        top = topInset,
-                        bottom = bottomInset,
-                    ),
+                val topInset = if (dimensions.isRound) maxHeight * .12f else 6.dp
+                val bottomInset = if (dimensions.isRound) maxHeight * .18f else 8.dp
+                val headerWidth = if (dimensions.isRound) roundWatchContentWidth(
+                    WatchScreenBounds(maxWidth, maxHeight), topInset, topInset + dimensions.touchTarget,
+                ) else maxWidth - horizontalInset * 2
+                Column(
+                    Modifier.fillMaxSize().padding(start = horizontalInset, end = horizontalInset,
+                        top = topInset, bottom = bottomInset).imePadding(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
-                    content = content,
-                )
-                Text(
-                    text = title,
-                    modifier = Modifier.align(Alignment.TopCenter)
-                        .padding(
-                            top = if (dimensions.isRound) maxHeight * .055f else 9.dp,
-                            start = 42.dp,
-                            end = 42.dp,
-                        ),
-                    color = WatchTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                WatchIconButton(
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    modifier = Modifier.align(Alignment.TopStart)
-                        .padding(
-                            start = if (dimensions.isRound) maxWidth * .11f else 6.dp,
-                            top = if (dimensions.isRound) maxHeight * .07f else 5.dp,
+                ) {
+                    Row(Modifier.width(headerWidth).height(dimensions.touchTarget), verticalAlignment = Alignment.CenterVertically) {
+                        WatchIconButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                            containerColor = WatchSurface.copy(alpha = .82f),
+                            onClick = onDismissRequest,
                         )
-                        .size(30.dp),
-                    containerColor = WatchSurface.copy(alpha = .82f),
-                    onClick = onDismissRequest,
-                )
+                        Text(title, Modifier.weight(1f).padding(start = 4.dp), color = WatchTextPrimary,
+                            fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                        // On the smallest watches, a fixed action must not leave
+                        // less than one full row for selecting songs.
+                        val scrollFooter = footer != null && maxHeight < dimensions.touchTarget + 52.dp
+                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            WatchLazyColumn(
+                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                contentPadding = PaddingValues(vertical = 2.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                content()
+                                if (scrollFooter) item { footer?.invoke() }
+                            }
+                            if (!scrollFooter) footer?.invoke()
+                        }
+                    }
+                }
             }
         }
     }

@@ -302,7 +302,9 @@ internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
         }
     }
     fun JsonObject.text(name: String) = (this[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
-    fun JsonObject.number(name: String) = (this[name] as? JsonPrimitive)?.intOrNull ?: 0
+    fun JsonObject.number(vararg names: String) = names.firstNotNullOfOrNull {
+        (this[it] as? JsonPrimitive)?.intOrNull?.takeIf { value -> value >= 0 }
+    } ?: -1
     return objects(root).mapNotNull { (item, ownedHint) ->
         val dirId = item.text("dirId").ifBlank { item.text("dirid") }
         val id = item.text("tid").ifBlank { item.text("id") }.ifBlank { dirId }
@@ -310,7 +312,7 @@ internal fun parseAccountPlaylists(root: JsonElement): List<MusicCollection> {
         val owned = item.text("isOwn").ifBlank { item.text("is_self") }.toIntOrNull()?.let { it > 0 } ?: ownedHint
         if (dirId.isBlank() || id.isBlank() || title.isBlank()) null else MusicCollection(
             id, title, normalizeHttpsUrl(item.text("picUrl").ifBlank { item.text("picurl") }),
-            item.number("songNum").takeIf { it > 0 } ?: item.number("songnum"), dirId, owned,
+            item.number("songNum", "songnum", "song_count"), dirId, owned,
         )
     }.distinctBy { it.directoryId }.filterNot(::isSystemLikedPlaylist).toList()
 }
@@ -1000,7 +1002,7 @@ class ApiClient(
                     val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
                         ?: "${error.javaClass.simpleName}"
                     AppLog.write("LIBRARY", "favorite playlists unavailable $detail")
-                }.getOrDefault(emptyList())
+                }.getOrThrow()
             }
             val likedTask = async { likedTracks() }
             val playlists = playlistsTask.await()
@@ -1035,40 +1037,26 @@ class ApiClient(
             return api(
                 "music.musicasset.PlaylistFavRead", "GetPlaylistFavInfo",
                 obj("uin" to accountId()),
-            ).let(::parseFavoritePlaylists)
+            ).let { parseFavoritePlaylists(parseQqPlaylistPage(it).items) }
         }
 
-        val playlists = mutableListOf<MusicCollection>()
-        val directories = mutableSetOf<String>()
-        for (page in 0 until 20) {
-            val data = try {
+        var requestedOffset = 0
+        try {
+            return collectQqPlaylistPages { offset, size ->
+                requestedOffset = offset
                 api(
                     "music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo",
-                    obj("uin" to encryptedUin, "offset" to page * 100, "size" to 100),
+                    obj("uin" to encryptedUin, "offset" to offset, "size" to size),
                 )
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                if (page == 0 && error is QqBusinessException && error.businessCode == 80050) {
-                    AppLog.write("LIBRARY", "favorite playlists compatibility=unpaged")
-                    return api(
-                        "music.musicasset.PlaylistFavRead", "GetPlaylistFavInfo",
-                        obj("uin" to accountId()),
-                    ).let(::parseFavoritePlaylists)
-                }
-                if (playlists.isNotEmpty()) {
-                    val detail = (error as? QqBusinessException)?.let { "business_code=${it.businessCode}" }
-                        ?: error.javaClass.simpleName
-                    AppLog.write("LIBRARY", "favorite playlists partial $detail")
-                    return playlists
-                }
-                throw error
             }
-            val batch = parseFavoritePlaylists(data)
-            val previousSize = playlists.size
-            playlists += batch.filter { directories.add(it.directoryId) }
-            if (batch.size < 100 || playlists.size == previousSize) break
+        } catch (error: QqBusinessException) {
+            if (requestedOffset != 0 || error.businessCode != 80050) throw error
+            AppLog.write("LIBRARY", "favorite playlists compatibility=unpaged")
+            return api(
+                "music.musicasset.PlaylistFavRead", "GetPlaylistFavInfo",
+                obj("uin" to accountId()),
+            ).let { parseFavoritePlaylists(parseQqPlaylistPage(it).items) }
         }
-        return playlists
     }
 
     suspend fun profile(): UserProfile = withContext(Dispatchers.IO) {
@@ -1170,6 +1158,7 @@ class ApiClient(
 
     suspend fun collection(type: String, collection: MusicCollection): CollectionDetail = withContext(Dispatchers.IO) {
         var title = collection.title.ifBlank { "详情" }
+        var total: Int? = null
         val tracks = collectQqTrackPages(fetchPage = { begin, size ->
             val data = when (type) {
                 "album" -> api("music.musichallAlbum.AlbumSongList", "GetAlbumSongList", obj("albumMid" to collection.id, "begin" to begin, "num" to size, "order" to 2))
@@ -1187,10 +1176,16 @@ class ApiClient(
                     )
                 }
             }
-            if (begin == 0) title = walkObjects(data).firstNotNullOfOrNull { it.string("title").ifBlank { it.string("name") }.takeIf(String::isNotBlank) } ?: title
+            if (begin == 0) {
+                val directory = data["dirinfo"] as? JsonObject
+                title = directory?.string("title")?.takeIf(String::isNotBlank)
+                    ?: data.string("title").ifBlank { data.string("name") }.takeIf(String::isNotBlank) ?: title
+                total = parseQqTrackPage(data).total
+            }
             data
         }, parseTracks = ::findTracks)
-        CollectionDetail(title, tracks)
+        CollectionDetail(title, tracks, artworkUrl = collection.artworkUrl,
+            trackCount = total ?: maxOf(collection.trackCount, tracks.size))
     }
 
     suspend fun createPlaylist(title: String): MusicCollection = withContext(Dispatchers.IO) {
@@ -1751,7 +1746,9 @@ class ApiClient(
         if (!looksRight || id.isBlank() || title.isBlank()) null else MusicCollection(
             id, title,
             normalizeHttpsUrl(value.string("picUrl").ifBlank { value.string("picurl") }.ifBlank { value.string("pic") }),
-            value.int("songNum").takeIf { it > 0 } ?: value.int("songnum"),
+            listOf("songNum", "songnum", "song_count").firstNotNullOfOrNull {
+                (value[it] as? JsonPrimitive)?.intOrNull?.takeIf { count -> count >= 0 }
+            } ?: -1,
             directoryId.ifBlank { id },
         )
     }.distinctBy { it.id }.toList()
